@@ -73,7 +73,7 @@ export default function Timer() {
 					<TimerActionButtons onClickStart={handleStart} onClickPause={handlePause} onClickResume={handleResume} onClickDraft={handleDraft} onClickSave={handleSave} isRunning={isRunning} isPaused={isPaused} />
 				</Flex>
 				{/* Comment Field */}
-				<TimerCommentField setComment={setComment} comment={comment} />
+				<TimerCommentField setComment={setComment} comment={comment} isRunning={!isRunning} />
 			</Flex>
 		</Box>
 	);
