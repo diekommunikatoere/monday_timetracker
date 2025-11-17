@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabase/client";
 interface UseDraftAutoSaveProps {
 	comment: string;
 	userId: string;
-	enabled?: boolean;
 }
 
 export function useDraftAutoSave({ comment, userId }: UseDraftAutoSaveProps) {
@@ -26,7 +25,6 @@ export function useDraftAutoSave({ comment, userId }: UseDraftAutoSaveProps) {
 					await supabase.from("time_entry").insert({
 						user_id: userId,
 						comment,
-						task_name: "Unbenannter Zeiteintrag",
 						start_time: new Date().toISOString(),
 						is_draft: true,
 					});

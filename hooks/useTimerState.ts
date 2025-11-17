@@ -3,10 +3,23 @@ import mondaySdk from "monday-sdk-js";
 import { useMondayContext } from "@/hooks/useMondayContext";
 import { useCommentFieldState } from "@/hooks/useCommentFieldState";
 import type { Database } from "@/types/database";
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase/client";
 
 const monday = mondaySdk();
 
 type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
+
+interface RealTimeTimerSessionPayload {
+	schema: "public";
+	table: "timer_session";
+	commit_timestamp: string;
+	eventType: "INSERT" | "UPDATE" | "DELETE";
+	new: TimerSession | null;
+	old: TimerSession | null;
+	errors: string[] | null;
+	latency: number;
+}
 
 interface TimerState {
 	isRunning: boolean;
@@ -98,59 +111,89 @@ export function useTimerState(userId: string) {
 		loadTimerSession();
 	}, [userProfile]);
 
-	// Real-time subscription for cross-device sync via SSE
+	// Real-time subscription for cross-device sync using Supabase client
 	useEffect(() => {
 		if (!userProfile) return;
 
-		const eventSource = new EventSource(`/api/subscriptions/timer`);
-		eventSource.onmessage = async (event) => {
-			const payload = JSON.parse(event.data);
+		const currentSessionId = state.sessionId;
 
-			// Comprehensive event filtering
-			const shouldProcess = (() => {
-				switch (payload.eventType) {
-					case "INSERT":
-					case "UPDATE":
-						return payload.new?.user_id === userProfile.id;
+		const channel = supabase
+			.channel("timer-updates")
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "timer_session",
+				},
+				async (payload: RealTimeTimerSessionPayload) => {
+					// Filter out events from other users
+					const shouldProcess = (() => {
+						switch (payload.eventType) {
+							case "INSERT":
+							case "UPDATE":
+								return payload.new?.user_id === userProfile.id;
+							case "DELETE":
+								return payload.old?.id === state.sessionId;
+							default:
+								return false;
+						}
+					})();
 
-					case "DELETE":
-						// For DELETE events, check if this was our active session
-						return payload.old?.id === state.sessionId;
+					if (!shouldProcess) {
+						return;
+					}
 
-					default:
-						return false;
+					if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+						const newData = payload.new;
+
+						// Calculate elapsed time for running sessions
+						let calculatedElapsedTime = newData.elapsed_time || 0;
+						if (newData.is_running && !newData.is_paused) {
+							try {
+								const { data: currentSegment } = await supabase.from("timer_segment").select("start_time").eq("session_id", newData.id).eq("is_running", true).is("end_time", null).order("start_time", { ascending: false }).limit(1).single();
+
+								if (currentSegment) {
+									const segmentStartTime = new Date(currentSegment.start_time).getTime();
+									calculatedElapsedTime = newData.elapsed_time + (Date.now() - segmentStartTime);
+								}
+							} catch (error) {
+								console.error("Error calculating elapsed time:", error);
+							}
+						}
+
+						setState({
+							isRunning: newData.is_running,
+							elapsedTime: calculatedElapsedTime,
+							startTime: newData.start_time,
+							isPaused: newData.is_paused,
+							draftId: newData.draft_id,
+							sessionId: newData.id,
+						});
+					} else if (payload.eventType === "DELETE") {
+						// Reset state when our session is deleted
+						setState({
+							isRunning: false,
+							elapsedTime: 0,
+							startTime: null,
+							isPaused: false,
+							draftId: null,
+							sessionId: null,
+						});
+					}
 				}
-			})();
+			)
+			.subscribe((status, err) => {
+				console.log("Subscription status:", status);
+				if (err) {
+					console.error("Subscription error:", err);
+				}
+			});
 
-			if (!shouldProcess) {
-				return;
-			}
-
-			if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-				const newData = payload.new as TimerSession & { calculatedElapsedTime: number };
-
-				setState({
-					isRunning: newData.is_running,
-					elapsedTime: newData.calculatedElapsedTime,
-					startTime: newData.start_time,
-					isPaused: newData.is_paused,
-					draftId: newData.draft_id,
-					sessionId: newData.id,
-				});
-			} else if (payload.eventType === "DELETE") {
-				// Reset state when our session is deleted
-				setState({
-					isRunning: false,
-					elapsedTime: 0,
-					startTime: null,
-					isPaused: false,
-					draftId: null,
-					sessionId: null,
-				});
-			}
+		return () => {
+			console.log("Unsubscribing from timer-updates");
+			supabase.removeChannel(channel);
 		};
-
-		return () => eventSource.close();
 	}, [userProfile, state.sessionId]);
 
 	// Timer interval for counting elapsed time

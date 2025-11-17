@@ -1,20 +1,26 @@
 import { NextRequest } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server"; // Assuming this is your server-side client
-import { getMondayContext } from "@/lib/monday"; // Helper to extract monday.com context
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-	// Extract monday.com context for authentication
-	const context = await getMondayContext(request);
-	if (!context?.user?.id) {
+	if (!request) {
 		return new Response("Unauthorized", { status: 401 });
 	}
 
-	const userId = context.user.id;
+	const userId = request.nextUrl.searchParams.get("userId");
+	console.log("SSE connection initiated for userId:", userId);
+	if (!userId) {
+		return new Response("Unauthorized", { status: 401 });
+	}
 
 	// Set up SSE response
 	const responseStream = new ReadableStream({
-		start(controller) {
-			// Subscribe to Supabase real-time changes (e.g., for timer table)
+		async start(controller) {
+			console.log("Starting SSE stream for userId:", userId);
+
+			// Send initial connection message
+			controller.enqueue(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+			// Subscribe to Supabase real-time changes
 			const channel = supabaseAdmin
 				.channel("timer-updates")
 				.on(
@@ -23,9 +29,11 @@ export async function GET(request: NextRequest) {
 						event: "*",
 						schema: "public",
 						table: "timer_session",
-						filter: `user_id=eq.${userId}`, // Filter to user's data
+						filter: `user_id=eq.${userId}`, // Enable user-specific filtering
 					},
 					async (payload) => {
+						console.log("Received payload:", payload);
+
 						// Calculate elapsed time for running sessions
 						let calculatedElapsedTime = (payload.new as any)?.elapsed_time || 0;
 						if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
@@ -63,10 +71,20 @@ export async function GET(request: NextRequest) {
 						}
 					}
 				)
-				.subscribe();
+				.subscribe((status, err) => {
+					console.log("Subscription status:", status);
+					if (err) {
+						console.error("Subscription error:", err);
+						controller.enqueue(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`);
+					}
+					if (status === "SUBSCRIBED") {
+						console.log("Successfully subscribed to timer-updates channel");
+					}
+				});
 
 			// Handle client disconnect
 			request.signal.addEventListener("abort", () => {
+				console.log("SSE connection closed for userId:", userId);
 				supabaseAdmin.removeChannel(channel);
 				controller.close();
 			});

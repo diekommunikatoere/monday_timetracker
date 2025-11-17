@@ -7,7 +7,7 @@ import Reset from "@/components/icons/Reset";
 
 import "@/public/css/components/RunningTimerDisplay.css";
 
-export default function RunningTimerDisplay({ resetTimer, clearComment, isRunning, isPaused, elapsedTime, ...props }) {
+export default function RunningTimerDisplay({ resetTimer, clearComment, isRunning, isPaused, elapsedTime, isSaving, ...props }) {
 	const handleTimerReset = () => {
 		resetTimer();
 		clearComment();
@@ -20,7 +20,7 @@ export default function RunningTimerDisplay({ resetTimer, clearComment, isRunnin
 			<Text className={`timer-time${isRunning ? " active" : ""}${isPaused ? " paused" : ""}`} type="text1" weight="bold">
 				{formatTime(elapsedTime)}
 			</Text>
-			<Button className="btn-reset" onClick={handleTimerReset} kind="primary" size="small" ariaLabel="Timer zurücksetzen" disabled={!isRunning}>
+			<Button className="btn-reset" onClick={handleTimerReset} kind="primary" size="small" ariaLabel="Timer zurücksetzen" disabled={!isRunning || isSaving}>
 				{resetIcon}
 			</Button>
 		</Flex>
