@@ -34,32 +34,26 @@ export default function Timer() {
 	}, [draftId, setComment]);
 
 	const handleStart = () => {
-		console.log("Timer started");
 		startTimer();
 	};
 
 	const handlePause = () => {
-		console.log("Timer paused");
 		pauseTimer();
 	};
 
 	const handleResume = () => {
-		console.log("Timer resumed");
 		pauseTimer();
 	};
 
 	const handleDraft = () => {
-		console.log("Draft action triggered");
 		// Implement draft logic here
 	};
 
 	const handleSave = () => {
-		console.log("Save action triggered");
 		// Implement save logic here
 	};
 
 	const handleReset = () => {
-		console.log("Reset action triggered");
 		resetTimer();
 		/* clearComment(); */
 	};

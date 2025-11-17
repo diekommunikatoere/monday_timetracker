@@ -1,7 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { cacheHelper } from "@/lib/redis";
 import type { Database } from "@/types/database";
-import { useMondayContext } from "@/hooks/useMondayContext";
 
 type TimeEntry = Database["public"]["Tables"]["time_entry"]["Row"];
 type TimeEntryInsert = Database["public"]["Tables"]["time_entry"]["Insert"];
@@ -12,8 +11,6 @@ type TimerSegmentInsert = Database["public"]["Tables"]["timer_segment"]["Insert"
 
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_PREFIX = "time_entry:";
-
-const { getUserId } = useMondayContext();
 
 // Get all time entries
 export async function getAllTimeEntries(): Promise<TimeEntry[]> {
@@ -67,7 +64,7 @@ export async function getTimeEntryById(id: string): Promise<TimeEntry | null> {
 }
 
 // Insert time entry
-export async function insertTimeEntry(entry: TimeEntryInsert): Promise<TimeEntry> {
+export async function insertTimeEntry(entry: TimeEntryInsert, userId: string): Promise<TimeEntry> {
 	// Make sure user_id is provided
 	if (!entry.user_id) {
 		throw new Error("user_id is required to create a time entry");
@@ -86,7 +83,7 @@ export async function insertTimeEntry(entry: TimeEntryInsert): Promise<TimeEntry
 	return data;
 }
 // Delete time entry
-export async function deleteTimeEntry(id: string): Promise<void> {
+export async function deleteTimeEntry(id: string, userId: string): Promise<void> {
 	const { error } = await supabaseAdmin.from("time_entry").delete().eq("id", id);
 
 	if (error) {
@@ -111,11 +108,7 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
 	}
 
 	// Fetch from database
-	const { data, error } = await supabaseAdmin
-		.from("time_entry")
-		.select("*")
-		.eq("user_id", userId)
-		.order("created_at", { ascending: false });
+	const { data, error } = await supabaseAdmin.from("time_entry").select("*").eq("user_id", userId).order("created_at", { ascending: false });
 
 	if (error) {
 		console.error("Error fetching user time entries:", error);
@@ -131,12 +124,7 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
 
 // Get current timer session
 export async function getCurrentTimerSession(userId: string): Promise<TimerSession | null> {
-	const { data, error } = await supabaseAdmin
-		.from("timer_session")
-		.select("*")
-		.eq("user_id", userId)
-		.or("is_running.eq.true,is_paused.eq.true")
-		.single();
+	const { data, error } = await supabaseAdmin.from("timer_session").select("*").eq("user_id", userId).or("is_running.eq.true,is_paused.eq.true").single();
 
 	if (error && error.code !== "PGRST116") {
 		console.error("Error fetching timer session:", error);
@@ -147,7 +135,7 @@ export async function getCurrentTimerSession(userId: string): Promise<TimerSessi
 }
 
 // Upsert timer session (insert if not exists, update if exists based on user_id and active state)
-export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert>): Promise<TimerSession> {
+export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert>, userId: string): Promise<TimerSession> {
 	if (!sessionData.user_id) {
 		throw new Error("user_id is required");
 	}
@@ -162,11 +150,7 @@ export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert
 		draft_id: sessionData.draft_id,
 	} as TimerSessionInsert;
 
-	const { data, error } = await supabaseAdmin
-		.from("timer_session")
-		.upsert(insertData, { onConflict: "user_id" })
-		.select()
-		.single();
+	const { data, error } = await supabaseAdmin.from("timer_session").upsert(insertData, { onConflict: "user_id" }).select().single();
 
 	if (error) {
 		console.error("Error upserting timer session:", error);
@@ -178,21 +162,11 @@ export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert
 
 // Clear timer session by deleting draft (cascades)
 export async function clearTimerSession(userId: string): Promise<void> {
-	const { data: draft } = await supabaseAdmin
-		.from("time_entry")
-		.select("id")
-		.eq("user_id", userId)
-		.eq("is_draft", true)
-		.order("created_at", { ascending: false })
-		.limit(1)
-		.single();
+	const { data: draft } = await supabaseAdmin.from("time_entry").select("id").eq("user_id", userId).eq("is_draft", true).order("created_at", { ascending: false }).limit(1).single();
 
 	if (draft) {
 		// Delete the draft (this cascades to timer_session and timer_segments)
-		const { error } = await supabaseAdmin
-			.from("time_entry")
-			.delete()
-			.eq("id", draft.id);
+		const { error } = await supabaseAdmin.from("time_entry").delete().eq("id", draft.id);
 
 		if (error) {
 			console.error(`Error clearing timer session for user ${userId}:`, error);
@@ -248,13 +222,11 @@ export async function startTimer(userId: string) {
 		if (sessionError) throw sessionError;
 
 		// Create initial running timer_segment
-		const { error: segmentError } = await supabaseAdmin
-			.from("timer_segment")
-			.insert({
-				session_id: session.id,
-				start_time: now,
-				is_running: true,
-			});
+		const { error: segmentError } = await supabaseAdmin.from("timer_segment").insert({
+			session_id: session.id,
+			start_time: now,
+			is_running: true,
+		});
 
 		if (segmentError) throw segmentError;
 
@@ -277,12 +249,7 @@ export async function togglePause(userId: string, elapsedTime: number, isPausing
 	try {
 		if (isPausing) {
 			// End current running segment
-			const { error: endRunningError } = await supabaseAdmin
-				.from("timer_segment")
-				.update({ end_time: now })
-				.eq("session_id", session.id)
-				.is("end_time", null)
-				.eq("is_running", true);
+			const { error: endRunningError } = await supabaseAdmin.from("timer_segment").update({ end_time: now }).eq("session_id", session.id).is("end_time", null).eq("is_running", true);
 
 			if (endRunningError) throw endRunningError;
 
@@ -294,12 +261,7 @@ export async function togglePause(userId: string, elapsedTime: number, isPausing
 			});
 		} else {
 			// End current pause segment
-			const { error: endPauseError } = await supabaseAdmin
-				.from("timer_segment")
-				.update({ end_time: now })
-				.eq("session_id", session.id)
-				.is("end_time", null)
-				.eq("is_pause", true);
+			const { error: endPauseError } = await supabaseAdmin.from("timer_segment").update({ end_time: now }).eq("session_id", session.id).is("end_time", null).eq("is_pause", true);
 
 			if (endPauseError) throw endPauseError;
 
