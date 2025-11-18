@@ -1,4 +1,6 @@
-import { Modal, ModalBasicLayout, ModalHeader, ModalContent, ModalFooter } from "@vibe/core/next";
+import dynamic from "next/dynamic";
+const Modal = dynamic(() => import("@vibe/core/next").then((mod) => mod.Modal));
+import { ModalBasicLayout, ModalHeader, ModalContent, ModalFooter } from "@vibe/core/next";
 
 interface ManualTimeEntryModalProps {
 	show: boolean;

@@ -45,10 +45,10 @@ export type Database = {
           is_draft: boolean
           item_id: string | null
           role: string | null
-          start_time: string
+          start_time: string | null
           synced_to_monday: boolean
           task_name: string | null
-          timer_sessions: Json | null
+          timer_session: Json | null
           updated_at: string
           user_id: string
         }
@@ -62,10 +62,10 @@ export type Database = {
           is_draft?: boolean
           item_id?: string | null
           role?: string | null
-          start_time: string
+          start_time?: string | null
           synced_to_monday?: boolean
           task_name?: string | null
-          timer_sessions?: Json | null
+          timer_session?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -79,10 +79,10 @@ export type Database = {
           is_draft?: boolean
           item_id?: string | null
           role?: string | null
-          start_time?: string
+          start_time?: string | null
           synced_to_monday?: boolean
           task_name?: string | null
-          timer_sessions?: Json | null
+          timer_session?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -99,28 +99,25 @@ export type Database = {
       timer_segment: {
         Row: {
           created_at: string
+          duration: number | null
           end_time: string | null
           id: string
-          is_pause: boolean
-          is_running: boolean
           session_id: string
           start_time: string
         }
         Insert: {
           created_at?: string
+          duration?: number | null
           end_time?: string | null
           id?: string
-          is_pause?: boolean
-          is_running?: boolean
           session_id: string
           start_time: string
         }
         Update: {
           created_at?: string
+          duration?: number | null
           end_time?: string | null
           id?: string
-          is_pause?: boolean
-          is_running?: boolean
           session_id?: string
           start_time?: string
         }
@@ -141,7 +138,6 @@ export type Database = {
           elapsed_time: number
           id: string
           is_paused: boolean
-          is_running: boolean
           start_time: string
           timer_segments: Json | null
           updated_at: string
@@ -153,7 +149,6 @@ export type Database = {
           elapsed_time?: number
           id?: string
           is_paused?: boolean
-          is_running?: boolean
           start_time: string
           timer_segments?: Json | null
           updated_at?: string
@@ -165,7 +160,6 @@ export type Database = {
           elapsed_time?: number
           id?: string
           is_paused?: boolean
-          is_running?: boolean
           start_time?: string
           timer_segments?: Json | null
           updated_at?: string
@@ -223,7 +217,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      finalize_draft: {
+        Args: {
+          p_comment: string
+          p_draft_id: string
+          p_task_name: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      finalize_segment: { Args: { p_session_id: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

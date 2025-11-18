@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useToast } from "@/components/ToastProvider";
 
 interface UseDraftAutoSaveProps {
 	comment: string;
 	userId: string;
+	sessionId?: string;
 }
 
-export function useDraftAutoSave({ comment, userId }: UseDraftAutoSaveProps) {
+export function useDraftAutoSave({ comment, userId, sessionId }: UseDraftAutoSaveProps) {
+	const { showToast } = useToast();
+	const [isSaving, setIsSaving] = useState(false);
+
 	const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
 	useEffect(() => {
@@ -15,19 +20,32 @@ export function useDraftAutoSave({ comment, userId }: UseDraftAutoSaveProps) {
 		debounceRef.current = setTimeout(async () => {
 			try {
 				// Check for existing draft (but don't create if comment is empty and no draft exists)
-				const { data: existingDraft } = await supabase.from("time_entry").select("id").eq("user_id", userId).eq("is_draft", true).single();
+				// Select draft from draft_id in session entry if available
+				const { data: session } = await supabase.from("timer_session").select("draft_id").eq("id", sessionId).single();
+				const draftId = session?.draft_id;
 
-				if (existingDraft) {
-					// Update existing draft
-					await supabase.from("time_entry").update({ comment }).eq("id", existingDraft.id);
-				} else if (comment.trim()) {
-					// Only create new draft if there's actual content
-					await supabase.from("time_entry").insert({
-						user_id: userId,
-						comment,
-						start_time: new Date().toISOString(),
-						is_draft: true,
-					});
+				if (draftId) {
+					const { data: existingDraft, error } = await supabase.from("time_entry").select("*").eq("id", draftId).single();
+
+					if (error) throw error;
+
+					console.log("Auto-saving draft:", { comment, existingDraft });
+
+					if (existingDraft) {
+						// Update existing draft
+						await supabase.from("time_entry").update({ comment }).eq("id", existingDraft.id);
+						setIsSaving(true);
+					} else if (comment.trim()) {
+						// Only create new draft if there's actual content
+						await supabase.from("time_entry").insert({
+							user_id: userId,
+							comment,
+							start_time: new Date().toISOString(),
+							is_draft: true,
+						});
+						setIsSaving(true);
+					}
+					setIsSaving(false);
 				}
 			} catch (error) {
 				console.error("Error auto-saving draft:", error);

@@ -1,13 +1,23 @@
+// app/dashboard/page.tsx
 "use client";
 
 import { Logo } from "@/components/Logo";
 import AppHeader from "@/components/AppHeader";
-import { TimeEntry } from "@/types/time-entry";
+import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
+import { useTimeEntries } from "@/hooks/useTimeEntries";
+import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
 
 export default function DashboardPage() {
+	const { timeEntries, loading, error, refetch } = useTimeEntries();
+
 	return (
-		<div id="dashboard-app">
-			<AppHeader variant="dashboard" />
-		</div>
+		<TimeEntriesProvider refetch={refetch}>
+			<div id="dashboard-app">
+				<AppHeader variant="dashboard" />
+				<main>
+					<TimeEntriesTable timeEntries={timeEntries} loading={loading} error={error} onRefetch={refetch} />
+				</main>
+			</div>
+		</TimeEntriesProvider>
 	);
 }

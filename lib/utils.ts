@@ -1,31 +1,30 @@
 /**
- * Format milliseconds into a human-readable duration string
- * @param milliseconds - Duration in milliseconds
- * @returns Human-readable duration string (e.g., "2 hours, 30 minutes")
+ * Format seconds into a human-readable duration string
+ * @param seconds - Duration in seconds (canonical DB/app unit)
+ * @returns Human-readable duration string (e.g., "2 h 30 m")
  */
-export function formatDuration(milliseconds: number): string {
-	const seconds = Math.floor(milliseconds / 1000);
+export function formatDuration(seconds: number): string {
 	const minutes = Math.floor(seconds / 60);
 	const hours = Math.floor(minutes / 60);
 
 	const remainingMinutes = minutes % 60;
 	const remainingSeconds = seconds % 60;
 
-	const parts = [];
+	const parts: string[] = [];
 
 	if (hours > 0) {
-		parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
+		parts.push(`${hours} h`);
 	}
 
 	if (remainingMinutes > 0) {
-		parts.push(`${remainingMinutes} minute${remainingMinutes !== 1 ? "s" : ""}`);
+		parts.push(`${remainingMinutes} m`);
 	}
 
 	if (remainingSeconds > 0 && hours === 0 && remainingMinutes === 0) {
-		parts.push(`${remainingSeconds} second${remainingSeconds !== 1 ? "s" : ""}`);
+		parts.push(`${remainingSeconds} s`);
 	}
 
-	return parts.join(", ") || "0 seconds";
+	return parts.join(" ") || "0 s";
 }
 
 /**
@@ -45,18 +44,31 @@ export function formatTimestamp(isoString: string): string {
 }
 
 /**
- * Format milliseconds to a simple time string (HH:MM:SS)
- * @param milliseconds - Duration in milliseconds
+ * Format seconds to a simple time string (HH:MM:SS)
+ * @param seconds - Duration in seconds
  * @returns Time string in HH:MM:SS format
  */
-export function formatTime(milliseconds: number): string {
-	const seconds = Math.floor(milliseconds / 1000);
-	const minutes = Math.floor(seconds / 60);
-	const hours = Math.floor(minutes / 60);
+export function formatTime(seconds: number): string {
+	const convertedSeconds = seconds / 1000;
+	const hours = Math.floor(convertedSeconds / 3600);
+	const minutes = Math.floor((convertedSeconds % 3600) / 60);
+	const remainingSeconds = Math.floor(convertedSeconds % 60);
 
 	const formattedHours = hours.toString().padStart(2, "0");
-	const formattedMinutes = (minutes % 60).toString().padStart(2, "0");
-	const formattedSeconds = (seconds % 60).toString().padStart(2, "0");
+	const formattedMinutes = minutes.toString().padStart(2, "0");
+	const formattedSeconds = remainingSeconds.toString().padStart(2, "0");
 
 	return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
 }
+
+/**
+ *
+ * - only create segments when timer is running
+ * - when pausing, close current segment and don't create a new segment
+ * - when resuming, create a new running segment
+ * - reset logic stays the same
+ * - add duration column to timer_segment table
+ * - save duration when closing a segment to the segment record
+ * - when calculating elapsed time, sum up durations from segments
+ *
+ *  */

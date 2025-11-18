@@ -1,0 +1,16 @@
+.toast-notification {
+	/* bottom: 20px;
+	right: 20px;
+	z-index: 1000;
+	padding: 16px 24px;
+	border-radius: 4px;
+	color: var(--color--text-primary);
+	background-color: var(--color--background-primary);
+	font-size: 14px;
+	box-shadow: var(--box-shadow-medium); */
+
+	&.toast-positive {
+		background-color: var(--color--background-success);
+		color: var(--color--text-on-primary);
+	}
+}

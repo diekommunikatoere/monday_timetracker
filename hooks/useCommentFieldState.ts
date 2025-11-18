@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useDraftAutoSave } from "./useDraftAutoSave";
 import { useMondayContext } from "./useMondayContext";
+import { useDraftAutoSave } from "./useDraftAutoSave";
 
-export function useCommentFieldState(initialValue: string = "") {
+export function useCommentFieldState(initialValue: string = "", sessionId) {
 	const [comment, setComment] = useState(initialValue);
 	const { getUserId } = useMondayContext();
 
 	// Auto-save draft when comment changes
-	useDraftAutoSave({ comment, userId: getUserId() });
+	useDraftAutoSave({ comment, userId: getUserId(), sessionId });
 
 	const clearComment = () => setComment("");
 

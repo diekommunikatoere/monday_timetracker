@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
 			`
 			)
 			.eq("user_id", userId.id)
-			.or("is_running.eq.true,is_paused.eq.true")
 			.single();
 
 		if (sessionError && sessionError.code !== "PGRST116") {
@@ -34,8 +33,8 @@ export async function GET(request: NextRequest) {
 			let calculatedElapsedTime = session.elapsed_time;
 
 			// If timer is currently running, calculate real elapsed time
-			if (session.is_running && !session.is_paused) {
-				const { data: currentSegment } = await supabaseAdmin.from("timer_segment").select("start_time").eq("session_id", session.id).eq("is_running", true).is("end_time", null).order("start_time", { ascending: false }).limit(1).single();
+			if (session.id && !session.is_paused) {
+				const { data: currentSegment } = await supabaseAdmin.from("timer_segment").select("start_time").eq("session_id", session.id).is("end_time", null).order("start_time", { ascending: false }).limit(1).single();
 
 				if (currentSegment) {
 					const segmentStartTime = new Date(currentSegment.start_time).getTime();

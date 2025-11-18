@@ -79,6 +79,7 @@ export async function insertTimeEntry(entry: TimeEntryInsert, userId: string): P
 
 	// Invalidate cache
 	await cacheHelper.clearPattern(`${CACHE_PREFIX}*`);
+	await cacheHelper.del(`${CACHE_PREFIX}all`);
 
 	return data;
 }
@@ -98,6 +99,8 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 
 // Get time entries for a specific user
 export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
+	console.log(`Fetching time entries for userId: ${userId}`);
+
 	const cacheKey = `${CACHE_PREFIX}user:${userId}`;
 
 	// Try cache first
@@ -109,6 +112,7 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
 
 	// Fetch from database
 	const { data, error } = await supabaseAdmin.from("time_entry").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+	console.log(`Fetched user time entries for userId: ${userId}`, data);
 
 	if (error) {
 		console.error("Error fetching user time entries:", error);
@@ -124,7 +128,7 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
 
 // Get current timer session
 export async function getCurrentTimerSession(userId: string): Promise<TimerSession | null> {
-	const { data, error } = await supabaseAdmin.from("timer_session").select("*").eq("user_id", userId).or("is_running.eq.true,is_paused.eq.true").single();
+	const { data, error } = await supabaseAdmin.from("timer_session").select("*").eq("user_id", userId).single();
 
 	if (error && error.code !== "PGRST116") {
 		console.error("Error fetching timer session:", error);
@@ -140,12 +144,13 @@ export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert
 		throw new Error("user_id is required");
 	}
 
+	console.log("Upserting timer session with data:", sessionData);
+
 	// Ensure required fields for insert
 	const insertData = {
 		user_id: sessionData.user_id,
 		start_time: sessionData.start_time || new Date().toISOString(),
 		elapsed_time: sessionData.elapsed_time || 0,
-		is_running: sessionData.is_running ?? false,
 		is_paused: sessionData.is_paused ?? false,
 		draft_id: sessionData.draft_id,
 	} as TimerSessionInsert;
@@ -213,7 +218,6 @@ export async function startTimer(userId: string) {
 				user_id: userId,
 				draft_id: draft.id,
 				start_time: now,
-				is_running: true,
 				elapsed_time: 0,
 			})
 			.select()
@@ -225,7 +229,7 @@ export async function startTimer(userId: string) {
 		const { error: segmentError } = await supabaseAdmin.from("timer_segment").insert({
 			session_id: session.id,
 			start_time: now,
-			is_running: true,
+			// end_time/duration null implicit, no flags needed
 		});
 
 		if (segmentError) throw segmentError;
@@ -237,59 +241,90 @@ export async function startTimer(userId: string) {
 	}
 }
 
-// Toggle pause/resume: Handle segments and session update
-export async function togglePause(userId: string, elapsedTime: number, isPausing: boolean) {
-	const session = await getCurrentTimerSession(userId);
-	if (!session) {
-		throw new Error("No active session found");
+export async function startRunningSegment(sessionId: string, userId: string) {
+	console.log("Starting running segment for session:", sessionId);
+	// Verify session ownership
+	const { data: session, error: sessionError } = await supabaseAdmin.from("timer_session").select("id").eq("id", sessionId).eq("user_id", userId).single();
+
+	if (sessionError || !session) {
+		throw new Error("Timer session not found or access denied");
 	}
 
 	const now = new Date().toISOString();
 
-	try {
-		if (isPausing) {
-			// End current running segment
-			const { error: endRunningError } = await supabaseAdmin.from("timer_segment").update({ end_time: now }).eq("session_id", session.id).is("end_time", null).eq("is_running", true);
+	const { data, error } = await supabaseAdmin
+		.from("timer_segment")
+		.insert({
+			session_id: sessionId,
+			start_time: now,
+			// end_time/duration null implicit, no flags needed
+		})
+		.select("id")
+		.single();
 
-			if (endRunningError) throw endRunningError;
-
-			// Create pause segment
-			await supabaseAdmin.from("timer_segment").insert({
-				session_id: session.id,
-				start_time: now,
-				is_pause: true,
-			});
-		} else {
-			// End current pause segment
-			const { error: endPauseError } = await supabaseAdmin.from("timer_segment").update({ end_time: now }).eq("session_id", session.id).is("end_time", null).eq("is_pause", true);
-
-			if (endPauseError) throw endPauseError;
-
-			// Create running segment
-			await supabaseAdmin.from("timer_segment").insert({
-				session_id: session.id,
-				start_time: now,
-				is_running: true,
-			});
-		}
-
-		// Update session
-		const { data: updatedSession, error: sessionError } = await supabaseAdmin
-			.from("timer_session")
-			.update({
-				is_running: !isPausing,
-				is_paused: isPausing,
-				elapsed_time: elapsedTime,
-			})
-			.eq("id", session.id)
-			.select()
-			.single();
-
-		if (sessionError) throw sessionError;
-
-		return updatedSession;
-	} catch (error) {
-		console.error("Error toggling pause:", error);
+	if (error) {
+		console.error("Error starting running segment:", error);
 		throw error;
 	}
+
+	return data;
+}
+
+export async function pauseTimer(sessionId: string, userId: string) {
+	console.log("Pausing timer for session:", sessionId);
+	// Call RPC to finalize open segment(s)
+	const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc("finalize_segment", { p_session_id: sessionId });
+
+	if (rpcError || !rpcResult) {
+		console.error("Error finalizing segment:", rpcError);
+		throw new Error("Failed to finalize timer segment");
+	}
+
+	console.log("Segment finalized, RPC result:", rpcResult);
+
+	// Update session flags and elapsed time in one operation
+	const { error: sessionUpdateError } = await supabaseAdmin
+		.from("timer_session")
+		.update({
+			is_paused: true,
+			elapsed_time: rpcResult.elapsed_time_ms, // Use RPC result to avoid separate updates
+		})
+		.eq("id", sessionId)
+		.eq("user_id", userId);
+
+	if (sessionUpdateError) {
+		console.error("Error updating session pause state:", sessionUpdateError);
+		throw sessionUpdateError;
+	}
+
+	return rpcResult;
+}
+
+export async function resumeTimer(sessionId: string, userId: string) {
+	console.log("Resuming timer for session:", sessionId);
+	// Verify session ownership
+	const { data: session, error: sessionError } = await supabaseAdmin.from("timer_session").select("id").eq("id", sessionId).eq("user_id", userId).single();
+
+	if (sessionError || !session) {
+		throw new Error("Timer session not found or access denied");
+	}
+
+	// Start new running segment
+	await startRunningSegment(sessionId, userId);
+
+	// Update session flags to reflect resume (elapsed_time will be updated via real-time or API if needed)
+	const { error: sessionUpdateError } = await supabaseAdmin
+		.from("timer_session")
+		.update({
+			is_paused: false,
+		})
+		.eq("id", sessionId)
+		.eq("user_id", userId);
+
+	if (sessionUpdateError) {
+		console.error("Error updating session resume state:", sessionUpdateError);
+		throw sessionUpdateError;
+	}
+
+	return { message: "Timer resumed successfully" };
 }
