@@ -1,92 +1,87 @@
+// hooks/useMondayContext.ts
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import mondaySdk from "monday-sdk-js";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+import { supabase } from "@/lib/supabase/client";
+import { useHydration } from "@/lib/store-utils";
+import type { MondayContext } from "@/types/monday";
+import type { Database } from "@/types/database";
 
 const monday = mondaySdk();
 
-interface MondayUser {
-	id: string;
-	name: string;
-	email: string;
-	account_id: string;
+type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
+
+interface UseMondayContextReturn {
+	rawContext: MondayContext | null;
+	mondayUser: MondayContext["user"] | null;
+	userProfile: UserProfile | null;
+	loading: boolean;
+	error: string | null;
 }
 
-interface UserProfile {
-	id: string;
-	monday_user_id: string;
-	monday_account_id: string;
-	email: string | null;
-	name: string | null;
-}
+export function useMondayContext(): UseMondayContextReturn {
+	const hydrated = useHydration();
+	const rawContext = useMondayStore((state) => (hydrated ? state.rawContext : null));
+	const setRawContext = useMondayStore((state) => state.setRawContext);
+	const userProfile = useUserStore((state) => (hydrated ? state.supabaseUser : null));
+	const setUserProfile = useUserStore((state) => state.setSupabaseUser);
 
-export function useMondayContext() {
-	const [isLoading, setIsLoading] = useState(true);
-	const [mondayUser, setMondayUser] = useState<MondayUser | null>(null);
-	const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [rawContext, setRawContext] = useState<any>(null);
 
+	// Load monday context on mount
 	useEffect(() => {
-		async function initializeMondayUser() {
+		if (!hydrated) return;
+
+		const loadContext = async () => {
 			try {
-				// Get current user from Monday.com SDK
+				setLoading(true);
+				setError(null);
+
+				// Get monday.com context
 				const context = await monday.get("context");
-				const user = await monday.api(`query { me { id name email } }`);
+				setRawContext(context.data as MondayContext);
 
-				if (!context?.data.user) {
-					throw new Error("No user found in Monday.com context");
+				// Fetch user profile from Supabase
+				const mondayUserId = (context.data as MondayContext).user.id;
+				const { data: profile, error: profileError } = await supabase.from("user_profiles").select("*").eq("monday_user_id", mondayUserId).single();
+
+				if (profileError) {
+					// User might not exist yet - this is normal for first-time users
+					console.warn("User profile not found:", profileError);
+					setUserProfile(null);
+				} else {
+					setUserProfile(profile);
 				}
-
-				setRawContext(context);
-
-				const mondayUserData: MondayUser = {
-					id: context.data.user.id,
-					name: user.data.me.name,
-					email: user.data.me.email,
-					account_id: context.data.account.id,
-				};
-
-				setMondayUser(mondayUserData);
-
-				// Find or create user in our database
-				const response = await fetch("/api/auth/monday-user", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						mondayUserId: mondayUserData.id,
-						mondayAccountId: mondayUserData.account_id,
-						email: mondayUserData.email,
-						name: mondayUserData.name,
-					}),
-				});
-
-				if (!response.ok) {
-					throw new Error("Failed to authenticate user");
-				}
-
-				const data = await response.json();
-				setUserProfile(data.user);
-				setIsLoading(false);
-			} catch (err) {
-				console.error("Error initializing Monday user:", err);
-				setError(err instanceof Error ? err.message : "Unknown error");
-				setIsLoading(false);
+			} catch (err: any) {
+				console.error("Failed to load monday context:", err);
+				setError(err.message || "Failed to load monday context");
+			} finally {
+				setLoading(false);
 			}
-		}
+		};
 
-		initializeMondayUser();
-	}, []);
+		loadContext();
+	}, [hydrated, setRawContext, setUserProfile]);
+
+	if (!hydrated) {
+		return {
+			rawContext: null,
+			mondayUser: null,
+			userProfile: null,
+			loading: true,
+			error: null,
+		};
+	}
 
 	return {
-		isLoading,
-		mondayUser,
-		userProfile,
-		error,
 		rawContext,
-		// Helper to get the Supabase user ID for database operations
-		getUserId: () => userProfile?.id || null,
+		mondayUser: rawContext?.user || null,
+		userProfile,
+		loading,
+		error,
 	};
 }

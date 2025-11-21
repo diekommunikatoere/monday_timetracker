@@ -1,10 +1,12 @@
+"use client";
+
 import { useState, useEffect, useMemo } from "react";
-import { useMondayContext } from "@/hooks/useMondayContext";
-import { useTimerState } from "@/hooks/useTimerState";
+import { useUserStore } from "@/stores/userStore";
+import { useTimerStore } from "@/stores/timerStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, Checkbox } from "@vibe/core";
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
-import { title } from "process";
 
 interface TimeEntriesTableProps {
 	timeEntries: TimeEntry[];
@@ -13,10 +15,12 @@ interface TimeEntriesTableProps {
 	onRefetch: () => void;
 }
 
-export default function TimeEntriesTable({ timeEntries, loading, error, onRefetch }: TimeEntriesTableProps) {
+export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
+	const { timeEntries, setTimeEntries, fetchTimeEntries, loading, error } = useTimeEntriesStore();
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const { elapsedTime, startTimer, pauseTimer, resetTimer, softResetTimer, isRunning, isPaused, draftId, sessionId } = useTimerState();
-	const userId = useMondayContext().getUserId();
+	const { elapsedTime, startTimer, pauseTimer, resetTimer, softResetTimer, isPaused, draftId, sessionId } = useTimerStore();
+
+	const userId = useUserStore((state) => state.supabaseUser?.id);
 
 	const columns = [
 		{
@@ -97,13 +101,13 @@ export default function TimeEntriesTable({ timeEntries, loading, error, onRefetc
 		}
 	};
 
-	if (loading) {
+	/* if (loading) {
 		return <div>Loading time entries...</div>;
 	}
 
 	if (error) {
 		return <div>Error: {error}</div>;
-	}
+	} */
 
 	return (
 		<Table columns={columns} emptyState={<h1 style={{ textAlign: "center" }}>Empty State</h1>} errorState={<h1 style={{ textAlign: "center" }}>Error State</h1>} id="time-entries-table">

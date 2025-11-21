@@ -34,6 +34,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      role: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       time_entry: {
         Row: {
           board_id: string | null
@@ -217,6 +241,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_default_roles: { Args: never; Returns: undefined }
       finalize_draft: {
         Args: {
           p_comment: string
@@ -229,8 +254,11 @@ export type Database = {
       finalize_segment: { Args: { p_session_id: string }; Returns: Json }
       finalize_time_entry: {
         Args: {
+          p_board_id?: string
           p_comment: string
           p_draft_id: string
+          p_item_id?: string
+          p_role?: string
           p_task_name: string
           p_user_id: string
         }

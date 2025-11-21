@@ -1,62 +1,28 @@
+// components/Timer.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useMondayContext } from "@/hooks/useMondayContext";
-import { useTimerState } from "@/hooks/useTimerState";
-import { useCommentFieldState } from "@/hooks/useCommentFieldState";
-import { useDraftManualSave } from "@/hooks/useDraftManualSave";
-import { useTimeEntriesRefetch } from "@/contexts/TimeEntriesContext";
-import { supabase } from "@/lib/supabase/client";
+import { useTimerStore } from "@/stores/timerStore";
+import { useDraftStore } from "@/stores/draftStore";
+import { useUserStore } from "@/stores/userStore";
+import { useTimerStateSSR } from "@/hooks/useTimerState";
 import { Box, Flex } from "@vibe/core";
 import RunningTimerDisplay from "@/components/RunningTimerDisplay";
 import TimerActionButtons from "@/components/TimerActionButtons";
 import TimerCommentField from "@/components/TimerCommentField";
-import { is } from "drizzle-orm";
 
 export default function Timer({ onSave }: { onSave: () => void }) {
-	const refetch = useTimeEntriesRefetch();
-	const { getUserId } = useMondayContext();
-	const { elapsedTime, startTimer, pauseTimer, resetTimer, softResetTimer, isPaused, draftId, sessionId } = useTimerState();
-	const [initialComment, setInitialComment] = useState("");
-	const { clearComment, setComment, comment } = useCommentFieldState(initialComment, sessionId);
-	const {
-		saveDraft,
-		isSaving,
-		error: saveError,
-		taskName,
-		setTaskName,
-	} = useDraftManualSave({
-		comment,
-		onSaved: refetch,
-	});
+	const { elapsedTime, startTimer, pauseTimer, resetTimer, softResetTimer, isPaused, draftId, sessionId, comment, isSaving } = useTimerStateSSR();
 
-	// Load comment from existing draft when session loads
-	useEffect(() => {
-		if (draftId) {
-			console.log("Loading comment for draftId:", draftId);
-			const loadComment = async () => {
-				const { data: draft } = await supabase.from("time_entry").select("comment").eq("id", draftId).single();
-
-				if (draft?.comment) {
-					setInitialComment(draft.comment);
-					setComment(draft.comment);
-				}
-			};
-			loadComment();
-		} else {
-			setInitialComment("");
-			setComment("");
-		}
-	}, [draftId, setComment]);
+	const { saveDraft } = useDraftStore();
+	const { updateComment, clearComment } = useTimerStore.getState();
+	const supabaseUser = useUserStore((state) => state.supabaseUser);
 
 	const handleStart = () => {
-		console.log("Starting timer...");
 		startTimer();
 	};
 
 	const handlePause = () => {
 		pauseTimer();
-		console.log("Timer paused.");
 	};
 
 	const handleResume = () => {
@@ -64,17 +30,20 @@ export default function Timer({ onSave }: { onSave: () => void }) {
 	};
 
 	const handleSaveAsDraft = async () => {
-		if (draftId) {
-			await saveDraft(draftId);
-			softResetTimer();
+		if (draftId && supabaseUser?.id) {
+			await saveDraft({
+				draftId,
+				userProfileId: supabaseUser.id,
+				comment: comment,
+			});
 		}
+		softResetTimer();
 	};
 
 	const handleSave = () => {
 		if (!isPaused) {
 			pauseTimer();
 		}
-
 		onSave();
 	};
 
@@ -86,13 +55,11 @@ export default function Timer({ onSave }: { onSave: () => void }) {
 	return (
 		<Box className="timer-container" padding="large">
 			<Flex direction="row" align="stretch" gap={32}>
-				{/* Timer Display */}
 				<Flex direction="row" align="center" justify="center" gap={16}>
 					<RunningTimerDisplay activeSession={!!sessionId} isPaused={isPaused} elapsedTime={elapsedTime} resetTimer={handleReset} clearComment={clearComment} isSaving={isSaving} />
 					<TimerActionButtons onClickStart={handleStart} onClickPause={handlePause} onClickResume={handleResume} onClickSaveAsDraft={handleSaveAsDraft} onClickSave={handleSave} activeSession={!!sessionId} isPaused={isPaused} isSaving={isSaving} />
 				</Flex>
-				{/* Comment Field */}
-				<TimerCommentField setComment={setComment} comment={comment} activeSession={!!sessionId} />
+				<TimerCommentField setComment={updateComment} comment={comment} activeSession={!!sessionId} />
 			</Flex>
 		</Box>
 	);

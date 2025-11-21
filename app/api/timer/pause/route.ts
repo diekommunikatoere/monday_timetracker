@@ -5,6 +5,7 @@ import { pauseTimer, resumeTimer } from "@/lib/database";
 
 export async function POST(request: NextRequest) {
 	try {
+		console.log("Received pause/resume timer request");
 		// Authenticate user
 		const context = await getMondayContext(request);
 		if (!context?.user?.id) {

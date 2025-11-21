@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { startTimer, startRunningSegment } from "@/lib/database";
 
 export async function POST(request: NextRequest) {
+	console.log("Received start timer request");
 	try {
 		// Authenticate user
 		const context = await getMondayContext(request);

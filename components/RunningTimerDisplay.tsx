@@ -1,10 +1,9 @@
+// components/RunningTimerDisplay.tsx
 import { formatTime } from "@/lib/utils";
-import { useTimerState } from "@/hooks/useTimerState";
-import { useCommentFieldState } from "@/hooks/useCommentFieldState";
+import { useTimerStore } from "@/stores/timerStore";
+import { useDraftStore } from "@/stores/draftStore";
 import { Flex, Text, Button } from "@vibe/core";
-import { Retry } from "@vibe/icons";
 import Reset from "@/components/icons/Reset";
-
 import "@/public/css/components/RunningTimerDisplay.css";
 
 export default function RunningTimerDisplay({ resetTimer, clearComment, activeSession, isPaused, elapsedTime, isSaving, ...props }) {

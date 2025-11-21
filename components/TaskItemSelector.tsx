@@ -1,10 +1,12 @@
+// components/TaskItemSelector.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { Flex, Text } from "@vibe/core";
 import Select from "react-select";
 import { useQuery } from "@tanstack/react-query";
-import { useMondayContext } from "@/hooks/useMondayContext";
+import { useMondayStore } from "@/stores/mondayStore";
+import { supabase } from "@/lib/supabase/client";
 
 // Type definitions for monday.com API responses
 type APIError = {
@@ -62,14 +64,16 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// State management
 	const [boards, setBoards] = useState<DropdownOption[]>([]);
 	const [tasks, setTasks] = useState<DropdownGroupOption[]>([]);
-	const [tasksOptions, setTasksOptions] = useState<DropdownOption[]>([]); // Keep if used elsewhere, but remove flattening below
+	const [tasksOptions, setTasksOptions] = useState<DropdownOption[]>([]);
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
 	const [loadingBoards, setLoadingBoards] = useState(false);
 	const [loadingTasks, setLoadingTasks] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const { rawContext } = useMondayContext();
+
+	// Use mondayStore instead of hook
+	const { rawContext } = useMondayStore();
 
 	// Reset functions
 	const resetBoard = useCallback(() => {
@@ -104,30 +108,29 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [onResetRef, resetSelections]);
 
-	// Role options (German)
-	const roles: DropdownOption[] = [
-		{ label: "Projektleitung", id: "projektleitung", value: "projektleitung" },
-		{ label: "Assistenz", id: "assistenz", value: "assistenz" },
-		{ label: "Graphik", id: "graphik", value: "graphik" },
-		{ label: "Copy Writing", id: "copy_writing", value: "copy_writing" },
-		{ label: "Medical Writing", id: "medical_writing", value: "medical_writing" },
-		{ label: "Entwicklung/Development", id: "entwicklung", value: "entwicklung" },
-		{ label: "Geschäftsführung", id: "geschaeftsfuehrung", value: "geschaeftsfuehrung" },
-		{ label: "Intern oder Akquise", id: "intern", value: "intern" },
-	];
+	// Fetch role options from Supabase
+	const fetchRoles = async () => {
+		const { data, error } = await supabase.from("role").select("*");
+		if (error) {
+			console.error("Error fetching roles from Supabase:", error);
+			return [];
+		}
+		return data.map((role) => ({
+			label: role.name,
+			id: role.id,
+			value: role.id,
+		}));
+	};
 
-	// Create loading placeholder options for tasks
-	/* const loadingTasksOptions: DropdownGroupOption[] = [
-		{
-			label: "Lade Aufgaben...",
-			options: Array.from({ length: 5 }, (_, i) => ({
-				label: `Loading ${i + 1}...`,
-				id: `loading-${i}`,
-				value: `loading-${i}`,
-				disabled: true,
-			})),
-		},
-	]; */
+	// Role options (German)
+	const [roles, setRoles] = useState<DropdownOption[]>([]);
+	useEffect(() => {
+		const loadRoles = async () => {
+			const fetchedRoles = await fetchRoles();
+			setRoles(fetchedRoles);
+		};
+		loadRoles();
+	}, []);
 
 	// Load connected boards on mount (client-side only)
 	useEffect(() => {

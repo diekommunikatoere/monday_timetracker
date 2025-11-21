@@ -1,14 +1,18 @@
+// components/dashboard/SaveTimerModal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Flex, Text, TextField } from "@vibe/core";
 import { formatTime } from "@/lib/utils";
 import { Modal, ModalBasicLayout, ModalHeader, ModalContent, ModalFooter } from "@vibe/core/next";
 import TaskItemSelector from "../TaskItemSelector";
-import { useCommentFieldState } from "@/hooks/useCommentFieldState";
-import { useTimerManualSave } from "@/hooks/useTimerManualSave";
-import { useTimerState } from "@/hooks/useTimerState";
+import { useTimerStore } from "@/stores/timerStore";
+import { useUserStore } from "@/stores/userStore";
+import { useToast } from "@/components/ToastProvider";
 import { supabase } from "@/lib/supabase/client";
+import mondaySdk from "monday-sdk-js";
+
+const monday = mondaySdk();
 
 interface SaveTimerModalProps {
 	show: boolean;
@@ -16,64 +20,66 @@ interface SaveTimerModalProps {
 }
 
 export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
-	const [selectedTask, setSelectedTask] = useState<{ boardId?: string; itemId?: string; role?: string } | null>(null);
-	const { elapsedTime, draftId, sessionId, softResetTimer } = useTimerState();
-	const [initialComment, setInitialComment] = useState("");
-	const { clearComment, setComment, comment } = useCommentFieldState(initialComment, sessionId);
-	const { saveTimeEntry, isSaving, error } = useTimerManualSave({
-		comment, // Use comment as comment (not task name)
-		onSaved: () => {
-			onClose();
-			// Reset timer state after successful save
-		},
-	});
+	const [selectedTask, setSelectedTask] = useState<{
+		boardId?: string;
+		itemId?: string;
+		role?: string;
+	} | null>(null);
+	const [isSaving, setIsSaving] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-	// Load comment from existing draft when session loads
-	useEffect(() => {
-		if (draftId) {
-			const loadComment = async () => {
-				const { data: draft } = await supabase.from("time_entry").select("comment").eq("id", draftId).single();
-
-				if (draft?.comment) {
-					setInitialComment(draft.comment);
-					setComment(draft.comment);
-				}
-			};
-			loadComment();
-		} else {
-			console.log("No draftId in SaveTimerModal useEffect");
-			setInitialComment("");
-			setComment("");
-		}
-	}, [draftId, setComment]);
-
-	console.log("SaveTimerModal rendered with:", { show, elapsedTime, draftId, sessionId, selectedTask, comment });
+	const { showToast } = useToast();
+	const userProfile = useUserStore((state) => state.supabaseUser);
+	const { comment, elapsedTime, draftId } = useTimerStore();
+	const { updateComment, softResetTimer } = useTimerStore.getState();
 
 	const handleTaskSelection = (taskData: { boardId?: string; itemId?: string; role?: string }) => {
 		setSelectedTask(taskData);
 	};
 
 	const handleSave = async () => {
-		console.log("SaveTimerModal: handleSave called.");
-		console.log("Draft ID:", draftId);
-		console.log("Selected Task:", selectedTask);
-		if (!draftId || !selectedTask) {
-			switch (true) {
-				case !draftId:
-					console.error("Cannot save time entry: missing draftId.");
-					break;
-				case !selectedTask:
-					console.error("Cannot save time entry: no task selected.");
-					break;
-			}
+		if (!draftId || !selectedTask || !userProfile?.id) {
+			console.error("Cannot save: missing required data");
 			return;
 		}
 
-		// Use selected task name as task_name, comment as comment
-		const taskName = selectedTask.itemId ? `Task ${selectedTask.itemId}` : "Manual Entry";
+		setIsSaving(true);
+		setError(null);
 
-		await saveTimeEntry(draftId, taskName, comment, selectedTask.boardId, selectedTask.itemId, selectedTask.role);
-		softResetTimer();
+		try {
+			const taskName = selectedTask.itemId ? `Task ${selectedTask.itemId}` : "Manual Entry";
+
+			// Call RPC to finalize time entry
+			const { data, error } = await supabase.rpc("finalize_time_entry", {
+				p_user_id: userProfile.id,
+				p_draft_id: draftId,
+				p_task_name: taskName,
+				p_comment: comment,
+				p_board_id: selectedTask.boardId,
+				p_item_id: selectedTask.itemId,
+				p_role: selectedTask.role,
+			});
+
+			if (error) throw error;
+
+			showToast("Zeiteintrag gespeichert.", "positive", 2000);
+
+			// Soft reset timer (keeps draft but clears session)
+			const context = await monday.get("context");
+			await softResetTimer(context);
+
+			onClose();
+		} catch (err: any) {
+			console.error("Error saving time entry:", err);
+			setError(err.message || "Failed to save time entry");
+			showToast("Fehler beim Speichern", "negative", 2000);
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleChange = (value: string) => {
+		updateComment(value);
 	};
 
 	return (
@@ -85,6 +91,8 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 						<Flex direction="column" gap={16}>
 							<Text>Elapsed Time: {formatTime(elapsedTime)}</Text>
 
+							{error && <Text style={{ color: "var(--negative-color)" }}>{error}</Text>}
+
 							<TaskItemSelector
 								onSelectionChange={handleTaskSelection}
 								onResetRef={(resetFn) => {
@@ -92,25 +100,20 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 								}}
 							/>
 
-							<TextField inputAriaLabel="Kommentar hinzufügen..." value={comment} onChange={setComment} placeholder="Kommentar hinzufügen..." />
+							<TextField inputAriaLabel="Kommentar hinzufügen..." value={comment} onChange={handleChange} placeholder="Kommentar hinzufügen..." />
 						</Flex>
 					</ModalContent>
 				</ModalBasicLayout>
 				<ModalFooter
 					primaryButton={{
 						text: "Speichern",
-						onClick: () => {
-							handleSave();
-						},
+						onClick: handleSave,
 						ariaLabel: "Zeit-Eintrag speichern",
 						disabled: !selectedTask || isSaving,
 					}}
 					secondaryButton={{
 						text: "Abbrechen",
-						onClick: () => {
-							console.log("secondary modal button clicked.");
-							onClose();
-						},
+						onClick: onClose,
 						ariaLabel: "Zeit-Eintrag abbrechen",
 					}}
 				/>
