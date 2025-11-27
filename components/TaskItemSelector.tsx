@@ -1,9 +1,8 @@
 // components/TaskItemSelector.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Flex, Text } from "@vibe/core";
-import Select from "react-select";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Flex, Text, Select, ComboboxItem, ComboboxItemGroup } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
@@ -11,9 +10,11 @@ import { supabase } from "@/lib/supabase/client";
 // Selection data type passed to parent
 export interface TaskSelection {
 	boardId?: string;
+	boardName?: string;
 	itemId?: string;
 	itemName?: string;
 	role?: string;
+	roleName?: string;
 }
 
 interface TaskItemSelectorProps {
@@ -26,17 +27,11 @@ interface TaskItemSelectorProps {
 	};
 }
 
+// Option type
 type DropdownOption = {
-	id: string;
 	value: string;
 	label: string;
 	disabled?: boolean;
-	[key: string]: unknown;
-};
-
-type DropdownGroupOption = {
-	label: string;
-	options: DropdownOption[];
 };
 
 type TaskGroupsResponse = {
@@ -51,7 +46,7 @@ type TaskGroupsResponse = {
 
 export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues }: TaskItemSelectorProps) {
 	// State management for selections
-	const [tasks, setTasks] = useState<DropdownGroupOption[]>([]);
+	const [tasks, setTasks] = useState<ComboboxItemGroup[]>([]);
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
@@ -81,9 +76,11 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		setTasks([]);
 		onSelectionChange({
 			boardId: undefined,
+			boardName: undefined,
 			itemId: undefined,
 			itemName: undefined,
 			role: undefined,
+			roleName: undefined,
 		});
 	}, [onSelectionChange, resetBoard, resetTask, resetRole]);
 
@@ -125,7 +122,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 			return (data.boards || []).map((board: any) => ({
 				label: board.label,
-				id: board.value.toString(),
 				value: board.value.toString(),
 			}));
 		},
@@ -142,7 +138,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			if (error) throw error;
 			return data.map((role) => ({
 				label: role.name,
-				id: role.id,
 				value: role.id,
 			}));
 		},
@@ -155,10 +150,10 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		isLoading: isLoadingTasks,
 		error: tasksError,
 	} = useQuery<TaskGroupsResponse>({
-		queryKey: ["tasks", selectedBoard?.id],
+		queryKey: ["tasks", selectedBoard?.value],
 		queryFn: async () => {
 			if (!selectedBoard) return { groups: [] };
-			const params = new URLSearchParams({ boardId: selectedBoard.id });
+			const params = new URLSearchParams({ boardId: selectedBoard.value });
 			const response = await fetch(`/api/tasks?${params}`);
 			if (!response.ok) {
 				throw new Error("Failed to fetch tasks");
@@ -181,7 +176,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Set initial board when boards load
 	useEffect(() => {
 		if (initialValues?.boardId && boards.length > 0 && !selectedBoard) {
-			const initialBoard = boards.find((board: DropdownOption) => board.id === initialValues.boardId);
+			const initialBoard = boards.find((board: DropdownOption) => board.value === initialValues.boardId);
 			if (initialBoard) {
 				setSelectedBoard(initialBoard);
 			}
@@ -191,7 +186,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Set initial role when roles load
 	useEffect(() => {
 		if (initialValues?.role && roles.length > 0 && !selectedRole) {
-			const initialRole = roles.find((role: DropdownOption) => role.id === initialValues.role);
+			const initialRole = roles.find((role: DropdownOption) => role.value === initialValues.role);
 			if (initialRole) {
 				setSelectedRole(initialRole);
 			}
@@ -201,10 +196,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Update tasks state when query data changes
 	useEffect(() => {
 		if (tasksData?.groups) {
-			const mappedTasks: DropdownGroupOption[] = tasksData.groups.map((group) => ({
-				label: group.label,
-				options: group.options.map((option) => ({
-					id: option.value,
+			const mappedTasks: ComboboxItemGroup[] = tasksData.groups.map((group) => ({
+				group: group.label,
+				items: group.options.map((option) => ({
 					value: option.value,
 					label: option.label,
 				})),
@@ -214,9 +208,11 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 			// Set initial task if provided
 			if (initialValues?.itemId && mappedTasks.length > 0 && !selectedTask) {
-				const initialTask = mappedTasks.flatMap((group) => group.options).find((task) => task.id === initialValues.itemId);
+				const allItems = mappedTasks.flatMap((group) => group.items);
+				const initialTask = allItems.find((task) => (task as DropdownOption).value === initialValues.itemId);
 				if (initialTask) {
-					setSelectedTask(initialTask);
+					// Need to cast because ComboboxItem doesn't guarantee label is string, but we know it is
+					setSelectedTask(initialTask as DropdownOption);
 				}
 			}
 		}
@@ -233,40 +229,40 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 	// Handle board selection
 	const handleBoardChange = useCallback(
-		(option: DropdownOption | null) => {
-			setSelectedBoard(option);
+		(value: string | null, option: ComboboxItem) => {
+			const selectedOption = option as DropdownOption;
+			setSelectedBoard(value ? selectedOption : null);
 			setSelectedTask(null);
 
-			if (!option) {
+			if (!value) {
 				setTasks([]);
 			}
-			// React Query will handle fetching automatically via enabled prop when option is set
 
 			onSelectionChange({
-				boardId: option?.id,
+				boardId: value || undefined,
+				boardName: selectedOption?.label,
 				itemId: undefined,
 				itemName: undefined,
-				role: selectedRole?.id,
+				role: selectedRole?.value,
+				roleName: selectedRole?.label,
 			});
 		},
 		[selectedRole, onSelectionChange]
 	);
 
-	// Handle task selection - includes itemName
+	// Handle task selection
 	const handleTaskChange = useCallback(
-		(option: DropdownOption | null) => {
-			// Prevent selection of loading placeholder items
-			if ((typeof option?.id === "string" && option.id.startsWith("loading-")) || option?.disabled) {
-				return;
-			}
-
-			setSelectedTask(option);
+		(value: string | null, option: ComboboxItem) => {
+			const selectedOption = option as DropdownOption;
+			setSelectedTask(value ? selectedOption : null);
 
 			onSelectionChange({
-				boardId: selectedBoard?.id,
-				itemId: option?.id,
-				itemName: option?.label,
-				role: selectedRole?.id,
+				boardId: selectedBoard?.value,
+				boardName: selectedBoard?.label,
+				itemId: value || undefined,
+				itemName: selectedOption?.label,
+				role: selectedRole?.value,
+				roleName: selectedRole?.label,
 			});
 		},
 		[selectedBoard, selectedRole, onSelectionChange]
@@ -274,14 +270,17 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 	// Handle role selection
 	const handleRoleChange = useCallback(
-		(option: DropdownOption | null) => {
-			setSelectedRole(option);
+		(value: string | null, option: ComboboxItem) => {
+			const selectedOption = option as DropdownOption;
+			setSelectedRole(value ? selectedOption : null);
 
 			onSelectionChange({
-				boardId: selectedBoard?.id,
-				itemId: selectedTask?.id,
+				boardId: selectedBoard?.value,
+				boardName: selectedBoard?.label,
+				itemId: selectedTask?.value,
 				itemName: selectedTask?.label,
-				role: option?.id,
+				role: value || undefined,
+				roleName: selectedOption?.label,
 			});
 		},
 		[selectedBoard, selectedTask, onSelectionChange]
@@ -292,75 +291,22 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	return (
 		<Flex
 			direction="column"
-			align="stretch"
-			gap="large"
+			gap="md"
 			style={{
 				width: "100%",
 			}}
 		>
 			{/* Error Display */}
-			{error && <Text style={{ color: "var(--negative-color)" }}>{error}</Text>}
+			{error && <Text c="dki-error">{error}</Text>}
 
 			{/* Board Selector */}
-			<label htmlFor="board-selector">Board auswählen</label>
-			<Select
-				id="board-selector"
-				className="dropdown dropdown-board"
-				placeholder="Board auswählen..."
-				options={boards}
-				value={selectedBoard}
-				onChange={handleBoardChange}
-				isClearable
-				isSearchable
-				isLoading={loadingBoards}
-				noOptionsMessage={() => "Keine Boards verfügbar"}
-				aria-label="Board auswählen"
-				menuPortalTarget={document.getElementById("save-timer-modal-outer") || undefined}
-				styles={{
-					menuPortal: (base) => ({ ...base, zIndex: 10001 }),
-				}}
-			/>
+			<Select id="board-selector" label="Board auswählen" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" />
 
 			{/* Task Selector - with groups */}
-			<label htmlFor="task-selector">Aufgabe auswählen</label>
-			<Select
-				id="task-selector"
-				className="dropdown dropdown-task"
-				placeholder={taskPlaceholder}
-				options={tasks}
-				value={selectedTask}
-				onChange={handleTaskChange}
-				isClearable
-				isSearchable={!isLoadingTasks}
-				isDisabled={!selectedBoard}
-				noOptionsMessage={() => (!selectedBoard ? "Wählen Sie zuerst ein Board aus" : "Keine Aufgaben gefunden")}
-				isLoading={isLoadingTasks}
-				aria-label="Aufgabe auswählen"
-				menuPortalTarget={document.getElementById("save-timer-modal-outer") || undefined}
-				styles={{
-					menuPortal: (base) => ({ ...base, zIndex: 10001 }),
-				}}
-			/>
+			<Select id="task-selector" label="Aufgabe auswählen" placeholder={taskPlaceholder} data={tasks} value={selectedTask?.value || null} onChange={handleTaskChange} clearable searchable={!isLoadingTasks} disabled={!selectedBoard || isLoadingTasks} nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : "Keine Aufgaben gefunden"} />
 
 			{/* Role Selector */}
-			<label htmlFor="role-selector">Rolle auswählen</label>
-			<Select
-				id="role-selector"
-				className="dropdown dropdown-role"
-				placeholder="Rolle auswählen..."
-				options={roles}
-				value={selectedRole}
-				onChange={handleRoleChange}
-				isClearable
-				isSearchable
-				isLoading={loadingRoles}
-				noOptionsMessage={() => "Keine Rollen verfügbar"}
-				aria-label="Rolle auswählen"
-				menuPortalTarget={document.getElementById("save-timer-modal-outer") || undefined}
-				styles={{
-					menuPortal: (base) => ({ ...base, zIndex: 10001 }),
-				}}
-			/>
+			<Select id="role-selector" label="Rolle auswählen" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" />
 		</Flex>
 	);
 }
