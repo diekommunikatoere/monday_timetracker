@@ -161,7 +161,10 @@ CREATE OR REPLACE FUNCTION finalize_time_entry(
     p_comment TEXT,
     p_board_id TEXT DEFAULT NULL,
     p_item_id TEXT DEFAULT NULL,
-    p_role TEXT DEFAULT NULL
+    p_role TEXT DEFAULT NULL,
+    p_board_name TEXT DEFAULT NULL,
+    p_item_name TEXT DEFAULT NULL,
+    p_role_name TEXT DEFAULT NULL
 )
 RETURNS jsonb AS $$
 
@@ -212,6 +215,7 @@ BEGIN
 
   -- Step 5: Update time_entry as FINAL entry (is_draft = false)
   -- Now includes board_id, item_id, and role from monday.com
+  -- Also includes display names for UI purposes
   UPDATE time_entry
   SET
     task_name = p_task_name,
@@ -219,8 +223,11 @@ BEGIN
     duration = v_total_duration::integer,
     comment = p_comment,
     board_id = p_board_id,
+    board_name = p_board_name,
     item_id = p_item_id,
+    item_name = p_item_name,
     role = p_role,
+    role_name = p_role_name,
     is_draft = false,
     timer_session = to_jsonb(v_updated_session)
   WHERE id = p_draft_id
