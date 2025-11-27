@@ -1,17 +1,18 @@
+// components/dashboard/TimeEntriesTable.tsx
 "use client";
 
 import { useState, useMemo } from "react";
 import { useUserStore } from "@/stores/userStore";
 import { useTimerStore, useTimerComputed } from "@/stores/timerStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, Checkbox } from "@vibe/core";
+import { Table, Checkbox, Text, Center, Loader } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
 
 interface TimeEntriesTableProps {
-	timeEntries: TimeEntry[];
-	loading: boolean;
-	error: string | null;
+	timeEntries?: TimeEntry[];
+	loading?: boolean;
+	error?: string | null;
 	onRefetch: () => void;
 }
 
@@ -26,59 +27,6 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const { isActive, isPaused, hasSession } = useTimerComputed();
 
 	const userId = useUserStore((state) => state.supabaseUser?.id);
-
-	const columns = [
-		{
-			id: "selection",
-			title: "",
-			loadingStateType: "circle" as const,
-			width: 40,
-		},
-		{
-			id: "task",
-			title: "Aufgabe",
-			loadingStateType: "medium-text" as const,
-		},
-		{
-			id: "board",
-			title: "Board",
-			loadingStateType: "medium-text" as const,
-		},
-		{
-			id: "job",
-			title: "Job",
-			loadingStateType: "medium-text" as const,
-		},
-		{
-			id: "comment",
-			title: "Kommentar",
-			loadingStateType: "medium-text" as const,
-		},
-		{
-			id: "date",
-			title: "Datum",
-			loadingStateType: "medium-text" as const,
-			width: 150,
-		},
-		{
-			id: "start",
-			title: "Start",
-			loadingStateType: "medium-text" as const,
-			width: 100,
-		},
-		{
-			id: "end",
-			title: "Ende",
-			loadingStateType: "medium-text" as const,
-			width: 100,
-		},
-		{
-			id: "totalTime",
-			title: "Gesamtzeit",
-			loadingStateType: "medium-text" as const,
-			width: 120,
-		},
-	];
 
 	// Selection logic
 	const selectAllState = useMemo(() => {
@@ -107,43 +55,65 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	};
 
 	if (loading) {
-		return <div>Loading time entries...</div>;
+		return (
+			<Center p="xl">
+				<Loader />
+			</Center>
+		);
 	}
 
 	if (error) {
-		return <div>Error: {error}</div>;
+		return (
+			<Center p="xl">
+				<Text c="dki-error">Error: {error}</Text>
+			</Center>
+		);
+	}
+
+	if (timeEntries.length === 0) {
+		return (
+			<Center p="xl">
+				<Text>Keine Zeiteinträge gefunden.</Text>
+			</Center>
+		);
 	}
 
 	return (
-		<Table columns={columns} emptyState={<h1 style={{ textAlign: "center" }}>Empty State</h1>} errorState={<h1 style={{ textAlign: "center" }}>Error State</h1>} id="time-entries-table">
-			<TableHeader>
-				<TableHeaderCell title={<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => handleSelectAll(e.target.checked)} ariaLabel="Alle Zeiteinträge auswählen" />} sticky />
-				<TableHeaderCell title="Aufgabe" sticky />
-				<TableHeaderCell title="Board" sticky />
-				<TableHeaderCell title="Job" sticky />
-				<TableHeaderCell title="Kommentar" sticky />
-				<TableHeaderCell title="Datum" sticky />
-				<TableHeaderCell title="Start" sticky />
-				<TableHeaderCell title="Ende" sticky />
-				<TableHeaderCell title="Gesamtzeit" sticky />
-			</TableHeader>
-			<TableBody>
+		<Table striped highlightOnHover>
+			<Table.Thead>
+				<Table.Tr>
+					<Table.Th style={{ width: 40 }}>
+						<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => handleSelectAll(e.currentTarget.checked)} aria-label="Alle Zeiteinträge auswählen" />
+					</Table.Th>
+					<Table.Th fw={600}>Aufgabe</Table.Th>
+					<Table.Th fw={600}>Rolle</Table.Th>
+					<Table.Th fw={600}>Board</Table.Th>
+					<Table.Th fw={600}>Job</Table.Th>
+					<Table.Th fw={600}>Kommentar</Table.Th>
+					<Table.Th fw={600}>Datum</Table.Th>
+					<Table.Th fw={600}>Start</Table.Th>
+					<Table.Th fw={600}>Ende</Table.Th>
+					<Table.Th fw={600}>Gesamtzeit</Table.Th>
+				</Table.Tr>
+			</Table.Thead>
+			<Table.Tbody>
 				{timeEntries.map((entry) => (
-					<TableRow key={entry.id} highlighted={selectedIds.includes(entry.id.toString())}>
-						<TableCell sticky>
-							<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.target.checked)} ariaLabel={`Select time entry ${entry.id}`} />
-						</TableCell>
-						<TableCell sticky>{entry.task_name}</TableCell>
-						<TableCell>{entry.board_id || "-"}</TableCell>
-						<TableCell>{entry.role || "-"}</TableCell>
-						<TableCell>{entry.comment || "-"}</TableCell>
-						<TableCell>{new Date(entry.start_time).toLocaleDateString()}</TableCell>
-						<TableCell>{new Date(entry.start_time).toLocaleTimeString()}</TableCell>
-						<TableCell>{new Date(entry.end_time).toLocaleTimeString()}</TableCell>
-						<TableCell>{formatDuration(entry.duration)}</TableCell>
-					</TableRow>
+					<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id.toString()) ? "dki-secondary" : undefined}>
+						<Table.Td>
+							<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.currentTarget.checked)} aria-label={`Select time entry ${entry.id}`} />
+						</Table.Td>
+						<Table.Td>{entry.task_name}</Table.Td>
+						<Table.Td>{entry.role_name || "-"}</Table.Td>
+						<Table.Td>{entry.board_name || "-"}</Table.Td>
+						<Table.Td>{entry.item_name || "-"}</Table.Td>
+						<Table.Td>{entry.comment || "-"}</Table.Td>
+						<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
+						<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
+						<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
+						<Table.Td>{formatDuration(entry.duration)}</Table.Td>
+					</Table.Tr>
 				))}
-			</TableBody>
+			</Table.Tbody>
 		</Table>
 	);
 }
