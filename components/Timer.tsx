@@ -18,7 +18,7 @@ import TimerCommentField from "@/components/TimerCommentField";
  * - This component owns ALL the logic
  * - Child components are pure and receive props only
  *
- * Note: The SaveTimerDrawer is rendered in AppHeader.tsx to avoid duplicate drawers
+ * Note: The SaveTimerModal is rendered in AppHeader.tsx to avoid duplicate modals
  */
 export default function Timer() {
 	// Get all timer state and actions from the unified hook
@@ -41,7 +41,7 @@ export default function Timer() {
 					<TimerDisplay elapsedTime={state.elapsedTime} status={state.status} onReset={actions.reset} disabled={!hasSession || state.isSaving} />
 
 					{/* Timer Controls - play/pause, save as draft, save buttons */}
-					<TimerControls status={state.status} hasSession={hasSession} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSaveAsDraft={actions.saveAsDraft} onSave={actions.openSaveDrawer} />
+					<TimerControls status={state.status} hasSession={hasSession} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSaveAsDraft={actions.saveAsDraft} onSave={actions.openSaveModal} />
 				</Flex>
 
 				{/* Comment Field */}

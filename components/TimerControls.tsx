@@ -22,7 +22,7 @@ import "@/public/css/components/TimerActionButtons.css";
  * @param isSaving - Whether a save operation is in progress
  * @param onPlayPause - Callback for play/pause button
  * @param onSaveAsDraft - Callback for save as draft button
- * @param onSave - Callback for save button (opens drawer)
+ * @param onSave - Callback for save button (opens modal)
  */
 export default function TimerControls({ status, hasSession, isSaving, onPlayPause, onSaveAsDraft, onSave }: TimerControlsProps) {
 	const isRunning = status === "running";

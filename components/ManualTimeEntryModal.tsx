@@ -1,17 +1,17 @@
-import { Drawer, Button, Group } from "@mantine/core";
+import { Modal, Button, Group } from "@mantine/core";
 
-interface ManualTimeEntryDrawerProps {
+interface ManualTimeEntryModalProps {
 	show: boolean;
 	onClose: () => void;
 }
-export default function ManualTimeEntryDrawer({ show, onClose }: ManualTimeEntryDrawerProps) {
+export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProps) {
 	return (
-		<Drawer opened={show} onClose={onClose} title="Zeit-Eintrag manuell erfassen" size="lg">
+		<Modal opened={show} onClose={onClose} title="Zeit-Eintrag manuell erfassen" size="lg">
 			<Group justify="flex-end" mt="md">
 				<Button
 					variant="default"
 					onClick={() => {
-						console.log("secondary drawer button clicked.");
+						console.log("secondary modal button clicked.");
 						onClose();
 					}}
 					aria-label="Zeit-Eintrag abbrechen"
@@ -20,7 +20,7 @@ export default function ManualTimeEntryDrawer({ show, onClose }: ManualTimeEntry
 				</Button>
 				<Button
 					onClick={() => {
-						console.log("primary drawer button clicked.");
+						console.log("primary modal button clicked.");
 						onClose();
 					}}
 					aria-label="Zeit-Eintrag speichern"
@@ -28,6 +28,6 @@ export default function ManualTimeEntryDrawer({ show, onClose }: ManualTimeEntry
 					Speichern
 				</Button>
 			</Group>
-		</Drawer>
+		</Modal>
 	);
 }

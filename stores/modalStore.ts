@@ -1,13 +1,13 @@
-// stores/drawerStore.ts
+// stores/modalStore.ts
 import { create } from "zustand";
 
-interface DrawerState {
+interface ModalState {
 	showTimerSave: boolean;
 	openTimerSave: () => void;
 	closeTimerSave: () => void;
 }
 
-export const useDrawerStore = create<DrawerState>((set, get) => ({
+export const useModalStore = create<ModalState>((set, get) => ({
 	showTimerSave: false,
 	openTimerSave: () => set({ showTimerSave: true }),
 	closeTimerSave: () => set({ showTimerSave: false }),

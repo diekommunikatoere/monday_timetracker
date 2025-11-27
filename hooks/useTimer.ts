@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
 import { useDraftStore } from "@/stores/draftStore";
-import { useDrawerStore } from "@/stores/drawerStore";
+import { useModalStore } from "@/stores/modalStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useHydration } from "@/lib/store-utils";
 
@@ -64,8 +64,8 @@ export function useTimer(): UseTimerReturn {
 	// Draft store for auto-save
 	const { autoSaveDraft } = useDraftStore();
 
-	// Drawer store for save drawer
-	const { openTimerSave } = useDrawerStore();
+	// Modal store for save modal
+	const { openTimerSave } = useModalStore();
 
 	// Time entries for refetch after save
 	const { refetch: refetchTimeEntries } = useTimeEntriesStore();
@@ -493,9 +493,9 @@ export function useTimer(): UseTimerReturn {
 			},
 
 			/**
-			 * Open save drawer
+			 * Open save modal
 			 */
-			openSaveDrawer: () => {
+			openSaveModal: () => {
 				// Pause timer first if running
 				if (status === "running") {
 					actions.pause();

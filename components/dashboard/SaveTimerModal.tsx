@@ -1,4 +1,4 @@
-// components/dashboard/SaveTimerDrawer.tsx
+// components/dashboard/SaveTimerModal.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,20 +14,20 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
-interface SaveTimerDrawerProps {
+interface SaveTimerModalProps {
 	show: boolean;
 	onClose: () => void;
 }
 
 /**
- * SaveTimerDrawer - Drawer for saving a timer session to a time entry
+ * SaveTimerModal - Modal for saving a timer session to a time entry
  *
  * This component allows the user to:
  * - Select a task/item to associate the time entry with
  * - Add/edit a comment
  * - Save the time entry
  */
-export default function SaveTimerDrawer({ show, onClose }: SaveTimerDrawerProps) {
+export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export default function SaveTimerDrawer({ show, onClose }: SaveTimerDrawerProps)
 	// Store actions
 	const { setComment, reset: resetTimer } = useTimerStore.getState();
 
-	// Clear error state and selection when drawer opens
+	// Clear error state and selection when modal opens
 	useEffect(() => {
 		if (show) {
 			setError(null);

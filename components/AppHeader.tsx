@@ -7,22 +7,22 @@ import Timer from "@/components/Timer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
 import { Flex } from "@mantine/core";
 import TaskItemSelector from "./TaskItemSelector";
-import { useDrawerStore } from "@/stores/drawerStore";
-import ManualTimeEntryDrawer from "./ManualTimeEntryDrawer";
-import SaveTimerDrawer from "./dashboard/SaveTimerDrawer";
+import { useModalStore } from "@/stores/modalStore";
+import ManualTimeEntryModal from "@/components/ManualTimeEntryModal";
+import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 
 import "@/public/css/components/AppHeader.css";
 
 export default function AppHeader(variant?) {
-	const [showManualSaveDrawer, setShowManualSaveDrawer] = useState(false);
-	const { showTimerSave, closeTimerSave } = useDrawerStore((s) => s);
+	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
+	const { showTimerSave, closeTimerSave } = useModalStore((s) => s);
 
-	const handleManualTimeDrawerOpen = useCallback(() => {
-		setShowManualSaveDrawer(true);
+	const handleManualTimeModalOpen = useCallback(() => {
+		setShowManualSaveModal(true);
 	}, []);
 
-	const handleManualTimeDrawerClose = useCallback(() => {
-		setShowManualSaveDrawer(false);
+	const handleManualTimeModalClose = useCallback(() => {
+		setShowManualSaveModal(false);
 	}, []);
 
 	return (
@@ -32,14 +32,14 @@ export default function AppHeader(variant?) {
 					<Logo size={{ width: 231, height: 40 }} style="brand" />
 					<ManualTimeEntryButton
 						onClick={() => {
-							handleManualTimeDrawerOpen();
+							handleManualTimeModalOpen();
 						}}
 					/>
 				</Flex>
 				<Timer />
 			</header>
-			<ManualTimeEntryDrawer show={showManualSaveDrawer} onClose={handleManualTimeDrawerClose} />
-			<SaveTimerDrawer show={showTimerSave} onClose={closeTimerSave} />
+			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
+			<SaveTimerModal show={showTimerSave} onClose={closeTimerSave} />
 		</>
 	);
 }
