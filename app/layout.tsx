@@ -1,24 +1,45 @@
 "use client";
 
-import "@vibe/core/tokens";
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
 import "@/public/css/fonts.css";
 import "./globals.scss";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/ToastProvider";
 import { StoreProvider } from "@/components/StoreProvider";
+import { createTheme, MantineProvider, ColorSchemeScript } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+const theme = createTheme({
+	colors: {
+		"dki-primary": ["#ffe8f9", "#ffcfeb", "#ff9cd3", "#fe65ba", "#fd39a5", "#fd1f98", "#fe1092", "#db007a", "#cb0070", "#b20061"],
+		"dki-secondary": ["#fffbe0", "#fff5ca", "#ffea99", "#ffde63", "#ffd640", "#ffcd18", "#ffca01", "#e3b200", "#ca9e00", "#af8800"],
+		"dki-tertiary": ["#f7f6ea", "#eae9e1", "#d2d1c7", "#b9b8aa", "#a4a292", "#969582", "#92907b", "#7c7a65", "#6f6d58", "#605e46"],
+		"dki-success": ["#e4ffee", "#d2f9e1", "#a8f0c3", "#7be7a3", "#4ade80", "#3cdb76", "#2bd96c", "#1ac05b", "#0aab4f", "#009440"],
+		"dki-error": ["#ffe8ed", "#ffd0d8", "#fba0ae", "#f76c81", "#f4415b", "#f32643", "#f31b3b", "#d80629", "#c20023", "#aa001c"],
+	},
+	primaryColor: "dki-primary",
+	primaryShade: 7,
+	other: {},
+});
 
 const queryClient = new QueryClient();
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
-		<html>
+		<html lang="de" suppressHydrationWarning>
+			<head>
+				<ColorSchemeScript />
+			</head>
 			<body>
-				<QueryClientProvider client={queryClient}>
-					<StoreProvider>
-						<ToastProvider>{children}</ToastProvider>
-					</StoreProvider>
-				</QueryClientProvider>
+				<MantineProvider theme={theme}>
+					<Notifications />
+					<QueryClientProvider client={queryClient}>
+						<StoreProvider>
+							<ToastProvider>{children}</ToastProvider>
+						</StoreProvider>
+					</QueryClientProvider>
+				</MantineProvider>
 			</body>
 		</html>
 	);
