@@ -12,6 +12,8 @@ interface FinalizeTimeEntryRequest {
 	itemName?: string;
 	role?: string;
 	roleName?: string;
+	duration?: number; // in seconds, optional override
+	date?: string; // ISO date string, optional override
 }
 
 export async function POST(request: NextRequest) {
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: FinalizeTimeEntryRequest = await request.json();
-		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, role, roleName } = body;
+		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, role, roleName, duration, date } = body;
 
 		// Validate required fields
 		if (!draftId) {
@@ -41,6 +43,37 @@ export async function POST(request: NextRequest) {
 
 		if (!taskName) {
 			return NextResponse.json({ error: "taskName is required" }, { status: 400 });
+		}
+
+		// If duration and date are provided, update the draft entry first
+		if (duration !== undefined || date !== undefined) {
+			// Get the current draft to calculate new timestamps
+			const { data: draft, error: draftError } = await supabaseAdmin.from("time_entry").select("start_time, duration").eq("id", draftId).single();
+
+			if (draftError || !draft) {
+				console.error("Error fetching draft:", draftError);
+				return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+			}
+
+			// Calculate new timestamps
+			const newDuration = duration !== undefined ? duration : draft.duration;
+			const newStartTime = date ? new Date(date).toISOString() : draft.start_time;
+			const newEndTime = new Date(new Date(newStartTime).getTime() + newDuration * 1000).toISOString();
+
+			// Update the draft with new duration and timestamps
+			const { error: updateError } = await supabaseAdmin
+				.from("time_entry")
+				.update({
+					duration: newDuration,
+					start_time: newStartTime,
+					end_time: newEndTime,
+				})
+				.eq("id", draftId);
+
+			if (updateError) {
+				console.error("Error updating draft:", updateError);
+				return NextResponse.json({ error: "Failed to update draft" }, { status: 500 });
+			}
 		}
 
 		// Call the RPC to finalize the time entry
@@ -55,6 +88,7 @@ export async function POST(request: NextRequest) {
 			p_item_name: itemName || null,
 			p_role: role || null,
 			p_role_name: roleName || null,
+			p_duration: duration, // Pass the duration override
 		});
 
 		if (error) {
