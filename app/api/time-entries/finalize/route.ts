@@ -7,8 +7,11 @@ interface FinalizeTimeEntryRequest {
 	taskName: string;
 	comment?: string;
 	boardId?: string;
+	boardName?: string;
 	itemId?: string;
+	itemName?: string;
 	role?: string;
+	roleName?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -29,7 +32,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: FinalizeTimeEntryRequest = await request.json();
-		const { draftId, taskName, comment, boardId, itemId, role } = body;
+		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, role, roleName } = body;
 
 		// Validate required fields
 		if (!draftId) {
@@ -47,8 +50,11 @@ export async function POST(request: NextRequest) {
 			p_task_name: taskName,
 			p_comment: comment || null,
 			p_board_id: boardId || null,
+			p_board_name: boardName || null,
 			p_item_id: itemId || null,
+			p_item_name: itemName || null,
 			p_role: role || null,
+			p_role_name: roleName || null,
 		});
 
 		if (error) {
