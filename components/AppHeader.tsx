@@ -1,26 +1,28 @@
+"use client";
+
 import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { Logo } from "./Logo";
 import Timer from "@/components/Timer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex } from "@vibe/core";
-import { useModalStore } from "@/stores/modalStore";
-
-const ManualTimeEntryModal = dynamic(() => import("./ManualTimeEntryModal"), { ssr: false });
-const SaveTimerModal = dynamic(() => import("./dashboard/SaveTimerModal"), { ssr: false });
+import { Flex } from "@mantine/core";
+import TaskItemSelector from "./TaskItemSelector";
+import { useDrawerStore } from "@/stores/drawerStore";
+import ManualTimeEntryDrawer from "./ManualTimeEntryDrawer";
+import SaveTimerDrawer from "./dashboard/SaveTimerDrawer";
 
 import "@/public/css/components/AppHeader.css";
 
 export default function AppHeader(variant?) {
-	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
-	const { showTimerSave, closeTimerSave } = useModalStore((s) => s);
+	const [showManualSaveDrawer, setShowManualSaveDrawer] = useState(false);
+	const { showTimerSave, closeTimerSave } = useDrawerStore((s) => s);
 
-	const handleManualTimeModalOpen = useCallback(() => {
-		setShowManualSaveModal(true);
+	const handleManualTimeDrawerOpen = useCallback(() => {
+		setShowManualSaveDrawer(true);
 	}, []);
 
-	const handleManualTimeModalClose = useCallback(() => {
-		setShowManualSaveModal(false);
+	const handleManualTimeDrawerClose = useCallback(() => {
+		setShowManualSaveDrawer(false);
 	}, []);
 
 	return (
@@ -30,14 +32,14 @@ export default function AppHeader(variant?) {
 					<Logo size={{ width: 231, height: 40 }} style="brand" />
 					<ManualTimeEntryButton
 						onClick={() => {
-							handleManualTimeModalOpen();
+							handleManualTimeDrawerOpen();
 						}}
 					/>
 				</Flex>
 				<Timer />
 			</header>
-			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
-			<SaveTimerModal show={showTimerSave} onClose={closeTimerSave} />
+			<ManualTimeEntryDrawer show={showManualSaveDrawer} onClose={handleManualTimeDrawerClose} />
+			<SaveTimerDrawer show={showTimerSave} onClose={closeTimerSave} />
 		</>
 	);
 }

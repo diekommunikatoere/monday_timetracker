@@ -1,10 +1,9 @@
-// components/dashboard/SaveTimerModal.tsx
+// components/dashboard/SaveTimerDrawer.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import { Flex, Text, TextField } from "@vibe/core";
+import { Flex, Text, TextInput, Modal, Button, Group } from "@mantine/core";
 import { formatTime } from "@/lib/utils";
-import { Modal, ModalBasicLayout, ModalHeader, ModalContent, ModalFooter } from "@vibe/core/next";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
@@ -15,20 +14,20 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
-interface SaveTimerModalProps {
+interface SaveTimerDrawerProps {
 	show: boolean;
 	onClose: () => void;
 }
 
 /**
- * SaveTimerModal - Modal for saving a timer session to a time entry
+ * SaveTimerDrawer - Drawer for saving a timer session to a time entry
  *
  * This component allows the user to:
  * - Select a task/item to associate the time entry with
  * - Add/edit a comment
  * - Save the time entry
  */
-export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
+export default function SaveTimerDrawer({ show, onClose }: SaveTimerDrawerProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -48,7 +47,7 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 	// Store actions
 	const { setComment, reset: resetTimer } = useTimerStore.getState();
 
-	// Clear error state and selection when modal opens
+	// Clear error state and selection when drawer opens
 	useEffect(() => {
 		if (show) {
 			setError(null);
@@ -88,8 +87,11 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 					taskName,
 					comment,
 					boardId: selectedTask.boardId,
+					boardName: selectedTask.boardName,
 					itemId: selectedTask.itemId,
+					itemName: selectedTask.itemName,
 					role: selectedTask.role,
+					roleName: selectedTask.roleName,
 				}),
 			});
 
@@ -131,42 +133,30 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 		}
 	};
 
-	const handleCommentChange = (value: string) => {
-		setComment(value);
+	const handleCommentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		setComment(event.currentTarget.value);
 	};
 
 	return (
-		<div id="save-timer-modal-outer">
-			<div id="modal-portal"></div>
-			<Modal id="save-timer-modal" show={show} onClose={onClose} container={document.getElementById("save-timer-modal-outer") || undefined}>
-				<ModalBasicLayout>
-					<ModalHeader title={"Timer speichern"} />
-					<ModalContent>
-						<Flex direction="column" gap={16}>
-							<Text>Erfasste Zeit: {formatTime(elapsedTime)}</Text>
+		<Modal opened={show} onClose={onClose} title="Timer speichern" size="lg">
+			<Flex direction="column" gap="md">
+				<Text>Erfasste Zeit: {formatTime(elapsedTime)}</Text>
 
-							{error && <Text style={{ color: "var(--negative-color)" }}>{error}</Text>}
+				{error && <Text c="dki-error">{error}</Text>}
 
-							<TaskItemSelector onSelectionChange={handleTaskSelection} />
+				<TaskItemSelector onSelectionChange={handleTaskSelection} />
 
-							<TextField inputAriaLabel="Kommentar hinzufügen..." value={comment} onChange={handleCommentChange} placeholder="Kommentar hinzufügen..." />
-						</Flex>
-					</ModalContent>
-				</ModalBasicLayout>
-				<ModalFooter
-					primaryButton={{
-						text: isSaving ? "Speichern..." : "Speichern",
-						onClick: handleSave,
-						ariaLabel: "Zeit-Eintrag speichern",
-						disabled: !selectedTask?.itemId || isSaving,
-					}}
-					secondaryButton={{
-						text: "Abbrechen",
-						onClick: onClose,
-						ariaLabel: "Speichervorgang abbrechen",
-					}}
-				/>
-			</Modal>
-		</div>
+				<TextInput aria-label="Kommentar hinzufügen..." value={comment} onChange={handleCommentChange} placeholder="Kommentar hinzufügen..." />
+
+				<Group justify="flex-end" mt="md">
+					<Button variant="default" onClick={onClose}>
+						Abbrechen
+					</Button>
+					<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving}>
+						{isSaving ? "Speichern..." : "Speichern"}
+					</Button>
+				</Group>
+			</Flex>
+		</Modal>
 	);
 }
