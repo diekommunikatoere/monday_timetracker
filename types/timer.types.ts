@@ -65,7 +65,7 @@ export interface TimerActions {
 	resume: () => Promise<void>;
 	reset: () => Promise<void>;
 	saveAsDraft: () => Promise<void>;
-	openSaveModal: () => void;
+	openSaveDrawer: () => void;
 	updateComment: (comment: string) => void;
 }
 

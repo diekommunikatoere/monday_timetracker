@@ -1,7 +1,7 @@
 // components/TimerDisplay.tsx
 "use client";
 
-import { Flex, Text, Button } from "@vibe/core";
+import { Flex, Text, Button, ActionIcon } from "@mantine/core";
 import { formatTime } from "@/lib/utils";
 import Reset from "@/components/icons/Reset";
 import type { TimerDisplayProps } from "@/types/timer.types";
@@ -24,17 +24,15 @@ export default function TimerDisplay({ elapsedTime, status, onReset, disabled }:
 	const isActive = status !== "idle";
 	const isPaused = status === "paused";
 
-	const activeColor = "var(--color--text-on-primary)";
-	const disabledColor = "var(--color--text-disabled)";
+	const activeColor = "var(--mantine-color-white)";
+	const disabledColor = "var(--mantine-color-gray-5)";
 
 	return (
-		<Flex direction="row" align="center" justify="center" className="timer-display" gap="medium">
-			<Text className={`timer-time${isActive ? " active" : ""}${isPaused ? " paused" : ""}`} type="text1" weight="bold">
-				{formatTime(elapsedTime)}
-			</Text>
-			<Button className="btn-reset" onClick={onReset} kind="primary" size="small" ariaLabel="Timer zurücksetzen" disabled={disabled}>
+		<Flex direction="row" align="center" justify="center" className="timer-display" gap="md">
+			<Text className={`timer-time${isActive ? " active" : ""}${isPaused ? " paused" : ""}`}>{formatTime(elapsedTime)}</Text>
+			<ActionIcon className="btn-reset" onClick={onReset} variant="filled" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
 				<Reset fillColor={!disabled ? activeColor : disabledColor} />
-			</Button>
+			</ActionIcon>
 		</Flex>
 	);
 }

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Flex, TextField } from "@vibe/core";
+import { Flex, TextInput } from "@mantine/core";
 import type { TimerCommentFieldProps } from "@/types/timer.types";
 import "@/public/css/components/TimerCommentField.css";
 
@@ -31,8 +31,8 @@ export default function TimerCommentField({ value, onChange, disabled }: TimerCo
 	};
 
 	return (
-		<Flex direction="row" align="center" className="timer-comment-field-container" gap="small">
-			<TextField className={`timer-comment-field${isFocused ? " focus" : ""}`} wrapperClassName="timer-comment-field-wrapper" placeholder="Kommentar hinzufügen..." inputAriaLabel="Kommentar hinzufügen..." onChange={onChange} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} />
+		<Flex direction="row" align="center" className="timer-comment-field-container" gap="sm">
+			<TextInput className={`timer-comment-field${isFocused ? " focus" : ""}`} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} style={{ flex: 1 }} />
 		</Flex>
 	);
 }

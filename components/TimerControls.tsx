@@ -1,7 +1,7 @@
 // components/TimerControls.tsx
 "use client";
 
-import { Button, Flex } from "@vibe/core";
+import { ActionIcon, Flex } from "@mantine/core";
 import Play from "@/components/icons/Play";
 import Pause from "@/components/icons/Pause";
 import MoveDown from "@/components/icons/MoveDown";
@@ -22,28 +22,28 @@ import "@/public/css/components/TimerActionButtons.css";
  * @param isSaving - Whether a save operation is in progress
  * @param onPlayPause - Callback for play/pause button
  * @param onSaveAsDraft - Callback for save as draft button
- * @param onSave - Callback for save button (opens modal)
+ * @param onSave - Callback for save button (opens drawer)
  */
 export default function TimerControls({ status, hasSession, isSaving, onPlayPause, onSaveAsDraft, onSave }: TimerControlsProps) {
 	const isRunning = status === "running";
 
-	const activeColor = "var(--color--text-on-primary)";
-	const disabledColor = "var(--color--text-disabled)";
+	const activeColor = "var(--mantine-color-white)";
+	const disabledColor = "var(--mantine-color-gray-5)";
 
 	// Determine which icon to show for play/pause button
 	const PlayPauseIcon = isRunning ? <Pause fillColor={activeColor} /> : <Play fillColor={activeColor} />;
 
 	return (
 		<Flex>
-			<Button className="button button--timer play-pause" kind="primary" size="small" onClick={onPlayPause} disabled={isSaving}>
+			<ActionIcon className="button button--timer play-pause" variant="filled" size="lg" onClick={onPlayPause} disabled={isSaving}>
 				{PlayPauseIcon}
-			</Button>
-			<Button className="button button--timer draft" kind="primary" size="small" onClick={onSaveAsDraft} disabled={!hasSession || isSaving}>
+			</ActionIcon>
+			<ActionIcon className="button button--timer draft" variant="filled" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving}>
 				<MoveDown fillColor={hasSession ? activeColor : disabledColor} />
-			</Button>
-			<Button className="button button--timer save" kind="primary" size="small" onClick={onSave} disabled={!hasSession || isSaving}>
+			</ActionIcon>
+			<ActionIcon className="button button--timer save" variant="filled" size="lg" onClick={onSave} disabled={!hasSession || isSaving}>
 				<Save fillColor={hasSession ? activeColor : disabledColor} />
-			</Button>
+			</ActionIcon>
 		</Flex>
 	);
 }
