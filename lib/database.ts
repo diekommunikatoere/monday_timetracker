@@ -111,7 +111,7 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
 	} */
 
 	// Fetch from database
-	const { data, error } = await supabaseAdmin.from("time_entry").select("*").eq("user_id", userId).eq("is_draft", false).order("created_at", { ascending: false });
+	const { data, error } = await supabaseAdmin.from("time_entry").select("*").eq("user_id", userId).gt("duration", 0).order("created_at", { ascending: false });
 	console.log(`Fetched user time entries for userId: ${userId}`, data);
 
 	if (error) {

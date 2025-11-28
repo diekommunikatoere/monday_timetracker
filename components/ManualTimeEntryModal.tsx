@@ -165,7 +165,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 				</div>
 
 				{/* Date Picker */}
-				<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={(newDate) => newDate && setDate(newDate)} valueFormat="DD.MM.YYYY" />
+				<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={(newDate) => newDate && setDate(new Date(newDate))} valueFormat="DD.MM.YYYY" />
 
 				{/* Task Selector (Board, Task, Role) */}
 				<TaskItemSelector onSelectionChange={handleTaskSelection} />
