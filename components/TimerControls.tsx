@@ -28,7 +28,7 @@ export default function TimerControls({ status, hasSession, isSaving, onPlayPaus
 	const isRunning = status === "running";
 
 	const activeColor = "white";
-	const disabledColor = "dki-tertiary";
+	const disabledColor = "var(--color--tertiary)";
 
 	// Determine which icon to show for play/pause button
 	const PlayPauseIcon = isRunning ? <Pause fillColor={activeColor} /> : <Play fillColor={activeColor} />;

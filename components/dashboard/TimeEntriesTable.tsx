@@ -5,10 +5,12 @@ import { useState, useMemo } from "react";
 import { useUserStore } from "@/stores/userStore";
 import { useTimerStore, useTimerComputed } from "@/stores/timerStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { Flex, Table, Checkbox, Text, Center, Loader } from "@mantine/core";
+import { Flex, Table, Checkbox, Text, Center, Loader, ActionIcon } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
 import Save from "@/components/icons/Save";
+import SaveTimerModal from "./SaveTimerModal";
+import { TaskSelection } from "../TaskItemSelector";
 
 interface TimeEntriesTableProps {
 	timeEntries?: TimeEntry[];
@@ -20,6 +22,8 @@ interface TimeEntriesTableProps {
 export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const { timeEntries, loading, error } = useTimeEntriesStore();
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showSaveModal, setShowSaveModal] = useState(false);
+	const [selectedDraft, setSelectedDraft] = useState<TimeEntry | null>(null);
 
 	// Use new timer store selectors
 	const elapsedTime = useTimerStore((s) => s.elapsedTime);
@@ -55,6 +59,23 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 		}
 	};
 
+	// Helper function to convert seconds to HH:MM format for TimePicker
+	const formatDurationAsTime = (seconds: number): string => {
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+	};
+
+	const handleOpenSaveModal = (entry: TimeEntry) => {
+		setSelectedDraft(entry);
+		setShowSaveModal(true);
+	};
+
+	const handleCloseSaveModal = () => {
+		setShowSaveModal(false);
+		setSelectedDraft(null);
+	};
+
 	if (loading) {
 		return (
 			<Center p="xl">
@@ -80,79 +101,107 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	}
 
 	return (
-		<Table striped highlightOnHover withColumnBorders withTableBorder withRowBorders>
-			<Table.Thead>
-				<Table.Tr bg="white" c="dki-black">
-					<Table.Th style={{ width: 40 }}>
-						<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => handleSelectAll(e.currentTarget.checked)} aria-label="Alle Zeiteinträge auswählen" />
-					</Table.Th>
-					<Table.Th fw={600} maw="100px">
-						Aufgabe
-					</Table.Th>
-					<Table.Th fw={600}>Rolle</Table.Th>
-					<Table.Th fw={600}>Board</Table.Th>
-					<Table.Th fw={600}>Kommentar</Table.Th>
-					<Table.Th fw={600}>Datum</Table.Th>
-					<Table.Th fw={600}>Start</Table.Th>
-					<Table.Th fw={600}>Ende</Table.Th>
-					<Table.Th fw={600}>Gesamtzeit</Table.Th>
-				</Table.Tr>
-			</Table.Thead>
-			<Table.Tbody>
-				{timeEntries.map(
-					(entry) =>
-						(!entry.is_draft && (
-							<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id.toString()) ? "dki-secondary.6" : undefined} c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "inherit"}>
-								<Table.Td>
-									<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.currentTarget.checked)} aria-label={`Select time entry ${entry.id}`} />
-								</Table.Td>
-								<Table.Td>
-									<Text size="sm">
-										{entry.task_name}
-										{entry.parent_item_name && (
-											<Text span c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "dki-tertiary"} fs="italic" fz={12} ml="xs">
-												{entry.parent_item_name}
-											</Text>
-										)}
-									</Text>
-								</Table.Td>
-								<Table.Td>{entry.role_name || "-"}</Table.Td>
-								<Table.Td>{entry.board_name || "-"}</Table.Td>
-								<Table.Td>{entry.comment || "-"}</Table.Td>
-								<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
-								<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
-								<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
-								<Table.Td>{formatDuration(entry.duration)}</Table.Td>
-							</Table.Tr>
-						)) || (
-							<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id.toString()) ? "dki-secondary.6" : "dki-tertiary-light"} c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "inherit"}>
-								<Table.Td>
-									<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.currentTarget.checked)} aria-label={`Select time entry ${entry.id}`} />
-								</Table.Td>
-								<Table.Td>
-									<Flex align="center" justify="space-between">
+		<>
+			<Table striped highlightOnHover withColumnBorders withTableBorder withRowBorders>
+				<Table.Thead>
+					<Table.Tr bg="white" c="dki-black">
+						<Table.Th style={{ width: 40 }}>
+							<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => handleSelectAll(e.currentTarget.checked)} aria-label="Alle Zeiteinträge auswählen" />
+						</Table.Th>
+						<Table.Th fw={600} maw="100px">
+							Aufgabe
+						</Table.Th>
+						<Table.Th fw={600}>Rolle</Table.Th>
+						<Table.Th fw={600}>Board</Table.Th>
+						<Table.Th fw={600}>Kommentar</Table.Th>
+						<Table.Th fw={600}>Datum</Table.Th>
+						<Table.Th fw={600}>Start</Table.Th>
+						<Table.Th fw={600}>Ende</Table.Th>
+						<Table.Th fw={600}>Gesamtzeit</Table.Th>
+					</Table.Tr>
+				</Table.Thead>
+				<Table.Tbody>
+					{timeEntries.map(
+						(entry) =>
+							(!entry.is_draft && (
+								<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id.toString()) ? "dki-secondary.6" : undefined} c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "inherit"}>
+									<Table.Td>
+										<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.currentTarget.checked)} aria-label={`Select time entry ${entry.id}`} />
+									</Table.Td>
+									<Table.Td>
 										<Text size="sm">
 											{entry.task_name}
 											{entry.parent_item_name && (
-												<Text span c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "dki-tertiary-dark"} fs="italic" fz={12} ml="xs">
+												<Text span c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "dki-tertiary"} fs="italic" fz={12} ml="xs">
 													{entry.parent_item_name}
 												</Text>
 											)}
 										</Text>
-										<Save size="21" fillColor={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
-									</Flex>
-								</Table.Td>
-								<Table.Td>{entry.role_name || "-"}</Table.Td>
-								<Table.Td>{entry.board_name || "-"}</Table.Td>
-								<Table.Td>{entry.comment || "-"}</Table.Td>
-								<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
-								<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
-								<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
-								<Table.Td>{formatDuration(entry.duration)}</Table.Td>
-							</Table.Tr>
-						)
-				)}
-			</Table.Tbody>
-		</Table>
+									</Table.Td>
+									<Table.Td>{entry.role_name || "-"}</Table.Td>
+									<Table.Td>{entry.board_name || "-"}</Table.Td>
+									<Table.Td>{entry.comment || "-"}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
+									<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
+									<Table.Td>{formatDuration(entry.duration)}</Table.Td>
+								</Table.Tr>
+							)) || (
+								<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id.toString()) ? "dki-secondary.6" : "dki-tertiary-light"} c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "inherit"}>
+									<Table.Td>
+										<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.currentTarget.checked)} aria-label={`Select time entry ${entry.id}`} />
+									</Table.Td>
+									<Table.Td>
+										<Flex align="center" justify="space-between">
+											<Text size="sm">
+												{entry.task_name}
+												{entry.parent_item_name && (
+													<Text span c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "dki-tertiary-dark"} fs="italic" fz={12} ml="xs">
+														{entry.parent_item_name}
+													</Text>
+												)}
+											</Text>
+											<ActionIcon variant="subtle" color="gray" onClick={() => handleOpenSaveModal(entry)} aria-label="Save draft entry">
+												<Save size="21" fillColor={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
+											</ActionIcon>
+										</Flex>
+									</Table.Td>
+									<Table.Td>{entry.role_name || "-"}</Table.Td>
+									<Table.Td>{entry.board_name || "-"}</Table.Td>
+									<Table.Td>{entry.comment || "-"}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
+									<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
+									<Table.Td>{formatDuration(entry.duration)}</Table.Td>
+								</Table.Tr>
+							)
+					)}
+				</Table.Tbody>
+			</Table>
+			<SaveTimerModal
+				show={showSaveModal}
+				onClose={handleCloseSaveModal}
+				initialData={
+					selectedDraft
+						? {
+								draftId: selectedDraft.id,
+								taskSelection: {
+									boardId: selectedDraft.board_id || "",
+									boardName: selectedDraft.board_name || "",
+									itemId: selectedDraft.item_id || "",
+									itemName: selectedDraft.item_name || "",
+									parentItemId: selectedDraft.parent_item_id || undefined,
+									parentItemName: selectedDraft.parent_item_name || undefined,
+									role: selectedDraft.role || "",
+									roleName: selectedDraft.role_name || "",
+								},
+								comment: selectedDraft.comment || "",
+								date: new Date(selectedDraft.start_time),
+								duration: formatDurationAsTime(selectedDraft.duration),
+						  }
+						: undefined
+				}
+			/>
+		</>
 	);
 }

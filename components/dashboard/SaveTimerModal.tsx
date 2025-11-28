@@ -22,6 +22,13 @@ const monday = mondaySdk();
 interface SaveTimerModalProps {
 	show: boolean;
 	onClose: () => void;
+	initialData?: {
+		draftId?: number;
+		taskSelection?: TaskSelection;
+		comment?: string;
+		date?: Date;
+		duration?: string;
+	};
 }
 
 /**
@@ -34,12 +41,14 @@ interface SaveTimerModalProps {
  * - Add/edit a comment
  * - Save the time entry
  */
-export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
+export default function SaveTimerModal({ show, onClose, initialData }: SaveTimerModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [date, setDate] = useState<Date>(new Date());
 	const [duration, setDuration] = useState("00:00");
+	// Local comment state - used when modal is opened with initialData
+	const [localComment, setLocalComment] = useState<string>("");
 
 	// Store selectors
 	const { refetch } = useTimeEntriesStore();
@@ -48,13 +57,17 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
 	// Timer store - using new API
-	const comment = useTimerStore((state) => state.comment);
+	const globalComment = useTimerStore((state) => state.comment);
 	const elapsedTime = useTimerStore((state) => state.elapsedTime);
 	const draftId = useTimerStore((state) => state.draftId);
 	const sessionId = useTimerStore((state) => state.sessionId);
 
 	// Store actions
-	const { setComment, reset: resetTimer } = useTimerStore.getState();
+	const { setComment: setGlobalComment, reset: resetTimer } = useTimerStore.getState();
+
+	// Use local comment when initialData is provided, otherwise use global comment
+	const comment = initialData ? localComment : globalComment;
+	const setComment = initialData ? setLocalComment : setGlobalComment;
 
 	// Convert HH:MM to seconds
 	const durationToSeconds = (timeStr: string): number => {
@@ -78,23 +91,36 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 		setDuration(formatDurationFromMs(newSeconds * 1000));
 	};
 
-	// Clear error state and selection when modal opens, sync duration with elapsed time
+	// Clear error state and selection when modal opens, sync duration with elapsed time or initial data
 	useEffect(() => {
 		if (show) {
 			setError(null);
-			setSelectedTask(null);
-			setDate(new Date());
-			setDuration(formatDurationFromMs(elapsedTime));
+
+			// If initialData is provided, use it; otherwise use current timer state
+			if (initialData) {
+				setSelectedTask(initialData.taskSelection || null);
+				setDate(initialData.date || new Date());
+				setDuration(initialData.duration || "00:00");
+				setLocalComment(initialData.comment || "");
+			} else {
+				setSelectedTask(null);
+				setDate(new Date());
+				setDuration(formatDurationFromMs(elapsedTime));
+				setLocalComment(""); // Clear local comment when not using initialData
+			}
 		}
-	}, [show, elapsedTime]);
+	}, [show, elapsedTime, initialData]);
 
 	const handleTaskSelection = (taskData: TaskSelection) => {
 		setSelectedTask(taskData);
 	};
 
 	const handleSave = async () => {
-		if (!draftId || !selectedTask || !userProfile?.id) {
-			console.error("Cannot save: missing required data", { draftId, selectedTask, userId: userProfile?.id });
+		// Use draftId from initialData if provided, otherwise use current timer's draftId
+		const activeDraftId = initialData?.draftId || draftId;
+
+		if (!activeDraftId || !selectedTask || !userProfile?.id) {
+			console.error("Cannot save: missing required data", { draftId: activeDraftId, selectedTask, userId: userProfile?.id });
 			return;
 		}
 
@@ -114,6 +140,8 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 			// Get fresh context for the API call
 			const context = rawContext || (await monday.get("context"));
 
+			console.log("Trying to save time entry with: ", { draftId: activeDraftId, taskName, comment, boardId: selectedTask.boardId, boardName: selectedTask.boardName, itemId: selectedTask.itemId, itemName: selectedTask.itemName, parentItemId: selectedTask.parentItemId || null, parentItemName: selectedTask.parentItemName || null, role: selectedTask.role, roleName: selectedTask.roleName, duration: durationSeconds, date: date.toISOString() });
+
 			// Call API route to finalize time entry
 			const response = await fetch("/api/time-entries/finalize", {
 				method: "POST",
@@ -122,15 +150,15 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 					"monday-context": JSON.stringify(context),
 				},
 				body: JSON.stringify({
-					draftId,
+					draftId: activeDraftId,
 					taskName,
 					comment,
 					boardId: selectedTask.boardId,
 					boardName: selectedTask.boardName,
 					itemId: selectedTask.itemId,
 					itemName: selectedTask.itemName,
-					parentItemId: selectedTask.parentItemId,
-					parentItemName: selectedTask.parentItemName,
+					parentItemId: selectedTask.parentItemId || null,
+					parentItemName: selectedTask.parentItemName || null,
 					role: selectedTask.role,
 					roleName: selectedTask.roleName,
 					duration: durationSeconds,
@@ -154,7 +182,7 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 						"monday-context": JSON.stringify(context),
 					},
 					body: JSON.stringify({
-						draftId,
+						draftId: activeDraftId,
 						sessionId,
 					}),
 				});

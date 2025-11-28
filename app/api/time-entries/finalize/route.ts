@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
 			}
 		}
 
+		console.log("Finalizing time entry with: ", { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date });
+
 		// Call the RPC to finalize the time entry
 		const { data, error } = await supabaseAdmin.rpc("finalize_time_entry", {
 			p_user_id: userProfile.id,
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest) {
 			p_role: role || null,
 			p_role_name: roleName || null,
 			p_duration: duration, // Pass the duration override
+			p_date: date ? new Date(date).toISOString() : null, // Pass the date override
 		});
 
 		if (error) {

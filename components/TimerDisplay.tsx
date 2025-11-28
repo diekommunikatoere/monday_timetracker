@@ -24,8 +24,8 @@ export default function TimerDisplay({ elapsedTime, status, onReset, disabled }:
 	const isActive = status !== "idle";
 	const isPaused = status === "paused";
 
-	const activeColor = "var(--mantine-color-white)";
-	const disabledColor = "var(--mantine-color-gray-5)";
+	const activeColor = "white";
+	const disabledColor = "var(--color--tertiary)";
 
 	return (
 		<Flex direction="row" align="center" justify="center" className="timer-display" gap="md">

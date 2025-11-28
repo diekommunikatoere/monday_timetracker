@@ -1,29 +1,27 @@
--- Migration 001: Initial Schema
--- Creates core tables: user_profiles, role, time_entry, timer_session, timer_segment
--- Schema matches types/database.ts
--- IMPORTANT: All timestamps use database server time (NOW()) to avoid clock drift issues
+-- Migration: table_user_profiles
+-- Links Monday.com users to Supabase
+-- Includes team_ids array added later
 
--- Enable UUID extension
+-- Enable UUID extension (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ============================================
--- Table: user_profiles
--- Links Monday.com users to Supabase
--- ============================================
 CREATE TABLE public.user_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     monday_user_id TEXT NOT NULL UNIQUE,
     monday_account_id TEXT NOT NULL,
     email TEXT,
     name TEXT,
+    team_ids text[] DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================
--- Table: role
+-- Add comments for documentation
+COMMENT ON COLUMN public.user_profiles.team_ids IS 'Array of Monday.com team IDs the user belongs to';
+
+-- Migration: table_role
 -- Stores available roles for time entries
--- ============================================
+
 CREATE TABLE public.role (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
@@ -32,20 +30,25 @@ CREATE TABLE public.role (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================
--- Table: time_entry
+-- Migration: table_time_entry
 -- Stores time tracking entries (both drafts and finalized)
--- ============================================
+-- Includes all modifications: display names, parent items, timestamp defaults
+
 CREATE TABLE public.time_entry (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
     task_name TEXT,
-    start_time TIMESTAMPTZ DEFAULT NOW(), -- Uses DB server time for consistency
+    start_time TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- Uses DB server time for consistency
     end_time TIMESTAMPTZ,
     duration INTEGER, -- Duration in seconds
     board_id TEXT,
+    board_name TEXT, -- Human-readable board name for display purposes
     item_id TEXT,
+    item_name TEXT, -- Human-readable task/item name for display purposes
+    parent_item_id TEXT, -- ID of the parent item (e.g. Monday.com parent item ID)
+    parent_item_name TEXT, -- Human-readable parent item name for display purposes
     role TEXT,
+    role_name TEXT, -- Human-readable role name for display purposes
     comment TEXT,
     is_draft BOOLEAN NOT NULL DEFAULT TRUE,
     synced_to_monday BOOLEAN NOT NULL DEFAULT FALSE,
@@ -54,10 +57,16 @@ CREATE TABLE public.time_entry (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================
--- Table: timer_session
+-- Add comments for documentation
+COMMENT ON COLUMN public.time_entry.board_name IS 'Human-readable board name for display purposes';
+COMMENT ON COLUMN public.time_entry.item_name IS 'Human-readable task/item name for display purposes';
+COMMENT ON COLUMN public.time_entry.role_name IS 'Human-readable role name for display purposes';
+COMMENT ON COLUMN public.time_entry.parent_item_id IS 'ID of the parent item (e.g. Monday.com parent item ID)';
+COMMENT ON COLUMN public.time_entry.parent_item_name IS 'Human-readable parent item name for display purposes';
+
+-- Migration: table_timer_session
 -- Tracks active timer sessions for users
--- ============================================
+
 CREATE TABLE public.timer_session (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
@@ -70,10 +79,9 @@ CREATE TABLE public.timer_session (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================
--- Table: timer_segment
+-- Migration: table_timer_segment
 -- Individual running segments within a timer session
--- ============================================
+
 CREATE TABLE public.timer_segment (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES public.timer_session(id) ON DELETE CASCADE,
@@ -82,35 +90,3 @@ CREATE TABLE public.timer_segment (
     duration INTEGER, -- Duration in milliseconds (computed on end)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- ============================================
--- Trigger function: Auto-update updated_at column
--- ============================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply updated_at triggers to all relevant tables
-CREATE TRIGGER update_user_profiles_updated_at
-    BEFORE UPDATE ON public.user_profiles
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_role_updated_at
-    BEFORE UPDATE ON public.role
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_time_entry_updated_at
-    BEFORE UPDATE ON public.time_entry
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_timer_session_updated_at
-    BEFORE UPDATE ON public.timer_session
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
