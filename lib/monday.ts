@@ -114,7 +114,7 @@ export async function getBoardTasks(
 ): Promise<{
 	groups: Array<{
 		label: string;
-		options: Array<{ id: string; value: string; label: string }>;
+		options: Array<{ id: string; value: string; label: string; name: string; parentItemId?: string; parentItemName?: string }>;
 	}>;
 }> {
 	// Validate boardId
@@ -188,6 +188,9 @@ export async function getBoardTasks(
 						id: subitem.id.toString(),
 						value: subitem.id.toString(),
 						label: `${item.name} > ${subitem.name}`,
+						name: subitem.name,
+						parentItemId: item.id.toString(),
+						parentItemName: item.name,
 					}));
 				}
 				return [
@@ -195,6 +198,7 @@ export async function getBoardTasks(
 						id: item.id.toString(),
 						value: item.id.toString(),
 						label: item.name,
+						name: item.name,
 					},
 				];
 			});
