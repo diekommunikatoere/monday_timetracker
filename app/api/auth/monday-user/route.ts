@@ -1,7 +1,7 @@
 // app/api/auth/monday-user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { findOrCreateUserByMondayId } from "@/lib/database/users";
-import { getMondayContext } from "@/lib/monday";
+import { getMondayContext, getUserTeams } from "@/lib/monday";
 
 export async function POST(request: NextRequest) {
 	try {
@@ -12,8 +12,12 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
 		}
 
+		// Fetch user's teams from Monday
+		const teams = await getUserTeams(mondayUserId);
+		const teamIds = teams.map((team) => team.id);
+
 		// This uses supabaseAdmin from server.ts - safe on server
-		const userProfile = await findOrCreateUserByMondayId(mondayUserId, mondayAccountId, email, name);
+		const userProfile = await findOrCreateUserByMondayId(mondayUserId, mondayAccountId, email, name, teamIds);
 
 		return NextResponse.json({ userProfile });
 	} catch (error) {

@@ -251,6 +251,7 @@ export type Database = {
 					monday_account_id: string;
 					monday_user_id: string;
 					name: string | null;
+					team_ids: string[] | null;
 					updated_at: string;
 				};
 				Insert: {
@@ -260,6 +261,7 @@ export type Database = {
 					monday_account_id: string;
 					monday_user_id: string;
 					name?: string | null;
+					team_ids?: string[] | null;
 					updated_at?: string;
 				};
 				Update: {
@@ -269,6 +271,7 @@ export type Database = {
 					monday_account_id?: string;
 					monday_user_id?: string;
 					name?: string | null;
+					team_ids?: string[] | null;
 					updated_at?: string;
 				};
 				Relationships: [];

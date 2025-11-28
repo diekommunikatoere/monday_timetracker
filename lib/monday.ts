@@ -231,3 +231,40 @@ export async function getMondayContext(request: NextRequest) {
 		throw new Error("Failed to parse monday context");
 	}
 }
+
+// Get teams for a specific user
+export async function getUserTeams(userId: string): Promise<Array<{ id: string; name: string }>> {
+	if (!userId) {
+		return [];
+	}
+
+	const query = `
+		query {
+			users(ids: [${userId}]) {
+				teams {
+					id
+					name
+				}
+			}
+		}
+	`;
+
+	try {
+		const response: any = await client.request(query);
+
+		if (response.error) {
+			console.error("Monday API error in getUserTeams:", response.error?.message);
+			throw new Error(response.error?.message || "Failed to fetch user teams");
+		}
+
+		const users = response.users || [];
+		if (users.length > 0 && users[0].teams) {
+			return users[0].teams;
+		}
+		return [];
+	} catch (error) {
+		console.error("Error in getUserTeams:", error);
+		// Don't fail the whole auth process if teams fetch fails, just return empty
+		return [];
+	}
+}
