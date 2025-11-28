@@ -9,6 +9,8 @@ export interface TimeEntry {
 	board_name: string | null; // Human-readable board name
 	item_id: string | null;
 	item_name: string | null; // Human-readable task/item name
+	parent_item_id: string | null;
+	parent_item_name: string | null; // Human-readable parent item name
 	role: string | null;
 	role_name: string | null; // Human-readable role name
 	is_draft: boolean;

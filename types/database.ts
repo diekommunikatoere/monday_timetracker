@@ -96,6 +96,9 @@ export type Database = {
 					id: string;
 					is_draft: boolean;
 					item_id: string | null;
+					item_name: string | null;
+					parent_item_id: string | null;
+					parent_item_name: string | null;
 					role: string | null;
 					start_time: string | null;
 					synced_to_monday: boolean;
@@ -113,6 +116,9 @@ export type Database = {
 					id?: string;
 					is_draft?: boolean;
 					item_id?: string | null;
+					item_name?: string | null;
+					parent_item_id?: string | null;
+					parent_item_name?: string | null;
 					role?: string | null;
 					start_time?: string | null; // Optional - uses DEFAULT NOW()
 					synced_to_monday?: boolean;
@@ -130,6 +136,9 @@ export type Database = {
 					id?: string;
 					is_draft?: boolean;
 					item_id?: string | null;
+					item_name?: string | null;
+					parent_item_id?: string | null;
+					parent_item_name?: string | null;
 					role?: string | null;
 					start_time?: string | null;
 					synced_to_monday?: boolean;

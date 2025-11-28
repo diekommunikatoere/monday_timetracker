@@ -10,6 +10,8 @@ interface FinalizeTimeEntryRequest {
 	boardName?: string;
 	itemId?: string;
 	itemName?: string;
+	parentItemId?: string;
+	parentItemName?: string;
 	role?: string;
 	roleName?: string;
 	duration?: number; // in seconds, optional override
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: FinalizeTimeEntryRequest = await request.json();
-		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, role, roleName, duration, date } = body;
+		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date } = body;
 
 		// Validate required fields
 		if (!draftId) {
@@ -86,6 +88,8 @@ export async function POST(request: NextRequest) {
 			p_board_name: boardName || null,
 			p_item_id: itemId || null,
 			p_item_name: itemName || null,
+			p_parent_item_id: parentItemId || null,
+			p_parent_item_name: parentItemName || null,
 			p_role: role || null,
 			p_role_name: roleName || null,
 			p_duration: duration, // Pass the duration override

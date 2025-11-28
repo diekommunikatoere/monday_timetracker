@@ -10,6 +10,8 @@ interface ManualTimeEntryRequest {
 	boardName?: string;
 	itemId?: string;
 	itemName?: string;
+	parentItemId?: string;
+	parentItemName?: string;
 	role?: string;
 	roleName?: string;
 	duration: number; // in seconds
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: ManualTimeEntryRequest = await request.json();
-		const { userId, taskName, comment, boardId, boardName, itemId, itemName, role, roleName, duration, date } = body;
+		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date } = body;
 
 		// Validate required fields
 		if (!userId || userId !== userProfile.id) {
@@ -64,6 +66,8 @@ export async function POST(request: NextRequest) {
 				board_name: boardName || null,
 				item_id: itemId || null,
 				item_name: itemName || null,
+				parent_item_id: parentItemId || null,
+				parent_item_name: parentItemName || null,
 				role: role || null,
 				role_name: roleName || null,
 				duration: duration,
