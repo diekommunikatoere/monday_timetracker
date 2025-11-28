@@ -87,6 +87,8 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 			const taskName = selectedTask.itemName || "Unbenannter Zeit-Eintrag";
 			const context = rawContext || (await monday.get("context"));
 
+			console.log("selectedTask", selectedTask);
+
 			// Create manual time entry
 			const response = await fetch("/api/time-entries/manual", {
 				method: "POST",
@@ -102,6 +104,8 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 					boardName: selectedTask.boardName,
 					itemId: selectedTask.itemId,
 					itemName: selectedTask.itemName,
+					parentItemId: selectedTask.parentItemId,
+					parentItemName: selectedTask.parentItemName,
 					role: selectedTask.role,
 					roleName: selectedTask.roleName,
 					duration: durationSeconds,

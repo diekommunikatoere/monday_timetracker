@@ -129,6 +129,8 @@ export default function SaveTimerModal({ show, onClose }: SaveTimerModalProps) {
 					boardName: selectedTask.boardName,
 					itemId: selectedTask.itemId,
 					itemName: selectedTask.itemName,
+					parentItemId: selectedTask.parentItemId,
+					parentItemName: selectedTask.parentItemName,
 					role: selectedTask.role,
 					roleName: selectedTask.roleName,
 					duration: durationSeconds,

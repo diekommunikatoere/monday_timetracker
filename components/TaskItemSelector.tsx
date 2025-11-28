@@ -13,6 +13,8 @@ export interface TaskSelection {
 	boardName?: string;
 	itemId?: string;
 	itemName?: string;
+	parentItemId?: string;
+	parentItemName?: string;
 	role?: string;
 	roleName?: string;
 }
@@ -31,7 +33,10 @@ interface TaskItemSelectorProps {
 type DropdownOption = {
 	value: string;
 	label: string;
+	name?: string;
 	disabled?: boolean;
+	parentItemId?: string;
+	parentItemName?: string;
 };
 
 type TaskGroupsResponse = {
@@ -40,6 +45,9 @@ type TaskGroupsResponse = {
 		options: {
 			value: string;
 			label: string;
+			name?: string;
+			parentItemId?: string;
+			parentItemName?: string;
 		}[];
 	}[];
 };
@@ -79,6 +87,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			boardName: undefined,
 			itemId: undefined,
 			itemName: undefined,
+			parentItemId: undefined,
+			parentItemName: undefined,
 			role: undefined,
 			roleName: undefined,
 		});
@@ -201,6 +211,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				items: group.options.map((option) => ({
 					value: option.value,
 					label: option.label,
+					name: option.name,
+					parentItemId: option.parentItemId,
+					parentItemName: option.parentItemName,
 				})),
 			}));
 			setTasks(mappedTasks);
@@ -243,6 +256,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				boardName: selectedOption?.label,
 				itemId: undefined,
 				itemName: undefined,
+				parentItemId: undefined,
+				parentItemName: undefined,
 				role: selectedRole?.value,
 				roleName: selectedRole?.label,
 			});
@@ -253,19 +268,31 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Handle task selection
 	const handleTaskChange = useCallback(
 		(value: string | null, option: ComboboxItem) => {
-			const selectedOption = option as DropdownOption;
+			console.log("handleTaskChange", value, option);
+
+			// Find the full option object from state to ensure we have all properties
+			// Mantine's Select might strip extra properties from the option argument
+			let fullOption: DropdownOption | null = null;
+			if (value) {
+				const allItems = tasks.flatMap((group) => group.items);
+				fullOption = (allItems.find((item) => (item as DropdownOption).value === value) as DropdownOption) || null;
+			}
+
+			const selectedOption = fullOption || (option as DropdownOption);
 			setSelectedTask(value ? selectedOption : null);
 
 			onSelectionChange({
 				boardId: selectedBoard?.value,
 				boardName: selectedBoard?.label,
 				itemId: value || undefined,
-				itemName: selectedOption?.label,
+				itemName: selectedOption?.name || selectedOption?.label,
+				parentItemId: selectedOption?.parentItemId,
+				parentItemName: selectedOption?.parentItemName,
 				role: selectedRole?.value,
 				roleName: selectedRole?.label,
 			});
 		},
-		[selectedBoard, selectedRole, onSelectionChange]
+		[selectedBoard, selectedRole, onSelectionChange, tasks]
 	);
 
 	// Handle role selection
