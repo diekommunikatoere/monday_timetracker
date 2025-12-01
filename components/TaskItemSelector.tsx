@@ -1,11 +1,12 @@
 // components/TaskItemSelector.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Flex, Text, Select, ComboboxItem, ComboboxItemGroup } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
+import { Flex, Text, Select, ComboboxItem, ComboboxItemGroup, Skeleton, ActionIcon, Tooltip, Loader } from "@mantine/core";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
+import RefreshIcon from "@/components/icons/Refresh";
 
 // Selection data type passed to parent
 export interface TaskSelection {
@@ -52,6 +53,33 @@ type TaskGroupsResponse = {
 	}[];
 };
 
+// Fetch tasks function - extracted for prefetching
+const fetchTasks = async (boardId: string): Promise<TaskGroupsResponse> => {
+	const params = new URLSearchParams({ boardId });
+	const response = await fetch(`/api/tasks?${params}`);
+	if (!response.ok) {
+		throw new Error("Failed to fetch tasks");
+	}
+	return response.json();
+};
+
+// Invalidate cache and refetch - returns true on success
+const invalidateAndRefetchTasks = async (boardId: string): Promise<boolean> => {
+	try {
+		// First, invalidate the Redis cache on the server
+		const response = await fetch(`/api/tasks/refresh?boardId=${boardId}`, {
+			method: "POST",
+		});
+		if (!response.ok) {
+			throw new Error("Failed to invalidate cache");
+		}
+		return true;
+	} catch (error) {
+		console.error("Error refreshing tasks:", error);
+		return false;
+	}
+};
+
 export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues }: TaskItemSelectorProps) {
 	// State management for selections
 	const [tasks, setTasks] = useState<ComboboxItemGroup[]>([]);
@@ -59,6 +87,10 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	// Query client for prefetching
+	const queryClient = useQueryClient();
 
 	// Use mondayStore for context
 	const { rawContext } = useMondayStore();
@@ -101,7 +133,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [onResetRef, resetSelections]);
 
-	// Boards query using React Query
+	// Boards query using React Query with enhanced caching
 	const boardIds = rawContext?.data?.boardIds;
 	const {
 		data: boards = [],
@@ -136,11 +168,32 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			}));
 		},
 		enabled: !!boardIds?.length,
-		staleTime: 5 * 60 * 1000, // 5 minutes
-		gcTime: 10 * 60 * 1000, // 10 minutes
+		// OPTIMIZATION: Extended cache times for board data
+		staleTime: 10 * 60 * 1000, // 10 minutes - boards rarely change
+		gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
+		refetchOnWindowFocus: false, // Don't refetch on tab focus
+		refetchOnMount: false, // Use cached data on remount
 	});
 
-	// Roles query
+	// OPTIMIZATION: Prefetch tasks for all boards when boards are loaded
+	useEffect(() => {
+		if (boards.length > 0) {
+			console.log(`[TaskItemSelector] Prefetching tasks for ${boards.length} boards`);
+
+			// Prefetch with a slight stagger to avoid overwhelming the API
+			boards.forEach((board: DropdownOption, index: number) => {
+				setTimeout(() => {
+					queryClient.prefetchQuery({
+						queryKey: ["tasks", board.value],
+						queryFn: () => fetchTasks(board.value),
+						staleTime: 5 * 60 * 1000, // 5 minutes
+					});
+				}, index * 100); // Stagger by 100ms per board
+			});
+		}
+	}, [boards, queryClient]);
+
+	// Roles query with enhanced caching
 	const { data: roles = [], isLoading: loadingRoles } = useQuery({
 		queryKey: ["roles"],
 		queryFn: async () => {
@@ -151,29 +204,57 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				value: role.id,
 			}));
 		},
-		staleTime: 10 * 60 * 1000, // Roles change infrequently
+		// OPTIMIZATION: Roles change very infrequently
+		staleTime: 30 * 60 * 1000, // 30 minutes
+		gcTime: 60 * 60 * 1000, // 1 hour
+		refetchOnWindowFocus: false,
+		refetchOnMount: false,
 	});
 
-	// Tasks query
+	// Tasks query with enhanced caching
 	const {
 		data: tasksData,
 		isLoading: isLoadingTasks,
+		isFetching: isFetchingTasks,
 		error: tasksError,
 	} = useQuery<TaskGroupsResponse>({
 		queryKey: ["tasks", selectedBoard?.value],
 		queryFn: async () => {
 			if (!selectedBoard) return { groups: [] };
-			const params = new URLSearchParams({ boardId: selectedBoard.value });
-			const response = await fetch(`/api/tasks?${params}`);
-			if (!response.ok) {
-				throw new Error("Failed to fetch tasks");
-			}
-			return response.json();
+			return fetchTasks(selectedBoard.value);
 		},
 		enabled: !!selectedBoard,
-		staleTime: 5 * 60 * 1000,
-		gcTime: 10 * 60 * 1000,
+		// OPTIMIZATION: Enhanced caching with stale-while-revalidate pattern
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 15 * 60 * 1000, // 15 minutes
+		refetchOnWindowFocus: false,
+		refetchOnMount: false,
+		// Show previous data immediately while revalidating
+		placeholderData: (previousData) => previousData,
 	});
+
+	// Handle refresh button click
+	const handleRefreshTasks = useCallback(async () => {
+		if (!selectedBoard || isRefreshing) return;
+
+		setIsRefreshing(true);
+		try {
+			// Invalidate server-side Redis cache
+			const success = await invalidateAndRefetchTasks(selectedBoard.value);
+
+			if (success) {
+				// Invalidate React Query cache and trigger refetch
+				await queryClient.invalidateQueries({
+					queryKey: ["tasks", selectedBoard.value],
+				});
+				console.log(`[TaskItemSelector] Tasks refreshed for board ${selectedBoard.value}`);
+			} else {
+				setError("Fehler beim Aktualisieren der Aufgaben");
+			}
+		} finally {
+			setIsRefreshing(false);
+		}
+	}, [selectedBoard, isRefreshing, queryClient]);
 
 	// Handle boards error
 	useEffect(() => {
@@ -313,7 +394,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		[selectedBoard, selectedTask, onSelectionChange]
 	);
 
-	const taskPlaceholder = isLoadingTasks ? "Lade Aufgaben..." : selectedBoard ? "Aufgabe auswählen..." : "Zuerst ein Board auswählen";
+	// Show loading indicator only for initial load, not background refetch
+	const showTasksLoading = isLoadingTasks && !tasksData;
+	const taskPlaceholder = showTasksLoading ? "Lade Aufgaben..." : selectedBoard ? "Aufgabe auswählen..." : "Zuerst ein Board auswählen";
 
 	return (
 		<Flex
@@ -326,14 +409,89 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			{/* Error Display */}
 			{error && <Text c="dki-error">{error}</Text>}
 
-			{/* Board Selector */}
-			<Select id="board-selector" label="Board auswählen" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" />
+			{/* Board Selector with skeleton loading */}
+			{loadingBoards ? (
+				<div>
+					<Text size="sm" fw={500} mb={4}>
+						Board auswählen
+					</Text>
+					<Skeleton height={36} radius="sm" />
+				</div>
+			) : (
+				<div>
+					<label htmlFor="board-selector" style={{ marginBottom: 0 }}>
+						<Text size="sm" fw={500} mb={4}>
+							Board auswählen
+						</Text>
+					</label>
+					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" />
+				</div>
+			)}
 
-			{/* Task Selector - with groups */}
-			<Select id="task-selector" label="Aufgabe auswählen" placeholder={taskPlaceholder} data={tasks} value={selectedTask?.value || null} onChange={handleTaskChange} clearable searchable={!isLoadingTasks} disabled={!selectedBoard || isLoadingTasks} nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : "Keine Aufgaben gefunden"} />
+			{/* Task Selector - with groups, skeleton loading, and refresh button */}
+			{showTasksLoading ? (
+				<div>
+					<Text size="sm" fw={500} mb={4}>
+						Aufgabe auswählen
+					</Text>
+					<Skeleton height={36} radius="sm" />
+				</div>
+			) : (
+				<div>
+					<Flex justify="space-between" align="center" mb={4}>
+						<label htmlFor="task-selector" style={{ marginBottom: 0 }}>
+							<Text size="sm" fw={500}>
+								Aufgabe auswählen
+							</Text>
+						</label>
+						{selectedBoard && (
+							<Tooltip label="Aufgabenliste aktualisieren" position="left">
+								<ActionIcon variant="subtle" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
+									{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
+								</ActionIcon>
+							</Tooltip>
+						)}
+					</Flex>
+					<Select
+						id="task-selector"
+						placeholder={taskPlaceholder}
+						data={tasks}
+						value={selectedTask?.value || null}
+						onChange={handleTaskChange}
+						clearable
+						searchable={!showTasksLoading}
+						disabled={!selectedBoard || showTasksLoading}
+						nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : "Keine Aufgaben gefunden"}
+						// Show subtle loading indicator for background refetch
+						rightSection={
+							isFetchingTasks && tasksData ? (
+								<Text size="xs" c="dimmed">
+									...
+								</Text>
+							) : undefined
+						}
+					/>
+				</div>
+			)}
 
-			{/* Role Selector */}
-			<Select id="role-selector" label="Rolle auswählen" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" />
+			{/* Role Selector with skeleton loading */}
+			{loadingRoles ? (
+				<div>
+					<Text size="sm" fw={500} mb={4}>
+						Rolle auswählen
+					</Text>
+					<Skeleton height={36} radius="sm" />
+				</div>
+			) : (
+				<div>
+					<label htmlFor="role-selector" style={{ marginBottom: 0 }}>
+						<Text size="sm" fw={500} mb={4}>
+							Rolle auswählen
+						</Text>
+					</label>
+					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" />
+				</div>
+			)}
 		</Flex>
 	);
 }
