@@ -8,16 +8,19 @@ import { useUserStore } from "@/stores/userStore";
 import { supabase } from "@/lib/supabase/client";
 import { useHydration } from "@/lib/store-utils";
 import type { MondayContext } from "@/types/monday";
-import type { Database } from "@/types/database";
 
 const monday = mondaySdk();
 
-type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
+// Use the same type as the store for consistency
+type UserProfile = {
+	id: string;
+	email: string;
+} | null;
 
 interface UseMondayContextReturn {
 	rawContext: MondayContext | null;
 	mondayUser: MondayContext["user"] | null;
-	userProfile: UserProfile | null;
+	userProfile: UserProfile;
 	loading: boolean;
 	error: string | null;
 }
@@ -54,7 +57,8 @@ export function useMondayContext(): UseMondayContextReturn {
 					console.warn("User profile not found:", profileError);
 					setUserProfile(null);
 				} else {
-					setUserProfile(profile);
+					// Store just the essential fields we need
+					setUserProfile({ id: profile.id, email: profile.email });
 				}
 			} catch (err: any) {
 				console.error("Failed to load monday context:", err);
