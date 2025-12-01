@@ -29,16 +29,16 @@ export const useTimeEntriesStore = create<TimeEntriesState>()((set, get) => ({
 		try {
 			set({ loading: true, error: null });
 			const response = await fetch(`/api/time-entries?mondayUserId=${userId}`);
-			
+
 			if (!response.ok) {
-				throw new Error("Failed to fetch time entries");
+				throw new Error("Fehler beim Laden der Zeiteinträge");
 			}
 
 			const data = await response.json();
 			set({ timeEntries: data, loading: false });
 		} catch (err) {
 			set({
-				error: err instanceof Error ? err.message : "Unknown error",
+				error: err instanceof Error ? err.message : "Unbekannter Fehler",
 				loading: false,
 			});
 		}

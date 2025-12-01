@@ -11,11 +11,11 @@ export default function Home() {
 				}}
 			>
 				<Dropdown
-					ariaLabel="Overview dropdown"
-					clearAriaLabel="Clear"
-					helperText="Helper text"
+					ariaLabel="Übersichts-Dropdown"
+					clearAriaLabel="Löschen"
+					helperText="Hilfetext"
 					id="overview-dropdown"
-					label="Label"
+					label="Etikett"
 					options={[
 						{
 							label: "Option 1",
@@ -30,7 +30,7 @@ export default function Home() {
 							value: 3,
 						},
 					]}
-					placeholder="Placeholder text here"
+					placeholder="Platzhaltertext hier"
 				/>
 			</div>
 		</>

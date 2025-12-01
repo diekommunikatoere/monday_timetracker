@@ -38,12 +38,12 @@ export default function DashboardPage() {
 
 	// Show loading state while initializing
 	if (mondayLoading) {
-		return <div>Initializing...</div>;
+		return <div>Wird initialisiert...</div>;
 	}
 
 	// Show error if Monday initialization failed
 	if (mondayError) {
-		return <div>Error: {mondayError}</div>;
+		return <div>Fehler: {mondayError}</div>;
 	}
 
 	return (

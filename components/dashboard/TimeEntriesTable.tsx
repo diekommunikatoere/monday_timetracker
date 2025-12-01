@@ -161,7 +161,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 													</Text>
 												)}
 											</Text>
-											<ActionIcon variant="subtle" color="gray" onClick={() => handleOpenSaveModal(entry)} aria-label="Save draft entry">
+											<ActionIcon variant="subtle" color="gray" onClick={() => handleOpenSaveModal(entry)} aria-label="Entwurf speichern">
 												<Save size="21" fillColor={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
 											</ActionIcon>
 										</Flex>
