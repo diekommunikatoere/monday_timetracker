@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { syncAfterFinalize } from "@/lib/columnSync";
 
 interface FinalizeTimeEntryRequest {
 	draftId: string;
@@ -101,6 +102,15 @@ export async function POST(request: NextRequest) {
 		if (error) {
 			console.error("Error finalizing time entry:", error);
 			return NextResponse.json({ error: error.message || "Failed to finalize time entry" }, { status: 500 });
+		}
+
+		// Trigger column sync after successful finalization
+		// This runs asynchronously and doesn't block the response
+		if (boardId && itemId) {
+			// Don't await - let it run in the background
+			syncAfterFinalize(itemId, boardId, userProfile.id, draftId).catch((syncError) => {
+				console.error("[ColumnSync] Background sync failed:", syncError);
+			});
 		}
 
 		return NextResponse.json({

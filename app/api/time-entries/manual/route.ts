@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { syncAfterFinalize } from "@/lib/columnSync";
 
 interface ManualTimeEntryRequest {
 	userId: string;
@@ -116,6 +117,15 @@ export async function POST(request: NextRequest) {
 		if (error) {
 			console.error("Error creating manual time entry:", error);
 			return NextResponse.json({ error: error.message || "Failed to create time entry" }, { status: 500 });
+		}
+
+		// Trigger column sync after successful manual entry creation
+		// This runs asynchronously and doesn't block the response
+		if (boardId && itemId && data?.id) {
+			// Don't await - let it run in the background
+			syncAfterFinalize(itemId, boardId, userProfile.id, data.id).catch((syncError) => {
+				console.error("[ColumnSync] Background sync failed:", syncError);
+			});
 		}
 
 		return NextResponse.json({
