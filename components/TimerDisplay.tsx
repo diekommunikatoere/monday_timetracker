@@ -3,7 +3,7 @@
 
 import { Flex, Text, Button, ActionIcon } from "@mantine/core";
 import { formatTime } from "@/lib/utils";
-import Reset from "@/components/icons/Reset";
+import { Icon } from "@/components/Icon";
 import type { TimerDisplayProps } from "@/types/timer.types";
 import "@/public/css/components/RunningTimerDisplay.css";
 
@@ -31,7 +31,7 @@ export default function TimerDisplay({ elapsedTime, status, onReset, disabled }:
 		<Flex direction="row" align="center" justify="center" className="timer-display" gap="md">
 			<Text className={`timer-time${isActive ? " active" : ""}${isPaused ? " paused" : ""}`}>{formatTime(elapsedTime)}</Text>
 			<ActionIcon className="btn-reset" onClick={onReset} variant="filled" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
-				<Reset fillColor={!disabled ? activeColor : disabledColor} />
+				<Icon name="reset" color={!disabled ? activeColor : disabledColor} />
 			</ActionIcon>
 		</Flex>
 	);
