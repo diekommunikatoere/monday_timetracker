@@ -1,13 +1,12 @@
-// Icon component
-// Imports and embeds SVG icons
+import { IconProps } from "@/types/IconProps";
+import * as icons from "./icons";
 
-import Add from "@/public/img/icons/add.svg";
-
-export function Icon(icon) {
-	const icons = {
-		add: <Add />,
-	};
-
-	// Return the raw SVG element for the requested icon
-	return icons[icon];
+export function Icon({ name, size = 24, color = "#282616", className }: IconProps) {
+	console.log("Icon name:", name);
+	const IconComponent = icons[name as keyof typeof icons] as React.ComponentType<{ size?: number; color?: string }>;
+	if (!IconComponent) {
+		console.warn(`Icon "${name}" not found`);
+		return null;
+	}
+	return <IconComponent size={size} color={color} />;
 }
