@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Logo } from "./Logo";
 import Timer from "@/components/Timer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex } from "@mantine/core";
+import { Flex, Tooltip } from "@mantine/core";
 import TaskItemSelector from "./TaskItemSelector";
 import { useModalStore } from "@/stores/modalStore";
 import ManualTimeEntryModal from "@/components/ManualTimeEntryModal";
@@ -30,6 +30,7 @@ export default function AppHeader(variant?) {
 			<header id="appHeader" className={`widget-header ${variant}`}>
 				<Flex align="center" gap={16}>
 					<Logo size={{ width: 231, height: 40 }} style="brand" />
+
 					<ManualTimeEntryButton
 						onClick={() => {
 							handleManualTimeModalOpen();

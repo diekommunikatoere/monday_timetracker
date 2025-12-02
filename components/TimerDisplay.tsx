@@ -1,7 +1,7 @@
 // components/TimerDisplay.tsx
 "use client";
 
-import { Flex, Text, Button, ActionIcon } from "@mantine/core";
+import { Flex, Text, Button, ActionIcon, Tooltip } from "@mantine/core";
 import { formatTime } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
 import type { TimerDisplayProps } from "@/types/timer.types";
@@ -30,9 +30,11 @@ export default function TimerDisplay({ elapsedTime, status, onReset, disabled }:
 	return (
 		<Flex direction="row" align="center" justify="center" className="timer-display" gap="md">
 			<Text className={`timer-time${isActive ? " active" : ""}${isPaused ? " paused" : ""}`}>{formatTime(elapsedTime)}</Text>
-			<ActionIcon className="btn-reset" onClick={onReset} variant="filled" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
-				<Icon name="reset" color={!disabled ? activeColor : disabledColor} />
-			</ActionIcon>
+			<Tooltip label="Timer zurücksetzen" position="top" withArrow>
+				<ActionIcon className="btn-reset" onClick={onReset} variant="filled" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
+					<Icon name="reset" color={!disabled ? activeColor : disabledColor} />
+				</ActionIcon>
+			</Tooltip>
 		</Flex>
 	);
 }
