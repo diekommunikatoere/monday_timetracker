@@ -2,10 +2,7 @@
 "use client";
 
 import { ActionIcon, Flex } from "@mantine/core";
-import Play from "@/components/icons/Play";
-import Pause from "@/components/icons/Pause";
-import MoveDown from "@/components/icons/MoveDown";
-import Save from "@/components/icons/Save";
+import { Icon } from "@/components/Icon";
 import type { TimerControlsProps } from "@/types/timer.types";
 import "@/public/css/components/TimerActionButtons.css";
 
@@ -31,7 +28,7 @@ export default function TimerControls({ status, hasSession, isSaving, onPlayPaus
 	const disabledColor = "var(--color--tertiary)";
 
 	// Determine which icon to show for play/pause button
-	const PlayPauseIcon = isRunning ? <Pause fillColor={activeColor} /> : <Play fillColor={activeColor} />;
+	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} /> : <Icon name="play" color={activeColor} />;
 
 	return (
 		<Flex>
@@ -39,10 +36,10 @@ export default function TimerControls({ status, hasSession, isSaving, onPlayPaus
 				{PlayPauseIcon}
 			</ActionIcon>
 			<ActionIcon className="button button--timer draft" variant="filled" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving}>
-				<MoveDown fillColor={hasSession ? activeColor : disabledColor} />
+				<Icon name="moveDown" color={hasSession ? activeColor : disabledColor} />
 			</ActionIcon>
 			<ActionIcon className="button button--timer save" variant="filled" size="lg" onClick={onSave} disabled={!hasSession || isSaving}>
-				<Save fillColor={hasSession ? activeColor : disabledColor} />
+				<Icon name="save" color={hasSession ? activeColor : disabledColor} />
 			</ActionIcon>
 		</Flex>
 	);
