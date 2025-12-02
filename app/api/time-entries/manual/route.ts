@@ -15,7 +15,9 @@ interface ManualTimeEntryRequest {
 	role?: string;
 	roleName?: string;
 	duration: number; // in seconds
-	date: string; // ISO date string
+	date: string; // ISO date string (fallback)
+	startTime?: string; // ISO date-time string (preferred)
+	endTime?: string; // ISO date-time string (preferred)
 }
 
 export async function POST(request: NextRequest) {
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: ManualTimeEntryRequest = await request.json();
-		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date } = body;
+		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date, startTime, endTime } = body;
 
 		// Validate required fields
 		if (!userId || userId !== userProfile.id) {
@@ -47,12 +49,45 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "taskName is required" }, { status: 400 });
 		}
 
-		if (!duration || duration <= 0) {
-			return NextResponse.json({ error: "Valid duration is required" }, { status: 400 });
-		}
+		// Determine start_time, end_time, and duration values
+		let finalStartTime: string;
+		let finalEndTime: string;
+		let finalDuration: number;
 
-		if (!date) {
-			return NextResponse.json({ error: "Date is required" }, { status: 400 });
+		if (startTime && endTime) {
+			// Use provided start and end times (preferred)
+			const startDate = new Date(startTime);
+			const endDate = new Date(endTime);
+
+			// Validate dates are valid
+			if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+				return NextResponse.json({ error: "Invalid startTime or endTime format" }, { status: 400 });
+			}
+
+			// Calculate duration from provided times
+			const durationMs = endDate.getTime() - startDate.getTime();
+			finalDuration = Math.floor(durationMs / 1000);
+
+			// Validate duration is positive
+			if (finalDuration <= 0) {
+				return NextResponse.json({ error: "End time must be after start time" }, { status: 400 });
+			}
+
+			finalStartTime = startDate.toISOString();
+			finalEndTime = endDate.toISOString();
+		} else {
+			// Fallback: use date + duration (legacy behavior)
+			if (!duration || duration <= 0) {
+				return NextResponse.json({ error: "Valid duration is required" }, { status: 400 });
+			}
+
+			if (!date) {
+				return NextResponse.json({ error: "Date is required" }, { status: 400 });
+			}
+
+			finalStartTime = new Date(date).toISOString();
+			finalEndTime = new Date(new Date(date).getTime() + duration * 1000).toISOString();
+			finalDuration = duration;
 		}
 
 		// Insert the time entry directly (no draft needed for manual entries)
@@ -70,9 +105,9 @@ export async function POST(request: NextRequest) {
 				parent_item_name: parentItemName || null,
 				role: role || null,
 				role_name: roleName || null,
-				duration: duration,
-				start_time: new Date(date).toISOString(),
-				end_time: new Date(new Date(date).getTime() + duration * 1000).toISOString(),
+				duration: finalDuration,
+				start_time: finalStartTime,
+				end_time: finalEndTime,
 				is_draft: false,
 			})
 			.select()
