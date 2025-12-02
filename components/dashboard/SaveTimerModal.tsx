@@ -13,9 +13,10 @@ import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import mondaySdk from "monday-sdk-js";
-import Calendar from "@/components/icons/Calendar";
+import { Icon } from "@/components/Icon";
 
 import "@mantine/dates/styles.css";
+import "@/public/css/components/SaveTimerModal.css";
 
 const monday = mondaySdk();
 
@@ -222,14 +223,14 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	};
 
 	return (
-		<Modal opened={show} onClose={onClose} title="Timer speichern" size="lg">
+		<Modal opened={show} onClose={onClose} title="Timer speichern" size="lg" padding="xl">
 			<Flex direction="column" gap="md">
 				{error && <Text c="dki-error">{error}</Text>}
 
 				<Flex gap="md" direction="column">
 					<Flex gap="sm">
 						<TimePicker label="Dauer" withAsterisk value={duration} onChange={(value) => setDuration(value)} clearable style={{ flex: 2 }} />
-						<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Calendar size="16" fillColor="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
+						<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
 					</Flex>
 					<Flex gap="sm">
 						<Flex align="center" flex={2}>
