@@ -171,8 +171,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 									<Table.Td>{entry.board_name || "-"}</Table.Td>
 									<Table.Td>{entry.comment || "-"}</Table.Td>
 									<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
-									<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
-									<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Table.Td>
+									<Table.Td>{new Date(entry.end_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Table.Td>
 									<Table.Td>{formatDuration(entry.duration)}</Table.Td>
 								</Table.Tr>
 							)
