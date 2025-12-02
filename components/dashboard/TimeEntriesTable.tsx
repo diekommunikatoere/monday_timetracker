@@ -9,6 +9,7 @@ import { Flex, Table, Checkbox, Text, Center, Loader, ActionIcon } from "@mantin
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
 import Save from "@/components/icons/Save";
+import { Icon } from "@/components/Icon";
 import SaveTimerModal from "./SaveTimerModal";
 import { TaskSelection } from "../TaskItemSelector";
 
@@ -162,7 +163,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 												)}
 											</Text>
 											<ActionIcon variant="subtle" color="gray" onClick={() => handleOpenSaveModal(entry)} aria-label="Entwurf speichern">
-												<Save size="21" fillColor={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
+												<Save size={21} color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
 											</ActionIcon>
 										</Flex>
 									</Table.Td>
