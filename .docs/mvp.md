@@ -1,0 +1,16 @@
+- dashboard mit übersicht und laufendem timer
+  - timer
+  - manuell eintrage
+  - einträge anpassen/löschen
+- seitenleiten app (subitem-ebene)
+  - eingetragene zeiten einsehen
+  - timer starten/stoppen
+  - manuell eintragen
+  - einträge anpassen/löschen
+- einstellungen
+  - benachrichtigungen (z.b. tägliche erinnerung)
+  - themen (hell/dunkel)
+- admin bereich (nur für bestimmte benutzer)
+  - berichte generieren
+  - rollen verwalten
+  - system einstellungen
