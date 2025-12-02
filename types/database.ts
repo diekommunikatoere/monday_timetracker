@@ -34,6 +34,34 @@ export interface GetTimerSessionWithElapsedResult {
 	server_time: string;
 }
 
+// Type for get_item_time_by_role RPC result
+export interface GetItemTimeByRoleResult {
+	role_id: string;
+	role_name: string;
+	total_seconds: number;
+	entry_count: number;
+}
+
+// Type for calculate_remaining_budget RPC result
+export interface CalculateRemainingBudgetResult {
+	budget_amount: number;
+	total_cost: number;
+	remaining_budget: number;
+	utilization_percent: number;
+}
+
+// Sync purpose enum type
+export type SyncPurpose = "total_time" | "time_by_role" | "remaining_budget";
+
+// Time format enum type
+export type TimeFormat = "hours" | "seconds" | "hh:mm";
+
+// Column type for sync config
+export type SyncColumnType = "numbers" | "text" | "long_text" | "time_tracking";
+
+// Budget column type
+export type BudgetColumnType = "numbers" | "formula" | "mirror";
+
 export type Database = {
 	graphql_public: {
 		Tables: {
@@ -62,12 +90,161 @@ export type Database = {
 	};
 	public: {
 		Tables: {
+			board_config: {
+				Row: {
+					id: string;
+					board_id: string;
+					board_name: string;
+					sync_enabled: boolean;
+					budget_column_id: string | null;
+					budget_column_type: BudgetColumnType | null;
+					currency_symbol: string;
+					sync_on_finalize: boolean;
+					sync_total_time: boolean;
+					sync_time_by_role: boolean;
+					sync_remaining_budget: boolean;
+					created_at: string;
+					updated_at: string;
+				};
+				Insert: {
+					id?: string;
+					board_id: string;
+					board_name: string;
+					sync_enabled?: boolean;
+					budget_column_id?: string | null;
+					budget_column_type?: BudgetColumnType | null;
+					currency_symbol?: string;
+					sync_on_finalize?: boolean;
+					sync_total_time?: boolean;
+					sync_time_by_role?: boolean;
+					sync_remaining_budget?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Update: {
+					id?: string;
+					board_id?: string;
+					board_name?: string;
+					sync_enabled?: boolean;
+					budget_column_id?: string | null;
+					budget_column_type?: BudgetColumnType | null;
+					currency_symbol?: string;
+					sync_on_finalize?: boolean;
+					sync_total_time?: boolean;
+					sync_time_by_role?: boolean;
+					sync_remaining_budget?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Relationships: [];
+			};
+			board_role_override: {
+				Row: {
+					id: string;
+					board_id: string;
+					role_id: string;
+					hourly_rate: number;
+					is_enabled: boolean;
+					created_at: string;
+					updated_at: string;
+				};
+				Insert: {
+					id?: string;
+					board_id: string;
+					role_id: string;
+					hourly_rate: number;
+					is_enabled?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Update: {
+					id?: string;
+					board_id?: string;
+					role_id?: string;
+					hourly_rate?: number;
+					is_enabled?: boolean;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "board_role_override_board_id_fkey";
+						columns: ["board_id"];
+						isOneToOne: false;
+						referencedRelation: "board_config";
+						referencedColumns: ["board_id"];
+					},
+					{
+						foreignKeyName: "board_role_override_role_id_fkey";
+						columns: ["role_id"];
+						isOneToOne: false;
+						referencedRelation: "role";
+						referencedColumns: ["id"];
+					}
+				];
+			};
+			column_sync_config: {
+				Row: {
+					id: string;
+					board_id: string;
+					column_id: string;
+					column_name: string;
+					column_type: SyncColumnType;
+					sync_purpose: SyncPurpose;
+					time_format: TimeFormat;
+					include_breakdown: boolean;
+					sync_enabled: boolean;
+					last_synced_at: string | null;
+					created_at: string;
+					updated_at: string;
+				};
+				Insert: {
+					id?: string;
+					board_id: string;
+					column_id: string;
+					column_name: string;
+					column_type: SyncColumnType;
+					sync_purpose: SyncPurpose;
+					time_format?: TimeFormat;
+					include_breakdown?: boolean;
+					sync_enabled?: boolean;
+					last_synced_at?: string | null;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Update: {
+					id?: string;
+					board_id?: string;
+					column_id?: string;
+					column_name?: string;
+					column_type?: SyncColumnType;
+					sync_purpose?: SyncPurpose;
+					time_format?: TimeFormat;
+					include_breakdown?: boolean;
+					sync_enabled?: boolean;
+					last_synced_at?: string | null;
+					created_at?: string;
+					updated_at?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "column_sync_config_board_id_fkey";
+						columns: ["board_id"];
+						isOneToOne: false;
+						referencedRelation: "board_config";
+						referencedColumns: ["board_id"];
+					}
+				];
+			};
 			role: {
 				Row: {
 					created_at: string;
 					description: string | null;
 					id: string;
 					name: string;
+					hourly_rate: number;
+					is_active: boolean;
+					color_hex: string | null;
 					updated_at: string;
 				};
 				Insert: {
@@ -75,6 +252,9 @@ export type Database = {
 					description?: string | null;
 					id?: string;
 					name: string;
+					hourly_rate?: number;
+					is_active?: boolean;
+					color_hex?: string | null;
 					updated_at?: string;
 				};
 				Update: {
@@ -82,9 +262,69 @@ export type Database = {
 					description?: string | null;
 					id?: string;
 					name?: string;
+					hourly_rate?: number;
+					is_active?: boolean;
+					color_hex?: string | null;
 					updated_at?: string;
 				};
 				Relationships: [];
+			};
+			sync_log: {
+				Row: {
+					id: string;
+					board_id: string;
+					item_id: string;
+					column_id: string;
+					sync_purpose: SyncPurpose;
+					value_synced: string;
+					success: boolean;
+					error_message: string | null;
+					triggered_by: string | null;
+					time_entry_id: string | null;
+					created_at: string;
+				};
+				Insert: {
+					id?: string;
+					board_id: string;
+					item_id: string;
+					column_id: string;
+					sync_purpose: SyncPurpose;
+					value_synced: string;
+					success: boolean;
+					error_message?: string | null;
+					triggered_by?: string | null;
+					time_entry_id?: string | null;
+					created_at?: string;
+				};
+				Update: {
+					id?: string;
+					board_id?: string;
+					item_id?: string;
+					column_id?: string;
+					sync_purpose?: SyncPurpose;
+					value_synced?: string;
+					success?: boolean;
+					error_message?: string | null;
+					triggered_by?: string | null;
+					time_entry_id?: string | null;
+					created_at?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "sync_log_triggered_by_fkey";
+						columns: ["triggered_by"];
+						isOneToOne: false;
+						referencedRelation: "user_profiles";
+						referencedColumns: ["id"];
+					},
+					{
+						foreignKeyName: "sync_log_time_entry_id_fkey";
+						columns: ["time_entry_id"];
+						isOneToOne: false;
+						referencedRelation: "time_entry";
+						referencedColumns: ["id"];
+					}
+				];
 			};
 			time_entry: {
 				Row: {
@@ -100,6 +340,7 @@ export type Database = {
 					parent_item_id: string | null;
 					parent_item_name: string | null;
 					role: string | null;
+					role_name: string | null;
 					start_time: string | null;
 					synced_to_monday: boolean;
 					task_name: string | null;
@@ -120,6 +361,7 @@ export type Database = {
 					parent_item_id?: string | null;
 					parent_item_name?: string | null;
 					role?: string | null;
+					role_name?: string | null;
 					start_time?: string | null; // Optional - uses DEFAULT NOW()
 					synced_to_monday?: boolean;
 					task_name?: string | null;
@@ -140,6 +382,7 @@ export type Database = {
 					parent_item_id?: string | null;
 					parent_item_name?: string | null;
 					role?: string | null;
+					role_name?: string | null;
 					start_time?: string | null;
 					synced_to_monday?: boolean;
 					task_name?: string | null;
@@ -282,6 +525,15 @@ export type Database = {
 		};
 		Functions: {
 			add_default_roles: { Args: Record<string, never>; Returns: undefined };
+			calculate_remaining_budget: {
+				Args: {
+					p_board_id: string;
+					p_item_id: string;
+					p_budget_amount: number;
+					p_user_id?: string;
+				};
+				Returns: CalculateRemainingBudgetResult;
+			};
 			finalize_draft: {
 				Args: {
 					p_comment: string;
@@ -310,6 +562,27 @@ export type Database = {
 			get_current_elapsed_time: {
 				Args: { p_session_id: string };
 				Returns: GetCurrentElapsedTimeResult;
+			};
+			get_effective_hourly_rate: {
+				Args: {
+					p_board_id: string;
+					p_role_id: string;
+				};
+				Returns: number;
+			};
+			get_item_time_by_role: {
+				Args: {
+					p_item_id: string;
+					p_user_id?: string;
+				};
+				Returns: GetItemTimeByRoleResult[];
+			};
+			get_item_total_time: {
+				Args: {
+					p_item_id: string;
+					p_user_id?: string;
+				};
+				Returns: number;
 			};
 			get_timer_session_with_elapsed: {
 				Args: { p_user_id: string };
@@ -436,3 +709,24 @@ export const Constants = {
 		Enums: {},
 	},
 } as const;
+
+// Convenience type aliases for the new tables
+export type BoardConfig = Database["public"]["Tables"]["board_config"]["Row"];
+export type BoardConfigInsert = Database["public"]["Tables"]["board_config"]["Insert"];
+export type BoardConfigUpdate = Database["public"]["Tables"]["board_config"]["Update"];
+
+export type BoardRoleOverride = Database["public"]["Tables"]["board_role_override"]["Row"];
+export type BoardRoleOverrideInsert = Database["public"]["Tables"]["board_role_override"]["Insert"];
+export type BoardRoleOverrideUpdate = Database["public"]["Tables"]["board_role_override"]["Update"];
+
+export type ColumnSyncConfig = Database["public"]["Tables"]["column_sync_config"]["Row"];
+export type ColumnSyncConfigInsert = Database["public"]["Tables"]["column_sync_config"]["Insert"];
+export type ColumnSyncConfigUpdate = Database["public"]["Tables"]["column_sync_config"]["Update"];
+
+export type SyncLog = Database["public"]["Tables"]["sync_log"]["Row"];
+export type SyncLogInsert = Database["public"]["Tables"]["sync_log"]["Insert"];
+export type SyncLogUpdate = Database["public"]["Tables"]["sync_log"]["Update"];
+
+export type Role = Database["public"]["Tables"]["role"]["Row"];
+export type RoleInsert = Database["public"]["Tables"]["role"]["Insert"];
+export type RoleUpdate = Database["public"]["Tables"]["role"]["Update"];
