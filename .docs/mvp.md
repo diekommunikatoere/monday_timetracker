@@ -1,12 +1,16 @@
 - dashboard mit übersicht und laufendem timer
-  - timer
-  - manuell eintrage
-  - einträge anpassen/löschen
-- seitenleiten app (subitem-ebene)
+  - timer (start/reset/zwischenspeichern/ordentlich speichern)
+  - manuell zeit eintragen
+  - einträge speichern/anpassen/löschen
+- seitenleisten app (subitem-ebene)
   - eingetragene zeiten einsehen
   - timer starten/stoppen
   - manuell eintragen
   - einträge anpassen/löschen
+- möglichkeit in monday-board-spalten zeiten auszugeben (von supabase)
+  - z.b. gesamtzeit pro aufgabe/projekt/projektphase
+  - verrechnung mit stundensätzen
+  -
 - einstellungen
   - benachrichtigungen (z.b. tägliche erinnerung)
   - themen (hell/dunkel)
