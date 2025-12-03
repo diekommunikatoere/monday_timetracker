@@ -16,7 +16,7 @@ export interface TaskSelection {
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	role?: string;
+	roleId?: string;
 	roleName?: string;
 }
 
@@ -339,7 +339,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				itemName: undefined,
 				parentItemId: undefined,
 				parentItemName: undefined,
-				role: selectedRole?.value,
+				roleId: selectedRole?.value,
 				roleName: selectedRole?.label,
 			});
 		},
@@ -369,7 +369,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				itemName: selectedOption?.name || selectedOption?.label,
 				parentItemId: selectedOption?.parentItemId,
 				parentItemName: selectedOption?.parentItemName,
-				role: selectedRole?.value,
+				roleId: selectedRole?.value,
 				roleName: selectedRole?.label,
 			});
 		},
@@ -387,7 +387,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				boardName: selectedBoard?.label,
 				itemId: selectedTask?.value,
 				itemName: selectedTask?.label,
-				role: value || undefined,
+				roleId: value || undefined,
 				roleName: selectedOption?.label,
 			});
 		},
