@@ -11,7 +11,7 @@ export interface TimeEntry {
 	item_name: string | null; // Human-readable task/item name
 	parent_item_id: string | null;
 	parent_item_name: string | null; // Human-readable parent item name
-	role: string | null;
+	role_id: string | null; // Foreign key to role table - primary source of truth
 	role_name: string | null; // Human-readable role name
 	is_draft: boolean;
 	comment: string | null;
