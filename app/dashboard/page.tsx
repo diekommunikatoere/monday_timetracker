@@ -9,6 +9,8 @@ import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
 
+console.log("DashboardPage component loaded");
+
 export default function DashboardPage() {
 	// Get user and time entries state
 	const userId = useUserStore((state) => state.supabaseUser?.id);

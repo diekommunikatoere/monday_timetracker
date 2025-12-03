@@ -17,7 +17,7 @@ export { default as favorite } from "./Favorite";
 export { default as filter } from "./Filter";
 export { default as filterList } from "./FilterList";
 export { default as menu } from "./Menu";
-export { default as moreVertical } from "./MoreVert";
+export { default as moreVert } from "./MoreVert";
 export { default as moveDown } from "./MoveDown";
 export { default as openInNew } from "./OpenInNew";
 export { default as pause } from "./Pause";
