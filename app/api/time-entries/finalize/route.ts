@@ -13,8 +13,7 @@ interface FinalizeTimeEntryRequest {
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	role?: string;
-	roleName?: string;
+	roleId?: string;
 	duration?: number; // in seconds, optional override
 	date?: string; // ISO date string, optional override
 }
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: FinalizeTimeEntryRequest = await request.json();
-		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date } = body;
+		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date } = body;
 
 		// Validate required fields
 		if (!draftId) {
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
 			}
 		}
 
-		console.log("Finalizing time entry with: ", { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date });
+		console.log("Finalizing time entry with: ", { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date });
 
 		// Call the RPC to finalize the time entry
 		const { data, error } = await supabaseAdmin.rpc("finalize_time_entry", {
@@ -93,8 +92,7 @@ export async function POST(request: NextRequest) {
 			p_item_name: itemName || null,
 			p_parent_item_id: parentItemId || null,
 			p_parent_item_name: parentItemName || null,
-			p_role: role || null,
-			p_role_name: roleName || null,
+			p_role_id: roleId || null,
 			p_duration: duration, // Pass the duration override
 			p_date: date ? new Date(date).toISOString() : null, // Pass the date override
 		});
