@@ -285,6 +285,7 @@ export type Database = {
           parent_item_id: string | null
           parent_item_name: string | null
           role: string | null
+          role_id: string | null
           role_name: string | null
           start_time: string
           synced_to_monday: boolean
@@ -307,6 +308,7 @@ export type Database = {
           parent_item_id?: string | null
           parent_item_name?: string | null
           role?: string | null
+          role_id?: string | null
           role_name?: string | null
           start_time?: string
           synced_to_monday?: boolean
@@ -329,6 +331,7 @@ export type Database = {
           parent_item_id?: string | null
           parent_item_name?: string | null
           role?: string | null
+          role_id?: string | null
           role_name?: string | null
           start_time?: string
           synced_to_monday?: boolean
@@ -338,6 +341,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "time_entry_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "time_entry_user_id_fkey"
             columns: ["user_id"]
