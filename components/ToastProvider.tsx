@@ -3,11 +3,17 @@
 
 import React, { createContext, useContext, useCallback } from "react";
 import { notifications } from "@mantine/notifications";
+import { Button } from "@mantine/core";
 
 export type ToastType = "normal" | "positive" | "negative" | "warning" | "dark";
 
+interface ToastAction {
+	actionLabel: string;
+	onAction: () => void;
+}
+
 interface ToastContextType {
-	showToast: (message: string, type?: ToastType, autoHideDuration?: number, isLoading?: boolean) => void;
+	showToast: (message: string, type?: ToastType, autoHideDuration?: number, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -21,7 +27,7 @@ export const useToast = () => {
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-	const showToast = useCallback((message: string, type: ToastType = "normal", autoHideDuration = 3000, isLoading?: boolean) => {
+	const showToast = useCallback((message: string, type: ToastType = "normal", autoHideDuration = 3000, action?: ToastAction) => {
 		let color = "blue";
 		switch (type) {
 			case "positive":
@@ -41,9 +47,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 		}
 
 		notifications.show({
-			message,
+			message: action ? (
+				<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+					<span>{message}</span>
+					<Button
+						size="xs"
+						variant="light"
+						onClick={() => {
+							action.onAction();
+							notifications.clean();
+						}}
+					>
+						{action.actionLabel}
+					</Button>
+				</div>
+			) : (
+				message
+			),
 			color,
-			loading: isLoading,
 			autoClose: autoHideDuration,
 		});
 	}, []);
