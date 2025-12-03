@@ -622,3 +622,191 @@ export async function syncAfterFinalize(itemId: string, boardId: string, userId:
 		};
 	}
 }
+
+// =====================================
+// Sync Queue System (Redis-backed)
+// =====================================
+
+interface SyncQueueItem {
+	itemId: string;
+	boardId: string;
+	userId: string;
+	timeEntryId?: string;
+	queuedAt: number;
+}
+
+// Import cacheHelper for Redis operations
+import { cacheHelper } from "@/lib/redis";
+
+const SYNC_QUEUE_PREFIX = "sync_queue:";
+const SYNC_QUEUE_TTL = 15; // seconds
+const DEBOUNCE_DELAY = 10000; // 10 seconds in milliseconds
+const MAX_QUEUE_SIZE = 1000;
+const MAX_CONCURRENT_SYNCS = 10;
+
+let debounceTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Queue an item for sync with debouncing
+ * Multiple requests for the same item are deduplicated
+ */
+export async function queueItemSync(itemId: string, boardId: string, userId: string, timeEntryId?: string): Promise<void> {
+	const queueKey = `${SYNC_QUEUE_PREFIX}${itemId}:${boardId}`;
+
+	// Store in Redis with TTL
+	const queueItem: SyncQueueItem = {
+		itemId,
+		boardId,
+		userId,
+		timeEntryId,
+		queuedAt: Date.now(),
+	};
+
+	await cacheHelper.set(queueKey, JSON.stringify(queueItem), SYNC_QUEUE_TTL);
+
+	// Check queue size and force flush if needed
+	const queueSize = await getQueueSize();
+	if (queueSize >= MAX_QUEUE_SIZE) {
+		console.warn(`[ColumnSync] Queue size (${queueSize}) exceeded max (${MAX_QUEUE_SIZE}), forcing flush`);
+		await flushSyncQueue();
+		return;
+	}
+
+	// Start or reset debounce timer
+	if (debounceTimer) {
+		clearTimeout(debounceTimer);
+	}
+
+	debounceTimer = setTimeout(async () => {
+		await flushSyncQueue();
+	}, DEBOUNCE_DELAY);
+}
+
+/**
+ * Get current queue size
+ */
+async function getQueueSize(): Promise<number> {
+	try {
+		const keys = await cacheHelper.keys(`${SYNC_QUEUE_PREFIX}*`);
+		return keys.length;
+	} catch (error) {
+		console.error("[ColumnSync] Error getting queue size:", error);
+		return 0;
+	}
+}
+
+/**
+ * Flush the sync queue - process all queued items
+ */
+export async function flushSyncQueue(): Promise<void> {
+	// Clear debounce timer
+	if (debounceTimer) {
+		clearTimeout(debounceTimer);
+		debounceTimer = null;
+	}
+
+	try {
+		// Get all queue keys
+		const keys = await cacheHelper.keys(`${SYNC_QUEUE_PREFIX}*`);
+
+		if (keys.length === 0) {
+			return;
+		}
+
+		console.log(`[ColumnSync] Flushing sync queue with ${keys.length} items`);
+
+		// Fetch all queue items
+		const queueItems: SyncQueueItem[] = [];
+		for (const key of keys) {
+			const itemJson = await cacheHelper.get<string>(key);
+			if (itemJson) {
+				try {
+					const item = JSON.parse(itemJson);
+					queueItems.push(item);
+				} catch (err) {
+					console.error(`[ColumnSync] Error parsing queue item ${key}:`, err);
+				}
+			}
+		}
+
+		// Process items in parallel with concurrency limit
+		const results = await processQueueBatch(queueItems);
+
+		// Delete processed keys from Redis
+		for (const key of keys) {
+			await cacheHelper.del(key);
+		}
+
+		const successCount = results.filter((r) => r.overallSuccess).length;
+		console.log(`[ColumnSync] Queue flush complete: ${successCount}/${results.length} successful`);
+	} catch (error) {
+		console.error("[ColumnSync] Error flushing sync queue:", error);
+	}
+}
+
+/**
+ * Process queue items in batches with concurrency limit
+ */
+async function processQueueBatch(items: SyncQueueItem[]): Promise<ItemSyncResult[]> {
+	const results: ItemSyncResult[] = [];
+	const batches: SyncQueueItem[][] = [];
+
+	// Split into batches of MAX_CONCURRENT_SYNCS
+	for (let i = 0; i < items.length; i += MAX_CONCURRENT_SYNCS) {
+		batches.push(items.slice(i, i + MAX_CONCURRENT_SYNCS));
+	}
+
+	// Process each batch
+	for (const batch of batches) {
+		const batchResults = await Promise.all(
+			batch.map(async (item) => {
+				try {
+					return await syncItemColumns(item.itemId, item.boardId, item.userId, item.timeEntryId);
+				} catch (error) {
+					console.error(`[ColumnSync] Error syncing item ${item.itemId}:`, error);
+					return {
+						itemId: item.itemId,
+						boardId: item.boardId,
+						results: [],
+						overallSuccess: false,
+					};
+				}
+			})
+		);
+		results.push(...batchResults);
+	}
+
+	return results;
+}
+
+/**
+ * Sync after time entry update
+ * Queues old and new items if item changed
+ */
+export async function syncAfterUpdate(newEntry: any, oldEntry: any, userId: string): Promise<void> {
+	const itemChanged = oldEntry.item_id !== newEntry.item_id || oldEntry.board_id !== newEntry.board_id;
+
+	if (itemChanged && oldEntry.item_id && oldEntry.board_id) {
+		console.log(`[ColumnSync] Item changed - queueing old item ${oldEntry.item_id}`);
+		await queueItemSync(oldEntry.item_id, oldEntry.board_id, userId, oldEntry.id);
+	}
+
+	if (newEntry.item_id && newEntry.board_id) {
+		console.log(`[ColumnSync] Queueing updated item ${newEntry.item_id}`);
+		await queueItemSync(newEntry.item_id, newEntry.board_id, userId, newEntry.id);
+	}
+}
+
+/**
+ * Sync after time entry delete
+ * Queues the item for sync
+ */
+export async function syncAfterDelete(deletedEntry: any, userId: string): Promise<void> {
+	if (!deletedEntry.item_id || !deletedEntry.board_id) {
+		console.log(`[ColumnSync] No item/board for deleted entry ${deletedEntry.id}`);
+		return;
+	}
+
+	console.log(`[ColumnSync] Queueing item ${deletedEntry.item_id} after delete`);
+	await queueItemSync(deletedEntry.item_id, deletedEntry.board_id, userId, deletedEntry.id);
+}
