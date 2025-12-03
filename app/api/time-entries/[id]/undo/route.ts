@@ -7,7 +7,7 @@ import { queueItemSync } from "@/lib/columnSync";
  * POST /api/time-entries/[id]/undo
  * Restore a soft-deleted time entry
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	try {
 		// Get user ID for user authentication
 		const userId = request.headers.get("userId");
