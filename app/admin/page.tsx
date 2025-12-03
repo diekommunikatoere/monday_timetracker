@@ -3,38 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
 import { Tabs, Button, TextInput, NumberInput, Switch, Select, Modal, Loader, ActionIcon, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
+import { Icon } from "@/components/Icon";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import type { Role, BoardConfig } from "@/types/database";
 
 import "@/public/css/components/AdminPage.css";
-
-// Icons
-const IconPlus = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-	</svg>
-);
-
-const IconEdit = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-	</svg>
-);
-
-const IconTrash = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M3 4h10M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M4 4l1 9a1 1 0 001 1h4a1 1 0 001-1l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-	</svg>
-);
-
-const IconSettings = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5" />
-		<path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-	</svg>
-);
 
 export default function AdminPage() {
 	const [activeTab, setActiveTab] = useState<string | null>("roles");
@@ -385,7 +360,7 @@ export default function AdminPage() {
 								<h2>Role Management</h2>
 								<p className="admin-section-description">Define roles and their default hourly rates for time tracking.</p>
 							</div>
-							<Button leftSection={<IconPlus />} onClick={() => handleOpenRoleModal()}>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenRoleModal()}>
 								Add Role
 							</Button>
 						</div>
@@ -420,18 +395,18 @@ export default function AdminPage() {
 											)}
 											<div className="role-detail-row">
 												<span className="role-detail-label">Hourly Rate</span>
-												<span className="role-detail-value">€{role.hourly_rate.toFixed(2)}</span>
+												<span className="role-detail-value">{role.hourly_rate.toFixed(2)} €</span>
 											</div>
 										</div>
 										<div className="role-card-actions">
 											<Tooltip label="Edit role">
 												<ActionIcon variant="light" onClick={() => handleOpenRoleModal(role)}>
-													<IconEdit />
+													<Icon name="edit" size={21} />
 												</ActionIcon>
 											</Tooltip>
 											<Tooltip label={role.is_active ? "Deactivate role" : "Role is inactive"}>
 												<ActionIcon variant="light" color="red" onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
-													<IconTrash />
+													<Icon name="delete" size={21} />
 												</ActionIcon>
 											</Tooltip>
 										</div>
@@ -450,7 +425,7 @@ export default function AdminPage() {
 								<h2>Board Configurations</h2>
 								<p className="admin-section-description">Configure which boards sync time data to monday.com columns.</p>
 							</div>
-							<Button leftSection={<IconPlus />} onClick={() => handleOpenBoardModal()}>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBoardModal()}>
 								Add Board
 							</Button>
 						</div>
@@ -478,10 +453,6 @@ export default function AdminPage() {
 												<span className="board-detail-label">Board ID</span>
 												<span className="board-detail-value">{board.board_id}</span>
 											</div>
-											<div className="board-detail-row">
-												<span className="board-detail-label">Currency</span>
-												<span className="board-detail-value">{board.currency_symbol}</span>
-											</div>
 											<div className="board-sync-options">
 												{board.sync_on_finalize && <Badge size="xs">Sync on Finalize</Badge>}
 												{board.sync_total_time && <Badge size="xs">Total Time</Badge>}
@@ -492,17 +463,17 @@ export default function AdminPage() {
 										<div className="board-card-actions">
 											<Tooltip label="Edit configuration">
 												<ActionIcon variant="light" onClick={() => handleOpenBoardModal(board)}>
-													<IconEdit />
+													<Icon name="edit" size={21} />
 												</ActionIcon>
 											</Tooltip>
 											<Tooltip label="Configure columns">
 												<ActionIcon variant="light" component="a" href={`/admin/boards/${board.board_id}`}>
-													<IconSettings />
+													<Icon name="settings" size={21} />
 												</ActionIcon>
 											</Tooltip>
 											<Tooltip label="Delete configuration">
 												<ActionIcon variant="light" color="red" onClick={() => handleDeleteBoard(board)}>
-													<IconTrash />
+													<Icon name="delete" size={21} />
 												</ActionIcon>
 											</Tooltip>
 										</div>
