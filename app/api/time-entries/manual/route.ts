@@ -13,8 +13,7 @@ interface ManualTimeEntryRequest {
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	role?: string;
-	roleName?: string;
+	roleId?: string;
 	duration: number; // in seconds
 	date: string; // ISO date string (fallback)
 	startTime?: string; // ISO date-time string (preferred)
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: ManualTimeEntryRequest = await request.json();
-		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, role, roleName, duration, date, startTime, endTime } = body;
+		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date, startTime, endTime } = body;
 
 		// Validate required fields
 		if (!userId || userId !== userProfile.id) {
@@ -104,8 +103,7 @@ export async function POST(request: NextRequest) {
 				item_name: itemName || null,
 				parent_item_id: parentItemId || null,
 				parent_item_name: parentItemName || null,
-				role: role || null,
-				role_name: roleName || null,
+				role_id: roleId || null,
 				duration: finalDuration,
 				start_time: finalStartTime,
 				end_time: finalEndTime,

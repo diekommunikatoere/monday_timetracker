@@ -121,7 +121,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			itemName: undefined,
 			parentItemId: undefined,
 			parentItemName: undefined,
-			role: undefined,
+			roleId: undefined,
 			roleName: undefined,
 		});
 	}, [onSelectionChange, resetBoard, resetTask, resetRole]);
@@ -366,7 +366,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				boardId: selectedBoard?.value,
 				boardName: selectedBoard?.label,
 				itemId: value || undefined,
-				itemName: selectedOption?.name || selectedOption?.label,
+				itemName: selectedOption?.name,
 				parentItemId: selectedOption?.parentItemId,
 				parentItemName: selectedOption?.parentItemName,
 				roleId: selectedRole?.value,
@@ -386,7 +386,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				boardId: selectedBoard?.value,
 				boardName: selectedBoard?.label,
 				itemId: selectedTask?.value,
-				itemName: selectedTask?.label,
+				itemName: selectedTask?.name,
+				parentItemId: selectedTask?.parentItemId,
+				parentItemName: selectedTask?.parentItemName,
 				roleId: value || undefined,
 				roleName: selectedOption?.label,
 			});
