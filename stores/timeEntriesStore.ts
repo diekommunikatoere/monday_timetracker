@@ -4,7 +4,7 @@ import { TimeEntry } from "@/types/time-entry";
 
 interface TimeEntriesState {
 	// Time entries data
-	timeEntries: TimeEntry[];
+	timeEntries: (TimeEntry & { role: { name: string } })[];
 
 	// Loading states
 	loading: boolean;

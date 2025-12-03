@@ -3,6 +3,7 @@ import { cacheHelper } from "@/lib/redis";
 import type { Database, FinalizeSegmentResult } from "@/types/database";
 
 type TimeEntry = Database["public"]["Tables"]["time_entry"]["Row"];
+type TimeEntryWithRole = TimeEntry & { role: { name: string } };
 type TimeEntryInsert = Database["public"]["Tables"]["time_entry"]["Insert"];
 type TimeEntryUpdate = Database["public"]["Tables"]["time_entry"]["Update"];
 type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
@@ -24,7 +25,7 @@ export async function getAllTimeEntries(): Promise<TimeEntry[]> {
 	}
 
 	// Fetch from database
-	const { data, error } = await supabaseAdmin.from("time_entry").select("*").order("created_at", { ascending: true });
+	const { data, error } = await supabaseAdmin.from("time_entry").select("*").is("deleted_at", null).order("created_at", { ascending: true });
 
 	if (error) {
 		console.error("Error fetching time entries:", error);
@@ -98,7 +99,7 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 }
 
 // Get time entries for a specific user
-export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
+export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithRole[]> {
 	console.log(`Fetching time entries for userId: ${userId}`);
 
 	/* const cacheKey = `${CACHE_PREFIX}user:${userId}`;
@@ -111,7 +112,7 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntry[]> {
 	} */
 
 	// Fetch from database
-	const { data, error } = await supabaseAdmin.from("time_entry").select("*").eq("user_id", userId).gt("duration", 0).order("created_at", { ascending: false });
+	const { data, error } = await supabaseAdmin.from("time_entry").select("* , role(name)").eq("user_id", userId).is("deleted_at", null).gt("duration", 0).order("created_at", { ascending: false });
 	console.log(`Fetched user time entries for userId: ${userId}`, data);
 
 	if (error) {
@@ -331,4 +332,217 @@ export async function resumeTimer(sessionId: string, userId: string) {
 	}
 
 	return { message: "Timer resumed successfully" };
+}
+
+// =====================================
+// Time Entry Update & Delete Functions
+// =====================================
+
+/**
+ * Update a time entry by ID with optimistic locking
+ * Returns both old and new entry states for sync comparison
+ */
+export async function updateTimeEntry(id: string, updates: TimeEntryUpdate, userId: string, expectedUpdatedAt?: string): Promise<{ old: TimeEntry; new: TimeEntry }> {
+	// Fetch old entry first
+	const oldEntry = await getTimeEntryById(id);
+	if (!oldEntry) {
+		throw new Error(`Time entry ${id} not found`);
+	}
+
+	// Verify ownership
+	if (oldEntry.user_id !== userId) {
+		throw new Error("Unauthorized to update this time entry");
+	}
+
+	// Optimistic locking: check if entry was modified since user loaded it
+	if (expectedUpdatedAt && oldEntry.updated_at !== expectedUpdatedAt) {
+		const error: any = new Error("Concurrent modification detected");
+		error.code = "CONFLICT";
+		error.statusCode = 409;
+		throw error;
+	}
+
+	// Update entry
+	const { data, error } = await supabaseAdmin
+		.from("time_entry")
+		.update({
+			...updates,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", id)
+		.select()
+		.single();
+
+	if (error) {
+		console.error(`Error updating time entry ${id}:`, error);
+		throw error;
+	}
+
+	// Invalidate cache
+	await cacheHelper.del(`${CACHE_PREFIX}${id}`);
+	await cacheHelper.clearPattern(`${CACHE_PREFIX}*`);
+
+	return { old: oldEntry, new: data };
+}
+
+/**
+ * Soft-delete a time entry
+ * Schedules hard delete via Redis key with 5-second TTL
+ */
+export async function softDeleteTimeEntry(id: string, userId: string): Promise<{ entry: TimeEntry; undoToken: string }> {
+	const entry = await getTimeEntryById(id);
+	if (!entry) {
+		throw new Error(`Time entry ${id} not found`);
+	}
+
+	if (entry.user_id !== userId) {
+		throw new Error("Unauthorized to delete this time entry");
+	}
+
+	// Mark as soft-deleted
+	const { data, error } = await supabaseAdmin
+		.from("time_entry")
+		.update({
+			deleted_at: new Date().toISOString(),
+			deleted_by: userId,
+		})
+		.eq("id", id)
+		.select()
+		.single();
+
+	if (error) {
+		throw error;
+	}
+
+	// Schedule hard delete in Redis (5 second TTL)
+	const hardDeleteKey = `hard_delete:${id}`;
+	await cacheHelper.set(
+		hardDeleteKey,
+		JSON.stringify({
+			entryId: id,
+			userId,
+			itemId: data.item_id,
+			boardId: data.board_id,
+			deletedAt: data.deleted_at,
+		}),
+		5 // 5 seconds TTL
+	);
+
+	// Generate undo token (JWT with 5s expiry)
+	const undoToken = Buffer.from(
+		JSON.stringify({
+			entryId: id,
+			userId,
+			exp: Date.now() + 5000, // 5 seconds from now
+		})
+	).toString("base64");
+
+	// Invalidate cache
+	await cacheHelper.del(`${CACHE_PREFIX}${id}`);
+	await cacheHelper.clearPattern(`${CACHE_PREFIX}*`);
+
+	return { entry: data, undoToken };
+}
+
+/**
+ * Restore a soft-deleted time entry (undo operation)
+ * Cancels scheduled hard delete by removing Redis key
+ */
+export async function restoreTimeEntry(id: string, userId: string, undoToken: string): Promise<TimeEntry> {
+	// Verify undo token
+	try {
+		const decoded = JSON.parse(Buffer.from(undoToken, "base64").toString());
+		if (decoded.entryId !== id || decoded.userId !== userId || decoded.exp < Date.now()) {
+			throw new Error("Invalid or expired undo token");
+		}
+	} catch (err) {
+		throw new Error("Invalid undo token");
+	}
+
+	// Restore entry
+	const { data, error } = await supabaseAdmin
+		.from("time_entry")
+		.update({
+			deleted_at: null,
+			deleted_by: null,
+		})
+		.eq("id", id)
+		.eq("user_id", userId)
+		.select()
+		.single();
+
+	if (error) {
+		throw error;
+	}
+
+	// Cancel scheduled hard delete
+	const hardDeleteKey = `hard_delete:${id}`;
+	await cacheHelper.del(hardDeleteKey);
+
+	// Invalidate cache
+	await cacheHelper.del(`${CACHE_PREFIX}${id}`);
+	await cacheHelper.clearPattern(`${CACHE_PREFIX}*`);
+
+	return data;
+}
+
+/**
+ * Permanently delete a time entry
+ * Called by cleanup job or after undo window expires
+ */
+export async function hardDeleteTimeEntry(id: string, userId: string): Promise<TimeEntry> {
+	const entry = await getTimeEntryById(id);
+	if (!entry) {
+		throw new Error(`Time entry ${id} not found`);
+	}
+
+	if (entry.user_id !== userId) {
+		throw new Error("Unauthorized to delete this time entry");
+	}
+
+	const { error } = await supabaseAdmin.from("time_entry").delete().eq("id", id);
+
+	if (error) {
+		throw error;
+	}
+
+	// Invalidate cache
+	await cacheHelper.del(`${CACHE_PREFIX}${id}`);
+	await cacheHelper.clearPattern(`${CACHE_PREFIX}*`);
+
+	return entry;
+}
+
+/**
+ * Cleanup orphaned soft-deletes
+ * Finds entries where deleted_at < NOW() - 10 seconds and hard deletes them
+ * Returns array of deleted entries for sync purposes
+ */
+export async function cleanupOrphanedSoftDeletes(): Promise<TimeEntry[]> {
+	const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
+
+	// Find orphaned soft-deleted entries
+	const { data: orphanedEntries, error: fetchError } = await supabaseAdmin.from("time_entry").select("*").not("deleted_at", "is", null).lt("deleted_at", tenSecondsAgo);
+
+	if (fetchError) {
+		console.error("Error fetching orphaned soft-deletes:", fetchError);
+		return [];
+	}
+
+	if (!orphanedEntries || orphanedEntries.length === 0) {
+		return [];
+	}
+
+	// Hard delete them
+	const deletedEntries: TimeEntry[] = [];
+	for (const entry of orphanedEntries) {
+		try {
+			await hardDeleteTimeEntry(entry.id, entry.user_id);
+			deletedEntries.push(entry);
+		} catch (err) {
+			console.error(`Error hard deleting orphaned entry ${entry.id}:`, err);
+		}
+	}
+
+	return deletedEntries;
 }
