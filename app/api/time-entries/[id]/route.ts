@@ -7,7 +7,7 @@ import { syncAfterUpdate, syncAfterDelete } from "@/lib/columnSync";
  * PATCH /api/time-entries/[id]
  * Update an existing time entry with optimistic locking
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	try {
 		// Get user ID for user authentication
 		const userId = request.headers.get("userId");
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
  * DELETE /api/time-entries/[id]
  * Soft-delete a time entry with undo support
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	try {
 		// Get user ID for user authentication
 		const userId = request.headers.get("userId");
