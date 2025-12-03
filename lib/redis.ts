@@ -63,4 +63,14 @@ export const cacheHelper = {
 			console.error(`Cache clear pattern error for ${pattern}:`, error);
 		}
 	},
+
+	// Get all keys matching a pattern
+	async keys(pattern: string): Promise<string[]> {
+		try {
+			return await redis.keys(pattern);
+		} catch (error) {
+			console.error(`Cache keys error for ${pattern}:`, error);
+			return [];
+		}
+	},
 };
