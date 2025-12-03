@@ -5,16 +5,27 @@ import { useState, useMemo } from "react";
 import { useUserStore } from "@/stores/userStore";
 import { useTimerStore, useTimerComputed } from "@/stores/timerStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useToast } from "@/components/ToastProvider";
 import { Flex, Table, Checkbox, Text, Center, Loader, ActionIcon } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
 import Save from "@/components/icons/Save";
 import { Icon } from "@/components/Icon";
 import SaveTimerModal from "./SaveTimerModal";
+import EditTimeEntryModal from "./EditTimeEntryModal";
+import TimeEntryRowMenu from "./TimeEntryRowMenu";
+import BulkActionButtons from "./BulkActionButtons";
+import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import { TaskSelection } from "../TaskItemSelector";
+import mondaySdk from "monday-sdk-js";
+
+const monday = mondaySdk();
+
+type TimeEntryWithRole = TimeEntry & { role: { name: string } };
 
 interface TimeEntriesTableProps {
-	timeEntries?: TimeEntry[];
+	timeEntries?: TimeEntryWithRole[];
 	loading?: boolean;
 	error?: string | null;
 	onRefetch: () => void;
@@ -25,6 +36,11 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showSaveModal, setShowSaveModal] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<TimeEntry | null>(null);
+	const [showEditModal, setShowEditModal] = useState(false);
+	const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+	const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+	const [deleteCount, setDeleteCount] = useState(0);
+	const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
 
 	// Use new timer store selectors
 	const elapsedTime = useTimerStore((s) => s.elapsedTime);
@@ -33,6 +49,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const { isActive, isPaused, hasSession } = useTimerComputed();
 
 	const userId = useUserStore((state) => state.supabaseUser?.id);
+	const { rawContext } = useMondayStore();
+	const { showToast } = useToast();
 
 	// Selection logic
 	const selectAllState = useMemo(() => {
@@ -75,6 +93,125 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const handleCloseSaveModal = () => {
 		setShowSaveModal(false);
 		setSelectedDraft(null);
+	};
+
+	// Edit handlers
+	const handleEdit = (entry: TimeEntry) => {
+		setEditingEntry(entry);
+		setShowEditModal(true);
+	};
+
+	const handleCloseEditModal = () => {
+		setShowEditModal(false);
+		setEditingEntry(null);
+	};
+
+	const handleEditSaved = () => {
+		onRefetch();
+	};
+
+	// Delete handlers
+	const handleDelete = async (entry: TimeEntry) => {
+		setDeleteCount(1);
+		setPendingDelete(() => async () => {
+			try {
+				const response = await fetch(`/api/time-entries/${entry.id}`, {
+					method: "DELETE",
+					headers: {
+						userId: userId || "",
+					},
+				});
+
+				if (!response.ok) {
+					throw new Error("Failed to delete entry");
+				}
+
+				const { undoToken } = await response.json();
+
+				showToast("Eintrag gelöscht", "warning", 5000, {
+					actionLabel: "Rückgängig",
+					onAction: () => handleUndo(entry.id.toString(), undoToken),
+				});
+
+				onRefetch();
+			} catch (error) {
+				console.error("Error deleting entry:", error);
+				showToast("Fehler beim Löschen", "negative", 2000);
+			}
+		});
+		setShowDeleteConfirmation(true);
+	};
+
+	const handleBulkDelete = async () => {
+		setDeleteCount(selectedIds.length);
+		setPendingDelete(() => async () => {
+			try {
+				const response = await fetch("/api/time-entries/bulk-delete", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						userId: userId || "",
+					},
+					body: JSON.stringify({
+						entryIds: selectedIds,
+					}),
+				});
+
+				if (!response.ok) {
+					throw new Error("Failed to bulk delete entries");
+				}
+
+				const result = await response.json();
+
+				showToast(`${result.deleted} Einträge gelöscht`, "positive", 2000);
+
+				setSelectedIds([]);
+				onRefetch();
+			} catch (error) {
+				console.error("Error bulk deleting entries:", error);
+				showToast("Fehler beim Löschen", "negative", 2000);
+			}
+		});
+		setShowDeleteConfirmation(true);
+	};
+
+	const handleConfirmDelete = () => {
+		if (pendingDelete) {
+			pendingDelete();
+			setPendingDelete(null);
+		}
+		setShowDeleteConfirmation(false);
+	};
+
+	const handleCancelDelete = () => {
+		setPendingDelete(null);
+		setShowDeleteConfirmation(false);
+	};
+
+	const handleUndo = async (entryId: string, undoToken: string) => {
+		try {
+			const context = rawContext || (await monday.get("context"));
+
+			const response = await fetch(`/api/time-entries/${entryId}/undo`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					userId: userId || "",
+				},
+				body: JSON.stringify({ undoToken }),
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to undo delete");
+			}
+
+			showToast("Eintrag wiederhergestellt", "positive", 2000);
+
+			onRefetch();
+		} catch (error) {
+			console.error("Error undoing delete:", error);
+			showToast("Fehler beim Wiederherstellen", "negative", 2000);
+		}
 	};
 
 	if (loading) {
@@ -130,16 +267,19 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 										<Checkbox checked={selectedIds.includes(entry.id.toString())} onChange={(e) => handleRowSelect(entry.id.toString(), e.currentTarget.checked)} aria-label={`Select time entry ${entry.id}`} />
 									</Table.Td>
 									<Table.Td>
-										<Text size="sm">
-											{entry.task_name}
-											{entry.parent_item_name && (
-												<Text span c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "dki-tertiary"} fs="italic" fz={12} ml="xs">
-													{entry.parent_item_name}
-												</Text>
-											)}
-										</Text>
+										<Flex align="center" justify="space-between">
+											<Text size="sm">
+												{entry.item_name}
+												{entry.parent_item_name && (
+													<Text span c={selectedIds.includes(entry.id.toString()) ? "dki-black" : "dki-tertiary"} fs="italic" fz={12} ml="xs">
+														{entry.parent_item_name}
+													</Text>
+												)}
+											</Text>
+											<TimeEntryRowMenu entry={entry} onEdit={handleEdit} onDelete={handleDelete} />
+										</Flex>
 									</Table.Td>
-									<Table.Td>{entry.role_name || "-"}</Table.Td>
+									<Table.Td>{entry.role.name || "-"}</Table.Td>
 									<Table.Td>{entry.board_name || "-"}</Table.Td>
 									<Table.Td>{entry.comment || "-"}</Table.Td>
 									<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
@@ -193,7 +333,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 									itemName: selectedDraft.item_name || "",
 									parentItemId: selectedDraft.parent_item_id || undefined,
 									parentItemName: selectedDraft.parent_item_name || undefined,
-									role: selectedDraft.role || "",
+									roleId: selectedDraft.role_id || "",
 									roleName: selectedDraft.role_name || "",
 								},
 								comment: selectedDraft.comment || "",
@@ -203,6 +343,9 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 						: undefined
 				}
 			/>
+			{editingEntry && <EditTimeEntryModal show={showEditModal} onClose={handleCloseEditModal} entry={editingEntry} onSaved={handleEditSaved} />}
+			<DeleteConfirmationDialog show={showDeleteConfirmation} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} count={deleteCount} />
+			<BulkActionButtons selectedIds={selectedIds} onBulkDelete={handleBulkDelete} onClearSelection={() => setSelectedIds([])} />
 		</>
 	);
 }
