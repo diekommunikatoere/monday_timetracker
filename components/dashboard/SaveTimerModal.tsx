@@ -141,7 +141,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			// Get fresh context for the API call
 			const context = rawContext || (await monday.get("context"));
 
-			console.log("Trying to save time entry with: ", { draftId: activeDraftId, taskName, comment, boardId: selectedTask.boardId, boardName: selectedTask.boardName, itemId: selectedTask.itemId, itemName: selectedTask.itemName, parentItemId: selectedTask.parentItemId || null, parentItemName: selectedTask.parentItemName || null, role: selectedTask.role, roleName: selectedTask.roleName, duration: durationSeconds, date: date.toISOString() });
+			console.log("Trying to save time entry with: ", { draftId: activeDraftId, taskName, comment, boardId: selectedTask.boardId, boardName: selectedTask.boardName, itemId: selectedTask.itemId, itemName: selectedTask.itemName, parentItemId: selectedTask.parentItemId || null, parentItemName: selectedTask.parentItemName || null, roleId: selectedTask.roleId, duration: durationSeconds, date: date.toISOString() });
 
 			// Call API route to finalize time entry
 			const response = await fetch("/api/time-entries/finalize", {
@@ -160,8 +160,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 					itemName: selectedTask.itemName,
 					parentItemId: selectedTask.parentItemId || null,
 					parentItemName: selectedTask.parentItemName || null,
-					role: selectedTask.role,
-					roleName: selectedTask.roleName,
+					roleId: selectedTask.roleId,
 					duration: durationSeconds,
 					date: date.toISOString(),
 				}),
