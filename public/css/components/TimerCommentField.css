@@ -13,7 +13,6 @@
 			&[data-disabled] {
 				background-color: var(--color--background-disabled);
 				cursor: not-allowed;
-				border-color: var(--color--border-disabled);
 
 				&::placeholder {
 					color: var(--color--text-disabled);

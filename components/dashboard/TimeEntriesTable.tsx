@@ -10,7 +10,6 @@ import { useToast } from "@/components/ToastProvider";
 import { Flex, Table, Checkbox, Text, Center, Loader, ActionIcon } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
-import Save from "@/components/icons/Save";
 import { Icon } from "@/components/Icon";
 import SaveTimerModal from "./SaveTimerModal";
 import EditTimeEntryModal from "./EditTimeEntryModal";
@@ -282,9 +281,9 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 									<Table.Td>{entry.role.name || "-"}</Table.Td>
 									<Table.Td>{entry.board_name || "-"}</Table.Td>
 									<Table.Td>{entry.comment || "-"}</Table.Td>
-									<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
-									<Table.Td>{new Date(entry.start_time).toLocaleTimeString()}</Table.Td>
-									<Table.Td>{new Date(entry.end_time).toLocaleTimeString()}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr</Table.Td>
+									<Table.Td>{new Date(entry.end_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr</Table.Td>
 									<Table.Td>{formatDuration(entry.duration)}</Table.Td>
 								</Table.Tr>
 							)) || (
@@ -302,17 +301,22 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 													</Text>
 												)}
 											</Text>
-											<ActionIcon variant="subtle" color="gray" onClick={() => handleOpenSaveModal(entry)} aria-label="Entwurf speichern">
-												<Save size={21} color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
-											</ActionIcon>
+											<Flex gap={4}>
+												<ActionIcon variant="light" color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} onClick={() => handleOpenSaveModal(entry)} aria-label="Entwurf speichern">
+													<Icon name="save" size={21} color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
+												</ActionIcon>
+												<ActionIcon variant="light" color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--error)"} onClick={() => handleDelete(entry)} aria-label="Entwurf löschen">
+													<Icon name="delete" size={21} color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--error)"} />
+												</ActionIcon>
+											</Flex>
 										</Flex>
 									</Table.Td>
 									<Table.Td>{entry.role_name || "-"}</Table.Td>
 									<Table.Td>{entry.board_name || "-"}</Table.Td>
 									<Table.Td>{entry.comment || "-"}</Table.Td>
-									<Table.Td>{new Date(entry.start_time).toLocaleDateString()}</Table.Td>
-									<Table.Td>{new Date(entry.start_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Table.Td>
-									<Table.Td>{new Date(entry.end_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}</Table.Td>
+									<Table.Td>{new Date(entry.start_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr</Table.Td>
+									<Table.Td>{new Date(entry.end_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr</Table.Td>
 									<Table.Td>{formatDuration(entry.duration)}</Table.Td>
 								</Table.Tr>
 							)
