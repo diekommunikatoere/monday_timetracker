@@ -1,0 +1,93 @@
+/**
+ * Custom Database Type Extensions
+ *
+ * This file contains custom type definitions that extend the auto-generated
+ * Supabase types from database.ts. These types are safe from regeneration.
+ *
+ * Categories:
+ * - Table convenience aliases for common operations
+ * - RPC function result types
+ * - Business logic enums and constants
+ *
+ * DO NOT add these types to database.ts as they will be overwritten
+ * when running `npm run db:types`
+ */
+
+import type { Database } from "./database";
+
+// ============================================
+// Table Convenience Type Aliases
+// ============================================
+// These provide shorter, more convenient names for common table operations
+
+export type BoardConfig = Database["public"]["Tables"]["board_config"]["Row"];
+export type BoardConfigInsert = Database["public"]["Tables"]["board_config"]["Insert"];
+export type BoardConfigUpdate = Database["public"]["Tables"]["board_config"]["Update"];
+
+export type BoardRoleOverride = Database["public"]["Tables"]["board_role_override"]["Row"];
+export type BoardRoleOverrideInsert = Database["public"]["Tables"]["board_role_override"]["Insert"];
+export type BoardRoleOverrideUpdate = Database["public"]["Tables"]["board_role_override"]["Update"];
+
+export type ColumnSyncConfig = Database["public"]["Tables"]["column_sync_config"]["Row"];
+export type ColumnSyncConfigInsert = Database["public"]["Tables"]["column_sync_config"]["Insert"];
+export type ColumnSyncConfigUpdate = Database["public"]["Tables"]["column_sync_config"]["Update"];
+
+export type SyncLog = Database["public"]["Tables"]["sync_log"]["Row"];
+export type SyncLogInsert = Database["public"]["Tables"]["sync_log"]["Insert"];
+export type SyncLogUpdate = Database["public"]["Tables"]["sync_log"]["Update"];
+
+export type Role = Database["public"]["Tables"]["role"]["Row"];
+export type RoleInsert = Database["public"]["Tables"]["role"]["Insert"];
+export type RoleUpdate = Database["public"]["Tables"]["role"]["Update"];
+
+// ============================================
+// RPC Function Result Types
+// ============================================
+// Type definitions for database function return values
+
+/**
+ * Result type for get_item_time_by_role RPC function
+ * Returns time breakdown by role for a specific item
+ */
+export interface GetItemTimeByRoleResult {
+	role_id: string;
+	role_name: string;
+	total_seconds: number;
+	entry_count: number;
+}
+
+/**
+ * Result type for calculate_remaining_budget RPC function
+ * Returns budget calculations for an item
+ */
+export interface CalculateRemainingBudgetResult {
+	budget_amount: number;
+	total_cost: number;
+	remaining_budget: number;
+	utilization_percent: number;
+}
+
+// ============================================
+// Business Logic Enums & Constants
+// ============================================
+// Type-safe enums for business logic and validation
+
+/**
+ * Sync purpose defines what type of data is being synced to monday.com columns
+ */
+export type SyncPurpose = "total_time" | "time_by_role" | "remaining_budget";
+
+/**
+ * Time format options for displaying time in monday.com columns
+ */
+export type TimeFormat = "hours" | "seconds" | "hh:mm";
+
+/**
+ * Valid monday.com column types that can be used for sync operations
+ */
+export type SyncColumnType = "numbers" | "text" | "long_text" | "time_tracking";
+
+/**
+ * Valid monday.com column types that can contain budget information
+ */
+export type BudgetColumnType = "numbers" | "formula" | "mirror";
