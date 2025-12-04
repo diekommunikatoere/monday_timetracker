@@ -1,14 +1,5 @@
 .button.button--timer {
-	padding: var(--space-8);
-	height: var(--space-36);
-	width: var(--space-36);
-
-	svg {
-		width: var(--space-24);
-		height: var(--space-24);
-	}
-
-	&.play-pause {
+	/* &.play-pause {
 		border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
 	}
 
@@ -18,7 +9,7 @@
 
 	&.save {
 		border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
-	}
+	} */
 
 	&:disabled {
 		cursor: not-allowed;

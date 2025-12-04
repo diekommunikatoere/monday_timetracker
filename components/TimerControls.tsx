@@ -1,7 +1,7 @@
 // components/TimerControls.tsx
 "use client";
 
-import { ActionIcon, Flex, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, Flex, Tooltip } from "@mantine/core";
 import { Icon } from "@/components/Icon";
 import type { TimerControlsProps } from "@/types/timer.types";
 import "@/public/css/components/TimerActionButtons.css";
@@ -31,22 +31,22 @@ export default function TimerControls({ status, hasSession, isSaving, onPlayPaus
 	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} /> : <Icon name="play" color={activeColor} />;
 
 	return (
-		<Flex>
+		<Button.Group>
 			<Tooltip label={isRunning ? "Timer pausieren" : "Timer starten"} position="top" withArrow>
-				<ActionIcon className="button button--timer play-pause" variant="filled" size="lg" onClick={onPlayPause} disabled={isSaving}>
+				<Button className="button button--timer play-pause" variant="filled" size="md" onClick={onPlayPause} disabled={isSaving}>
 					{PlayPauseIcon}
-				</ActionIcon>
+				</Button>
 			</Tooltip>
 			<Tooltip label="Als Entwurf speichern" position="top" withArrow>
-				<ActionIcon className="button button--timer draft" variant="filled" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving}>
+				<Button className="button button--timer draft" variant="filled" size="md" onClick={onSaveAsDraft} disabled={!hasSession || isSaving}>
 					<Icon name="moveDown" color={hasSession ? activeColor : disabledColor} />
-				</ActionIcon>
+				</Button>
 			</Tooltip>
 			<Tooltip label="Speichern" position="top" withArrow>
-				<ActionIcon className="button button--timer save" variant="filled" size="lg" onClick={onSave} disabled={!hasSession || isSaving}>
+				<Button className="button button--timer save" variant="filled" size="md" onClick={onSave} disabled={!hasSession || isSaving}>
 					<Icon name="save" color={hasSession ? activeColor : disabledColor} />
-				</ActionIcon>
+				</Button>
 			</Tooltip>
-		</Flex>
+		</Button.Group>
 	);
 }

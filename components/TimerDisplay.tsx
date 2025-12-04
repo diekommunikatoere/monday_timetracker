@@ -28,12 +28,12 @@ export default function TimerDisplay({ elapsedTime, status, onReset, disabled }:
 	const disabledColor = "var(--color--tertiary)";
 
 	return (
-		<Flex direction="row" align="center" justify="center" className="timer-display" gap="md">
+		<Flex direction="row" align="center" justify="center" className="timer-display" gap="lg">
 			<Text className={`timer-time${isActive ? " active" : ""}${isPaused ? " paused" : ""}`}>{formatTime(elapsedTime)}</Text>
 			<Tooltip label="Timer zurücksetzen" position="top" withArrow>
-				<ActionIcon className="btn-reset" onClick={onReset} variant="filled" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
+				<Button className="btn-reset" onClick={onReset} variant="filled" size="compact-xl" aria-label="Timer zurücksetzen" disabled={disabled}>
 					<Icon name="reset" color={!disabled ? activeColor : disabledColor} />
-				</ActionIcon>
+				</Button>
 			</Tooltip>
 		</Flex>
 	);

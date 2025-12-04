@@ -23,11 +23,12 @@
 	--color--background-primary-hover: var(--color--tertiary-light);
 	--color--background-secondary: #f5f4f0;
 	--color--background-secondary-hover: #ffffff;
-	--color--background-disabled: var(--color--tertiary-extra-light);
+	--color--background-disabled: var(--color--tertiary-light);
 	--color--background-backdrop: rgba(245, 244, 240, 0.7);
 
 	--color--border-ui: var(--color--tertiary-light);
 	--color--border-layout: var(--color--background-secondary);
+	--color--border-disabled: var(--color--tertiary);
 
 	--color--text-primary: var(--color--contrast);
 	--color--text-secondary: var(--color--tertiary-dark);

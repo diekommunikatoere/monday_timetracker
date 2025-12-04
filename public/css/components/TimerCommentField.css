@@ -1,11 +1,29 @@
 .timer-comment-field-container {
-	.timer-comment-field-wrapper {
-		.timer-comment-field {
-			width: clamp(150px, 20vw, 300px);
-			transition: width 0.3s ease;
+	width: min(400px, 100%);
+	.timer-comment-field {
+		input {
+			font-size: 0.9rem;
+			border-color: var(--color--border-ui);
+			transition: border-color 0.3s ease;
 
-			&.focus {
-				width: clamp(200px, 50vw, 600px);
+			&::placeholder {
+				color: var(--color--text-placeholder);
+			}
+
+			&[data-disabled] {
+				background-color: var(--color--background-disabled);
+				cursor: not-allowed;
+				border-color: var(--color--border-disabled);
+
+				&::placeholder {
+					color: var(--color--text-disabled);
+				}
+			}
+		}
+
+		&.focus {
+			input {
+				border-color: var(--color--primary);
 			}
 		}
 	}
