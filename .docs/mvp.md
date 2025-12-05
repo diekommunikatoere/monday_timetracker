@@ -35,6 +35,8 @@ edit time entry start und endzeit fehlt
 - Overview of all `draft entries`.
 - Ability to manually enter time.
 - "save as draft" is only available when a comment is provided (display error if not).
+- Timer should be the prominent feature on the dashboard.
+- Manual time entry and time entries overview are secondary features.
 
 ### 1.1 `Time Entry` Creation
 
