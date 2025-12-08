@@ -1,7 +1,8 @@
 // components/dashboard/DeleteConfirmationDialog.tsx
 "use client";
 
-import { Modal, Text, Button, Group } from "@mantine/core";
+import { Modal, Text, Group } from "@mantine/core";
+import { Button } from "@/components/ui/buttons/Button";
 
 interface DeleteConfirmationDialogProps {
 	show: boolean;

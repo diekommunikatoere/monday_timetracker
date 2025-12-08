@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
-import { Tabs, Button, TextInput, NumberInput, Switch, Select, Modal, Loader, ActionIcon, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
+import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
+import { Button, IconButton } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -657,12 +658,12 @@ export default function BoardConfigPage() {
 											</Table.Td>
 											<Table.Td>
 												<Group gap="xs">
-													<ActionIcon variant="light" onClick={() => handleOpenColumnModal(column)}>
+													<IconButton variant="light" onClick={() => handleOpenColumnModal(column)}>
 														<IconEdit />
-													</ActionIcon>
-													<ActionIcon variant="light" color="red" onClick={() => handleDeleteColumn(column)}>
+													</IconButton>
+													<IconButton variant="light" color="red" onClick={() => handleDeleteColumn(column)}>
 														<IconTrash />
-													</ActionIcon>
+													</IconButton>
 												</Group>
 											</Table.Td>
 										</Table.Tr>
@@ -723,12 +724,12 @@ export default function BoardConfigPage() {
 											</Table.Td>
 											<Table.Td>
 												<Group gap="xs">
-													<ActionIcon variant="light" onClick={() => handleOpenOverrideModal(override)}>
+													<IconButton variant="light" onClick={() => handleOpenOverrideModal(override)}>
 														<IconEdit />
-													</ActionIcon>
-													<ActionIcon variant="light" color="red" onClick={() => handleDeleteOverride(override)}>
+													</IconButton>
+													<IconButton variant="light" color="red" onClick={() => handleDeleteOverride(override)}>
 														<IconTrash />
-													</ActionIcon>
+													</IconButton>
 												</Group>
 											</Table.Td>
 										</Table.Tr>

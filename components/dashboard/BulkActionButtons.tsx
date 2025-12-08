@@ -1,7 +1,8 @@
 // components/dashboard/BulkActionButtons.tsx
 "use client";
 
-import { Card, Button, Flex, Text } from "@mantine/core";
+import { Card, Flex, Text } from "@mantine/core";
+import { Button } from "@/components/ui/buttons/Button";
 import { Icon } from "@/components/Icon";
 
 interface BulkActionButtonsProps {

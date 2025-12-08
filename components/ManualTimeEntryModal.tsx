@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Modal, Button, Group, Flex, TextInput } from "@mantine/core";
+import { Modal, Group, Flex, TextInput } from "@mantine/core";
+import { Button } from "@/components/ui/buttons/Button";
 import { DatePickerInput } from "@mantine/dates";
 import { TimeInput } from "@mantine/dates";
 import TaskItemSelector, { TaskSelection } from "./TaskItemSelector";
@@ -12,6 +13,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import { Icon } from "@/components/Icon";
 import mondaySdk from "monday-sdk-js";
+import { ButtonGroup } from "@/components";
 
 const monday = mondaySdk();
 
@@ -235,7 +237,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 						<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={(newDate) => newDate && setDate(new Date(newDate))} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
 					</Flex>
 					<Flex gap="sm">
-						<Button.Group flex={2}>
+						<ButtonGroup flex={2}>
 							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(15)}>
 								+15m
 							</Button>
@@ -248,15 +250,15 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(120)}>
 								+2h
 							</Button>
-						</Button.Group>
-						<Button.Group flex={1}>
+						</ButtonGroup>
+						<ButtonGroup flex={1}>
 							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(-15)}>
 								-15m
 							</Button>
 							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(-60)}>
 								-1h
 							</Button>
-						</Button.Group>
+						</ButtonGroup>
 					</Flex>
 				</Flex>
 

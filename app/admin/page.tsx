@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
-import { Tabs, Button, TextInput, NumberInput, Switch, Select, Modal, Loader, ActionIcon, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
+import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
+import { Button, IconButton, IconLink } from "@/components";
 import { Icon } from "@/components/Icon";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
@@ -400,14 +401,14 @@ export default function AdminPage() {
 										</div>
 										<div className="role-card-actions">
 											<Tooltip label="Edit role">
-												<ActionIcon variant="light" onClick={() => handleOpenRoleModal(role)}>
+												<IconButton variant="light" onClick={() => handleOpenRoleModal(role)}>
 													<Icon name="edit" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 											<Tooltip label={role.is_active ? "Deactivate role" : "Role is inactive"}>
-												<ActionIcon variant="light" color="red" onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
+												<IconButton variant="light" color="red" onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
 													<Icon name="delete" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 										</div>
 									</div>
@@ -462,19 +463,19 @@ export default function AdminPage() {
 										</div>
 										<div className="board-card-actions">
 											<Tooltip label="Edit configuration">
-												<ActionIcon variant="light" onClick={() => handleOpenBoardModal(board)}>
+												<IconButton variant="light" onClick={() => handleOpenBoardModal(board)}>
 													<Icon name="edit" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 											<Tooltip label="Configure columns">
-												<ActionIcon variant="light" component="a" href={`/admin/boards/${board.board_id}`}>
+												<IconLink variant="light" href={`/admin/boards/${board.board_id}`}>
 													<Icon name="settings" size={21} />
-												</ActionIcon>
+												</IconLink>
 											</Tooltip>
 											<Tooltip label="Delete configuration">
-												<ActionIcon variant="light" color="red" onClick={() => handleDeleteBoard(board)}>
+												<IconButton variant="light" color="red" onClick={() => handleDeleteBoard(board)}>
 													<Icon name="delete" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 										</div>
 									</div>

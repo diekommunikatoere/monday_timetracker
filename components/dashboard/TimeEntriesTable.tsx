@@ -7,7 +7,8 @@ import { useTimerStore, useTimerComputed } from "@/stores/timerStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
-import { Flex, Table, Checkbox, Text, Center, Loader, ActionIcon } from "@mantine/core";
+import { Flex, Table, Checkbox, Text, Center, Loader } from "@mantine/core";
+import { IconButton } from "@/components";
 import { TimeEntry } from "@/types/time-entry";
 import { formatDuration } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
@@ -302,12 +303,12 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 												)}
 											</Text>
 											<Flex gap={4}>
-												<ActionIcon variant="light" color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} onClick={() => handleOpenSaveModal(entry)} aria-label="Entwurf speichern">
+												<IconButton variant="light" color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} onClick={() => handleOpenSaveModal(entry)} aria-label="Entwurf speichern">
 													<Icon name="save" size={21} color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--contrast)"} />
-												</ActionIcon>
-												<ActionIcon variant="light" color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--error)"} onClick={() => handleDelete(entry)} aria-label="Entwurf löschen">
+												</IconButton>
+												<IconButton variant="light" color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--error)"} onClick={() => handleDelete(entry)} aria-label="Entwurf löschen">
 													<Icon name="delete" size={21} color={selectedIds.includes(entry.id.toString()) ? "var(--color--tertiary-dark)" : "var(--color--error)"} />
-												</ActionIcon>
+												</IconButton>
 											</Flex>
 										</Flex>
 									</Table.Td>
