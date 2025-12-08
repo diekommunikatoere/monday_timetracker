@@ -23,6 +23,8 @@ const theme = createTheme({
 	},
 	primaryColor: "dki-primary",
 	primaryShade: 7,
+	black: "#282616",
+	white: "#ffffff",
 	other: {},
 });
 
