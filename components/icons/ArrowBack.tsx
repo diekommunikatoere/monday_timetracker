@@ -1,4 +1,4 @@
-import { IconComponentProps } from "@/types/IconProps";
+import { IconComponentProps } from "@/components/ui/icons/types";
 
 export default function ArrowBack({ size = 24, color = "#282616", className }: IconComponentProps & { className?: string }) {
 	return (
