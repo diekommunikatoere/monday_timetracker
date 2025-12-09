@@ -1,0 +1,30 @@
+.bulk-action-buttons--container-outer {
+	position: fixed;
+	bottom: 2rem;
+	left: 50%;
+	z-index: 1000;
+	min-width: 300px;
+	width: auto;
+	transform: translateX(-50%);
+	animation: slideUp 0.3s ease-out;
+	box-shadow: var(--box-shadow--large);
+	border-radius: var(--border-radius--md);
+}
+
+@media (max-width: 768px) {
+	.bulk-action-buttons--container-outer {
+		width: 90%;
+		min-width: 0;
+	}
+}
+
+@keyframes slideUp {
+	from {
+		transform: translateX(-50%) translateY(100px);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(-50%) translateY(0);
+		opacity: 1;
+	}
+}
