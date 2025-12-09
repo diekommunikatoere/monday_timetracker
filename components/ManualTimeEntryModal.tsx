@@ -2,16 +2,16 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Modal, Group, Flex, TextInput } from "@mantine/core";
-import { Button } from "@/components/ui/buttons/Button";
-import { DatePickerInput } from "@mantine/dates";
+import { Group, Flex, TextInput } from "@mantine/core";
+import { Button, Modal } from "@/components";
+import { DatePicker } from "@/components";
 import { TimeInput } from "@mantine/dates";
 import TaskItemSelector, { TaskSelection } from "./TaskItemSelector";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components";
 import mondaySdk from "monday-sdk-js";
 import { ButtonGroup } from "@/components";
 
@@ -219,64 +219,67 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 	};
 
 	return (
-		<Modal opened={show} onClose={onClose} title="Zeit eintragen" size="lg" padding="xl">
-			<Flex direction="column" gap="md">
-				{error && <div style={{ color: "var(--mantine-color-red-6)" }}>{error}</div>}
+		<Modal show={show} onClose={onClose}>
+			<Modal.Header>Zeit eintragen</Modal.Header>
+			<Modal.Body>
+				<Flex direction="column" gap="md">
+					{error && <div style={{ color: "var(--mantine-color-red-6)" }}>{error}</div>}
 
-				{/* Start and End Time Inputs */}
-				<Flex gap="md">
-					<TimeInput label="Startzeit" value={startTime} onChange={(event) => handleStartTimeChange(event.currentTarget.value)} style={{ flex: 1 }} />
-					<TimeInput label="Endzeit" value={endTime} onChange={(event) => handleEndTimeChange(event.currentTarget.value)} style={{ flex: 1 }} />
-				</Flex>
-
-				{/* Duration Input with Quick Adjustment Buttons */}
-				<Flex gap="md" direction="column">
-					<Flex gap="xs" align="center">
-						<TimeInput label="Dauer" required value={duration} onChange={(event) => setDuration(event.currentTarget.value)} style={{ flex: 2 }} />
-						{/* Date Picker */}
-						<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={(newDate) => newDate && setDate(new Date(newDate))} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
+					{/* Start and End Time Inputs */}
+					<Flex gap="md">
+						<TimeInput label="Startzeit" value={startTime} onChange={(event) => handleStartTimeChange(event.currentTarget.value)} style={{ flex: 1 }} />
+						<TimeInput label="Endzeit" value={endTime} onChange={(event) => handleEndTimeChange(event.currentTarget.value)} style={{ flex: 1 }} />
 					</Flex>
-					<Flex gap="sm">
-						<ButtonGroup flex={2}>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(15)}>
-								+15m
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(30)}>
-								+30m
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(60)}>
-								+1h
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(120)}>
-								+2h
-							</Button>
-						</ButtonGroup>
-						<ButtonGroup flex={1}>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(-15)}>
-								-15m
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(-60)}>
-								-1h
-							</Button>
-						</ButtonGroup>
+
+					{/* Duration Input with Quick Adjustment Buttons */}
+					<Flex gap="md" direction="column">
+						<Flex gap="xs" align="center">
+							<TimeInput label="Dauer" required value={duration} onChange={(event) => setDuration(event.currentTarget.value)} style={{ flex: 2 }} />
+							{/* Date Picker */}
+							<DatePicker label="Datum" placeholder="Datum auswählen" value={date} onChange={(newDate) => newDate && setDate(new Date(newDate))} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
+						</Flex>
+						<Flex gap="sm">
+							<ButtonGroup flex={2}>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(15)}>
+									+15m
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(30)}>
+									+30m
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(60)}>
+									+1h
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(120)}>
+									+2h
+								</Button>
+							</ButtonGroup>
+							<ButtonGroup flex={1}>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(-15)}>
+									-15m
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(-60)}>
+									-1h
+								</Button>
+							</ButtonGroup>
+						</Flex>
 					</Flex>
+
+					{/* Task Selector (Board, Task, Role) */}
+					<TaskItemSelector onSelectionChange={handleTaskSelection} />
+
+					{/* Comment Input */}
+					<TextInput label="Kommentar" value={comment} onChange={(event) => setComment(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
+
+					<Group justify="flex-end" mt="md">
+						<Button variant="default" onClick={onClose} aria-label="Zeit-Eintrag abbrechen">
+							Abbrechen
+						</Button>
+						<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving} aria-label="Zeit-Eintrag speichern">
+							{isSaving ? "Speichern..." : "Speichern"}
+						</Button>
+					</Group>
 				</Flex>
-
-				{/* Task Selector (Board, Task, Role) */}
-				<TaskItemSelector onSelectionChange={handleTaskSelection} />
-
-				{/* Comment Input */}
-				<TextInput label="Kommentar" value={comment} onChange={(event) => setComment(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
-
-				<Group justify="flex-end" mt="md">
-					<Button variant="default" onClick={onClose} aria-label="Zeit-Eintrag abbrechen">
-						Abbrechen
-					</Button>
-					<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving} aria-label="Zeit-Eintrag speichern">
-						{isSaving ? "Speichern..." : "Speichern"}
-					</Button>
-				</Group>
-			</Flex>
+			</Modal.Body>
 		</Modal>
 	);
 }
