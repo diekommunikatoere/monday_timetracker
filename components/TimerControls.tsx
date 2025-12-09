@@ -4,7 +4,7 @@
 import { Tooltip } from "@mantine/core";
 import { Button, ButtonGroup } from "@/components";
 
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components";
 import type { TimerControlsProps } from "@/types/timer.types";
 import "@/public/css/components/TimerActionButtons.css";
 

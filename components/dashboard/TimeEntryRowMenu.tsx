@@ -2,8 +2,7 @@
 "use client";
 
 import { Menu } from "@mantine/core";
-import { IconButton } from "@/components";
-import { Icon } from "@/components/Icon";
+import { IconButton, Icon } from "@/components";
 import { TimeEntry } from "@/types/time-entry";
 
 interface TimeEntryRowMenuProps {

@@ -2,9 +2,8 @@
 "use client";
 
 import { Flex, Text, Button, Tooltip } from "@mantine/core";
-import { IconButton } from "@/components";
+import { IconButton, Icon } from "@/components";
 import { formatTime } from "@/lib/utils";
-import { Icon } from "@/components/Icon";
 import type { TimerDisplayProps } from "@/types/timer.types";
 import "@/public/css/components/RunningTimerDisplay.css";
 

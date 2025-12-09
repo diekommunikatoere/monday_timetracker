@@ -1,6 +1,6 @@
 import { Tooltip } from "@mantine/core";
 import { Button } from "@/components/ui/buttons/Button";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components";
 
 export default function ManualTimeEntryButton(props: { onClick: () => void }) {
 	return (

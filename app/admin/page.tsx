@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
 import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
 import { Button, IconButton, IconLink } from "@/components";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
