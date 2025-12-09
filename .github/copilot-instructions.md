@@ -4,7 +4,7 @@
 
 A Next.js time tracking application embedded within monday.com as a dashboard widget. Users track time via timer or manual entries, with data stored in Supabase PostgreSQL and cached in Redis. Time entries eventually sync to monday.com boards as subitems.
 
-**Stack**: Next.js 16 (App Router), React 19, Supabase (PostgreSQL), Redis, monday.com SDK, @vibe/core UI components
+**Stack**: Next.js 16 (App Router), React 19, Supabase (PostgreSQL), Redis, monday.com SDK, Mantine UI components
 
 ## Authentication & User Context
 
@@ -109,10 +109,11 @@ This single command:
 
 ### Component Patterns
 
-**Use @vibe/core components** (monday.com's design system):
+**Use own components or Mantine components** (UI library):
 
 ```tsx
-import { Button, TextField, Loader } from "@vibe/core";
+import { Button, TextField, Loader } from "@mantine/core";
+// or import from own components in ui/ folder
 ```
 
 **State management**:
