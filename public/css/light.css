@@ -1,7 +1,7 @@
 /* public/css/light.css */
-[data-mantine-color-scheme="light"],
-.light {
-	:root {
+:root {
+	html[data-mantine-color-scheme="light"],
+	html.light {
 		--color--primary: #db007a;
 		--color--primary-hover: #f31b63;
 		--color--primary-selected: #ffd640;

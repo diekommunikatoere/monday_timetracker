@@ -5,6 +5,7 @@ import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
 import "@/public/css/fonts.css";
 import "./globals.scss";
+import { themeTokens } from "@/components/ui/theme/tokens";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/ToastProvider";
 import { StoreProvider } from "@/components/StoreProvider";
@@ -37,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				<ColorSchemeScript />
 			</head>
 			<body>
-				<MantineProvider theme={theme}>
+				<MantineProvider theme={theme} cssVariablesResolver={themeTokens}>
 					<Notifications />
 					<QueryClientProvider client={queryClient}>
 						<StoreProvider>
