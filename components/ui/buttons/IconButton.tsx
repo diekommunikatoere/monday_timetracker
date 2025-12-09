@@ -5,7 +5,7 @@ import { IconButtonProps } from "./types";
 
 export function IconButton({ children, onClick, href, ...props }: IconButtonProps) {
 	return (
-		<ActionIcon onClick={onClick} {...props}>
+		<ActionIcon className={`icon-button`} onClick={onClick} {...props}>
 			{children}
 		</ActionIcon>
 	);

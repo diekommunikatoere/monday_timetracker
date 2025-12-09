@@ -1,0 +1,45 @@
+button.button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	transition: background-color var(--transition);
+
+	&[data-variant="default"] {
+		border-color: var(--color--border-ui);
+	}
+
+	&.button--primary,
+	&[data-variant="filled"] {
+		background-color: var(--color-primary);
+		color: var(--color-white);
+
+		&:disabled,
+		&[data-disabled] {
+			background-color: red;
+			color: var(--color-text-disabled);
+		}
+	}
+
+	&[data-variant="light"] {
+	}
+	&[data-variant="outline"] {
+	}
+	&[data-variant="subtle"] {
+	}
+	&[data-variant="transparent"] {
+	}
+	&[data-variant="white"] {
+	}
+
+	&[data-loading] {
+		opacity: 0.7;
+		cursor: not-allowed;
+	}
+
+	&:disabled,
+	&[data-disabled] {
+		background-color: var(--color-background-disabled);
+		cursor: not-allowed;
+	}
+}
