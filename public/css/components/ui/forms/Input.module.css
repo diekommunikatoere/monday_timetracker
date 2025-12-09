@@ -1,0 +1,31 @@
+.input {
+	/* Base input styling */
+}
+
+.input--error {
+	border-color: var(--mantine-color-red-6);
+}
+
+.input--warning {
+	border-color: var(--mantine-color-yellow-6);
+}
+
+.input--success {
+	border-color: var(--mantine-color-green-6);
+}
+
+.textarea {
+	/* Base textarea styling */
+}
+
+.textarea--error {
+	border-color: var(--mantine-color-red-6);
+}
+
+.textarea--warning {
+	border-color: var(--mantine-color-yellow-6);
+}
+
+.textarea--success {
+	border-color: var(--mantine-color-green-6);
+}

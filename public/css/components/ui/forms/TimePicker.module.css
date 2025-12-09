@@ -1,0 +1,15 @@
+.time-picker {
+	/* Base time picker styling */
+}
+
+.time-picker--error {
+	border-color: var(--mantine-color-red-6);
+}
+
+.time-picker--warning {
+	border-color: var(--mantine-color-yellow-6);
+}
+
+.time-picker--success {
+	border-color: var(--mantine-color-green-6);
+}
