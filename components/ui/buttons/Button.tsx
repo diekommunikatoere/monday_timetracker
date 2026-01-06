@@ -2,7 +2,7 @@
 
 import { Button as MantineButton } from "@mantine/core";
 import { ButtonProps } from "./types";
-import "@/public/css/components/ui/buttons/Button.module.css";
+import "@/components/styles/ui/buttons/Button.module.css";
 
 export function Button(props: ButtonProps) {
 	let className = props.className || "";

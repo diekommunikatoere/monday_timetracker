@@ -1,5 +1,7 @@
-import "@/public/css/components/ui/buttons/IconLink.module.css";
+"use client";
+
 import { ActionIcon } from "@mantine/core";
+import "@/components/styles/ui/buttons/IconLink.module.css";
 
 import { IconLinkProps } from "./types";
 

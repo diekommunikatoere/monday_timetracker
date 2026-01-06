@@ -3,7 +3,7 @@
 import React from "react";
 import { TextInput as MantineTextInput, Textarea as MantineTextarea } from "@mantine/core";
 import { InputProps, TextareaProps } from "./types";
-import "@/public/css/components/ui/forms/Input.module.css";
+import "@/components/styles/ui/forms/Input.module.css";
 
 export const Input: React.FC<InputProps> = ({ error, validationState, className = "", ...props }) => {
 	const inputClass = ["input", validationState ? `input--${validationState}` : "", className].filter(Boolean).join(" ");

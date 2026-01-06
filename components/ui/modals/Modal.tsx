@@ -6,7 +6,7 @@ import { ModalProps, ModalCompoundComponent } from "./types";
 import { ModalHeader } from "./ModalHeader";
 import { ModalBody } from "./ModalBody";
 import { ModalFooter } from "./ModalFooter";
-import "@/public/css/components/ui/modals/Modal.module.css";
+import "@/components/styles/ui/modals/Modal.module.css";
 
 const ModalRoot: React.FC<ModalProps> & ModalCompoundComponent = ({ children, show = false, onClose, ...props }) => {
 	return (

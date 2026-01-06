@@ -3,7 +3,7 @@
 import React from "react";
 import { DatePickerInput as MantineDatePickerInput } from "@mantine/dates";
 import { DatePickerProps } from "./types";
-import "@/public/css/components/ui/forms/DatePicker.module.css";
+import "@/components/styles/ui/forms/DatePicker.module.css";
 
 export const DatePicker: React.FC<DatePickerProps> = ({ error, validationState, className = "", ...props }) => {
 	const datePickerClass = ["date-picker", validationState ? `date-picker--${validationState}` : "", className].filter(Boolean).join(" ");
