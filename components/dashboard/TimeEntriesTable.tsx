@@ -21,10 +21,8 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
-type TimeEntryWithRole = TimeEntry & { role: { name: string } };
-
 interface TimeEntriesTableProps {
-	timeEntries?: TimeEntryWithRole[];
+	timeEntries?: TimeEntry[];
 	loading?: boolean;
 	error?: string | null;
 	onRefetch: () => void;
@@ -278,7 +276,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 											<TimeEntryRowMenu entry={entry} onEdit={handleEdit} onDelete={handleDelete} />
 										</Flex>
 									</Table.Td>
-									<Table.Td>{entry.role.name || "-"}</Table.Td>
+									<Table.Td>{entry.role_name || "-"}</Table.Td>
 									<Table.Td>{entry.board_name || "-"}</Table.Td>
 									<Table.Td>{entry.comment || "-"}</Table.Td>
 									<Table.Td>{new Date(entry.start_time).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}</Table.Td>
@@ -319,7 +317,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 									<Table.Td>{new Date(entry.end_time).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr</Table.Td>
 									<Table.Td>{formatDuration(entry.duration)}</Table.Td>
 								</Table.Tr>
-							)
+							),
 					)}
 				</Table.Tbody>
 			</Table>
@@ -343,7 +341,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 								comment: selectedDraft.comment || "",
 								date: new Date(selectedDraft.start_time),
 								duration: formatDurationAsTime(selectedDraft.duration),
-						  }
+							}
 						: undefined
 				}
 			/>

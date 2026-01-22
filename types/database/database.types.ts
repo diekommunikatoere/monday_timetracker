@@ -40,6 +40,10 @@ export type Role = Database["public"]["Tables"]["role"]["Row"];
 export type RoleInsert = Database["public"]["Tables"]["role"]["Insert"];
 export type RoleUpdate = Database["public"]["Tables"]["role"]["Update"];
 
+export type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
+export type TimerSessionInsert = Database["public"]["Tables"]["timer_session"]["Insert"];
+export type TimerSessionUpdate = Database["public"]["Tables"]["timer_session"]["Update"];
+
 // ============================================
 // RPC Function Result Types
 // ============================================
@@ -65,6 +69,47 @@ export interface CalculateRemainingBudgetResult {
 	total_cost: number;
 	remaining_budget: number;
 	utilization_percent: number;
+}
+
+/**
+ * Result type for get_current_elapsed_time RPC function
+ * Returns the current calculated elapsed time for a session
+ */
+export interface GetCurrentElapsedTimeResult {
+	elapsed_time_ms: number;
+	server_time: string;
+	error?: string;
+}
+
+/**
+ * Result type for get_timer_session_with_elapsed RPC function
+ * Returns current session details with server-calculated elapsed time
+ */
+export interface GetTimerSessionWithElapsedResult {
+	session: {
+		id: string;
+		user_id: string;
+		draft_id: string;
+		start_time: string;
+		elapsed_time: number;
+		is_paused: boolean;
+		created_at: string;
+		time_entry: {
+			id: string;
+			comment: string | null;
+		} | null;
+	} | null;
+	calculated_elapsed_time_ms: number;
+	server_time: string;
+}
+
+/**
+ * Result type for finalize_segment RPC function
+ * Returns the final elapsed time and the duration added in the last segment
+ */
+export interface FinalizeSegmentResult {
+	elapsed_time_ms: number;
+	duration_added_ms: number;
 }
 
 // ============================================

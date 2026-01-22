@@ -17,7 +17,7 @@ import styles from "@/components/styles/features/timer/TimerContainer.module.css
  * - This component owns ALL the logic
  * - Child components are pure and receive props only
  *
- * Note: The SaveTimerModal is rendered in AppHeader.tsx to avoid duplicate modals
+ * Note: The SaveTimerModal is rendered in TimerDashboardHeader.tsx to avoid duplicate modals
  */
 export function TimerContainer() {
 	// Get all timer state and actions from the unified hook
@@ -44,7 +44,7 @@ export function TimerContainer() {
 					<TimerDisplay elapsedTime={state.elapsedTime} status={state.status} onReset={actions.reset} disabled={!hasSession || state.isSaving} />
 
 					{/* Timer Controls - play/pause, save as draft, save buttons */}
-					<TimerControls status={state.status} hasSession={hasSession} hasComment={state.comment} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSaveAsDraft={actions.saveAsDraft} onSave={actions.openSaveModal} />
+					<TimerControls status={state.status} hasSession={hasSession} hasComment={!!state.comment} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSaveAsDraft={actions.saveAsDraft} onSave={actions.openSaveModal} />
 				</Flex>
 
 				{/* Comment Field */}

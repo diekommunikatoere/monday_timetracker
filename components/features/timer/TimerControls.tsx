@@ -18,6 +18,7 @@ import styles from "@/components/styles/features/timer/TimerControls.module.css"
  *
  * @param status - Timer status (idle, running, paused)
  * @param hasSession - Whether there is an active timer session
+ * @param hasComment - Whether there is a comment to save
  * @param isSaving - Whether a save operation is in progress
  * @param onPlayPause - Callback for play/pause button
  * @param onSaveAsDraft - Callback for save as draft button

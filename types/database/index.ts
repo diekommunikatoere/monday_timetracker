@@ -33,9 +33,15 @@ export type {
 	Role,
 	RoleInsert,
 	RoleUpdate,
+	TimerSession,
+	TimerSessionInsert,
+	TimerSessionUpdate,
 	// RPC result types
 	GetItemTimeByRoleResult,
 	CalculateRemainingBudgetResult,
+	GetCurrentElapsedTimeResult,
+	GetTimerSessionWithElapsedResult,
+	FinalizeSegmentResult,
 	// Business logic enums
 	SyncPurpose,
 	TimeFormat,

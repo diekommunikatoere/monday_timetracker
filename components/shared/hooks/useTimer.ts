@@ -6,6 +6,7 @@ import { useModalStore } from "@/stores/modalStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { supabase } from "@/lib/supabase/client";
 import { UseTimerReturn } from "@/types/timer.types";
+import { TimerSession } from "@/types/database";
 
 export function useTimer(): UseTimerReturn {
 	/* Reactive state selectors */
@@ -24,9 +25,11 @@ export function useTimer(): UseTimerReturn {
 
 		const channel = supabase
 			.channel("timer_updates")
-			.on("postgres_changes", { event: "*", schema: "public", table: "timer_session" }, (payload) => {
-				if (payload.new?.user_id === userProfile.id) {
-					storeActions.setSession(payload.new);
+			.on<TimerSession>("postgres_changes", { event: "*", schema: "public", table: "timer_session" }, (payload) => {
+				// Use a type guard or safe property access for payload.new
+				const newSession = payload.new as TimerSession;
+				if (newSession && "user_id" in newSession && newSession.user_id === userProfile.id) {
+					storeActions.setSession(newSession as any);
 				}
 			})
 			.subscribe();
@@ -41,17 +44,24 @@ export function useTimer(): UseTimerReturn {
 		() => ({
 			start: async () => {},
 			pause: async () => {},
-			stop: async () => {
-				// Trigger the save modal
-				useModalStore.getState().openTimerSave();
-			},
+			resume: async () => {},
 			reset: async () => {
 				storeActions.reset();
 				// Trigger the save modal
-				useTimeEntriesStore.getState().refetch(userProfile.id);
+				if (userProfile.id) {
+					useTimeEntriesStore.getState().refetch(userProfile.id);
+				}
+			},
+			saveAsDraft: async () => {},
+			openSaveModal: () => {
+				// Trigger the save modal
+				useModalStore.getState().openTimerSave();
+			},
+			updateComment: (comment: string) => {
+				storeActions.setComment(comment);
 			},
 		}),
-		[storeActions]
+		[storeActions, userProfile.id],
 	);
 
 	/* Computed properties */
@@ -60,5 +70,6 @@ export function useTimer(): UseTimerReturn {
 		actions,
 		isActive: state.status === "running",
 		hasSession: !!state.sessionId,
+		canSave: !!state.sessionId && !state.isSaving,
 	};
 }
