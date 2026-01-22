@@ -119,7 +119,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 				roleName: item.roleName,
 				totalSeconds: item.totalSeconds,
 			})),
-			{ includeTotal: true, format }
+			{ includeTotal: true, format },
 		);
 
 		const response: TimeBreakdownResponse = {

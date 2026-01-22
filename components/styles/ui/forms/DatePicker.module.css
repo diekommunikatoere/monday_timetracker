@@ -1,0 +1,15 @@
+.date-picker {
+	/* Base date picker styling */
+}
+
+.date-picker--error {
+	border-color: var(--mantine-color-red-6);
+}
+
+.date-picker--warning {
+	border-color: var(--mantine-color-yellow-6);
+}
+
+.date-picker--success {
+	border-color: var(--mantine-color-green-6);
+}

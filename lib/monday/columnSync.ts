@@ -10,6 +10,10 @@
 import { ApiClient, ClientError } from "@mondaydotcomorg/api";
 import { cacheHelper } from "../redis";
 import { SyncColumnType, SyncPurpose, TimeFormat } from "@/types/database";
+import { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose } from "./utils";
+
+// Re-export shared utilities for convenience
+export { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose };
 
 // Cache TTL for columns (5 minutes - columns rarely change)
 const COLUMNS_CACHE_TTL = 300;
@@ -66,23 +70,6 @@ type ChangeColumnValueResponse = {
 		message: string;
 		status: number;
 	};
-};
-
-// Column types that are compatible with time tracking sync
-const COMPATIBLE_COLUMN_TYPES: Record<string, { label: string; purposes: SyncPurpose[] }> = {
-	numbers: {
-		label: "Numbers",
-		purposes: ["total_time", "remaining_budget"],
-	},
-	text: {
-		label: "Text",
-		purposes: ["total_time", "time_by_role"],
-	},
-	long_text: {
-		label: "Long Text",
-		purposes: ["time_by_role"],
-	},
-	// Note: time_tracking column type is read-only in monday.com API
 };
 
 // ============================================

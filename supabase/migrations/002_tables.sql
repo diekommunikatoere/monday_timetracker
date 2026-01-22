@@ -2,9 +2,6 @@
 -- Links Monday.com users to Supabase
 -- Includes team_ids array added later
 
--- Enable UUID extension (if not already enabled)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TABLE public.user_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     monday_user_id TEXT NOT NULL UNIQUE,

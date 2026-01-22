@@ -1,0 +1,15 @@
+.select {
+	/* Base select styling */
+}
+
+.select--error {
+	border-color: var(--mantine-color-red-6);
+}
+
+.select--warning {
+	border-color: var(--mantine-color-yellow-6);
+}
+
+.select--success {
+	border-color: var(--mantine-color-green-6);
+}

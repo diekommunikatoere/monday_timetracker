@@ -8,7 +8,7 @@
 "use client";
 
 import TimerDisplay from "@/components/TimerDisplay";
-import { useTimer } from "@/hooks/useTimer";
+import { useTimer } from "@/components/features/timer/hooks/useTimer";
 
 export default function RunningTimerDisplay({ ...props }) {
 	const { state, hasSession, actions } = useTimer();

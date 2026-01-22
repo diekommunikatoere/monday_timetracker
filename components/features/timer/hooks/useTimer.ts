@@ -106,7 +106,7 @@ export function useTimer(): UseTimerReturn {
 
 			return response.json();
 		},
-		[getMondayContext]
+		[getMondayContext],
 	);
 
 	// ============================================
@@ -258,7 +258,7 @@ export function useTimer(): UseTimerReturn {
 							store.reset();
 						}
 					}, 200);
-				}
+				},
 			)
 			.subscribe();
 
@@ -510,7 +510,7 @@ export function useTimer(): UseTimerReturn {
 				store.setComment(newComment);
 			},
 		}),
-		[sessionId, draftId, elapsedTime, status, comment, userProfile?.id, apiCall, getMondayContext, openTimerSave, refetchTimeEntries]
+		[sessionId, draftId, elapsedTime, status, comment, userProfile?.id, apiCall, getMondayContext, openTimerSave, refetchTimeEntries],
 	);
 
 	// ============================================
@@ -530,7 +530,7 @@ export function useTimer(): UseTimerReturn {
 			error: error || hookError,
 			_serverSync,
 		}),
-		[sessionId, draftId, elapsedTime, startTime, status, comment, isSaving, isLoading, error, hookError, _serverSync]
+		[sessionId, draftId, elapsedTime, startTime, status, comment, isSaving, isLoading, error, hookError, _serverSync],
 	);
 
 	// ============================================

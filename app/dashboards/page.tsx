@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { Logo } from "@/components/Logo";
-import AppHeader from "@/components/AppHeader";
+import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
@@ -51,7 +51,7 @@ export default function DashboardPage() {
 	return (
 		<TimeEntriesProvider refetch={() => refetch(userId!)}>
 			<div id="dashboard-app">
-				<AppHeader variant="dashboard" />
+				<TimerDashboardHeader variant="dashboard" />
 				<TimeEntriesTable timeEntries={timeEntries} loading={loading} error={error} onRefetch={() => refetch(userId!)} />
 			</div>
 		</TimeEntriesProvider>

@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
-import { Tabs, Button, TextInput, NumberInput, Switch, Select, Modal, Loader, ActionIcon, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
-import { Icon } from "@/components/Icon";
+import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
+import { Button, IconButton, IconLink } from "@/components";
+import { Icon } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -42,6 +43,9 @@ export default function AdminPage() {
 		sync_total_time: true,
 		sync_time_by_role: false,
 		sync_remaining_budget: false,
+		sync_budget_used: false,
+		linked_board_id: "",
+		sync_linked_items: false,
 	});
 	const [savingBoard, setSavingBoard] = useState(false);
 
@@ -213,6 +217,9 @@ export default function AdminPage() {
 				sync_total_time: board.sync_total_time,
 				sync_time_by_role: board.sync_time_by_role,
 				sync_remaining_budget: board.sync_remaining_budget,
+				sync_budget_used: board.sync_budget_used,
+				linked_board_id: board.linked_board_id || "",
+				sync_linked_items: board.sync_linked_items || false,
 			});
 		} else {
 			setEditingBoard(null);
@@ -225,6 +232,9 @@ export default function AdminPage() {
 				sync_total_time: true,
 				sync_time_by_role: false,
 				sync_remaining_budget: false,
+				sync_budget_used: false,
+				linked_board_id: "",
+				sync_linked_items: false,
 			});
 		}
 		setBoardModalOpen(true);
@@ -400,14 +410,14 @@ export default function AdminPage() {
 										</div>
 										<div className="role-card-actions">
 											<Tooltip label="Edit role">
-												<ActionIcon variant="light" onClick={() => handleOpenRoleModal(role)}>
+												<IconButton variant="light" onClick={() => handleOpenRoleModal(role)}>
 													<Icon name="edit" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 											<Tooltip label={role.is_active ? "Deactivate role" : "Role is inactive"}>
-												<ActionIcon variant="light" color="red" onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
+												<IconButton variant="light" color="red" onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
 													<Icon name="delete" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 										</div>
 									</div>
@@ -457,24 +467,25 @@ export default function AdminPage() {
 												{board.sync_on_finalize && <Badge size="xs">Sync on Finalize</Badge>}
 												{board.sync_total_time && <Badge size="xs">Total Time</Badge>}
 												{board.sync_time_by_role && <Badge size="xs">Time by Role</Badge>}
-												{board.sync_remaining_budget && <Badge size="xs">Budget</Badge>}
+												{board.sync_remaining_budget && <Badge size="xs">Remaining Budget</Badge>}
+												{board.sync_budget_used && <Badge size="xs">Budget Used</Badge>}
 											</div>
 										</div>
 										<div className="board-card-actions">
 											<Tooltip label="Edit configuration">
-												<ActionIcon variant="light" onClick={() => handleOpenBoardModal(board)}>
+												<IconButton variant="light" onClick={() => handleOpenBoardModal(board)}>
 													<Icon name="edit" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 											<Tooltip label="Configure columns">
-												<ActionIcon variant="light" component="a" href={`/admin/boards/${board.board_id}`}>
+												<IconLink variant="light" href={`/admin/boards/${board.board_id}`}>
 													<Icon name="settings" size={21} />
-												</ActionIcon>
+												</IconLink>
 											</Tooltip>
 											<Tooltip label="Delete configuration">
-												<ActionIcon variant="light" color="red" onClick={() => handleDeleteBoard(board)}>
+												<IconButton variant="light" color="red" onClick={() => handleDeleteBoard(board)}>
 													<Icon name="delete" size={21} />
-												</ActionIcon>
+												</IconButton>
 											</Tooltip>
 										</div>
 									</div>
@@ -532,6 +543,12 @@ export default function AdminPage() {
 							<Switch label="Sync Time by Role" description="Update a column with time breakdown by role" checked={boardForm.sync_time_by_role} onChange={(e) => setBoardForm({ ...boardForm, sync_time_by_role: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
 
 							<Switch label="Sync Remaining Budget" description="Calculate and sync remaining budget based on tracked time" checked={boardForm.sync_remaining_budget} onChange={(e) => setBoardForm({ ...boardForm, sync_remaining_budget: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
+
+							<Switch label="Sync Budget Used" description="Sync total expenditure (Total Cost) to a separate column" checked={boardForm.sync_budget_used} onChange={(e) => setBoardForm({ ...boardForm, sync_budget_used: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
+
+							<Switch label="Sync Linked Items" description="Trigger sync for items on a linked board" checked={boardForm.sync_linked_items} onChange={(e) => setBoardForm({ ...boardForm, sync_linked_items: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
+
+							{boardForm.sync_linked_items && <TextInput label="Linked Board ID" placeholder="e.g., 987654321" value={boardForm.linked_board_id} onChange={(e) => setBoardForm({ ...boardForm, linked_board_id: e.target.value })} description="The board where linked items (e.g. Budgets) are located" />}
 						</Stack>
 					</Box>
 

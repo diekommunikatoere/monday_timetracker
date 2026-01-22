@@ -1,8 +1,8 @@
 // components/dashboard/TimeEntryRowMenu.tsx
 "use client";
 
-import { Menu, ActionIcon } from "@mantine/core";
-import { Icon } from "@/components/Icon";
+import { Menu } from "@mantine/core";
+import { IconButton, Icon } from "@/components";
 import { TimeEntry } from "@/types/time-entry";
 
 interface TimeEntryRowMenuProps {
@@ -15,9 +15,9 @@ export default function TimeEntryRowMenu({ entry, onEdit, onDelete }: TimeEntryR
 	return (
 		<Menu shadow="md" width={200} position="bottom-end">
 			<Menu.Target>
-				<ActionIcon variant="subtle" color="gray" size="sm" aria-label="Aktionen">
+				<IconButton variant="subtle" color="gray" size="sm" aria-label="Aktionen">
 					<Icon name="moreVert" size={18} />
-				</ActionIcon>
+				</IconButton>
 			</Menu.Target>
 
 			<Menu.Dropdown>

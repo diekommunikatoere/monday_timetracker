@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
-import { Tabs, Button, TextInput, NumberInput, Switch, Select, Modal, Loader, ActionIcon, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
+import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
+import { Button, IconButton } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType } from "@/types/database";
+import { isTimePurpose } from "@/lib/monday/utils";
 
 import "@/public/css/components/AdminPage.css";
 
@@ -306,9 +308,9 @@ export default function BoardConfigPage() {
 			setColumnForm({
 				column_id: column.column_id,
 				column_name: column.column_name,
-				column_type: column.column_type,
-				sync_purpose: column.sync_purpose,
-				time_format: column.time_format,
+				column_type: column.column_type as SyncColumnType,
+				sync_purpose: column.sync_purpose as SyncPurpose,
+				time_format: column.time_format as TimeFormat,
 				include_breakdown: column.include_breakdown,
 				sync_enabled: column.sync_enabled,
 			});
@@ -522,6 +524,7 @@ export default function BoardConfigPage() {
 		total_time: "Total Time",
 		time_by_role: "Time by Role",
 		remaining_budget: "Remaining Budget",
+		budget_used: "Budget Used",
 	};
 
 	// Format display names
@@ -657,12 +660,12 @@ export default function BoardConfigPage() {
 											</Table.Td>
 											<Table.Td>
 												<Group gap="xs">
-													<ActionIcon variant="light" onClick={() => handleOpenColumnModal(column)}>
+													<IconButton variant="light" onClick={() => handleOpenColumnModal(column)}>
 														<IconEdit />
-													</ActionIcon>
-													<ActionIcon variant="light" color="red" onClick={() => handleDeleteColumn(column)}>
+													</IconButton>
+													<IconButton variant="light" color="red" onClick={() => handleDeleteColumn(column)}>
 														<IconTrash />
-													</ActionIcon>
+													</IconButton>
 												</Group>
 											</Table.Td>
 										</Table.Tr>
@@ -723,12 +726,12 @@ export default function BoardConfigPage() {
 											</Table.Td>
 											<Table.Td>
 												<Group gap="xs">
-													<ActionIcon variant="light" onClick={() => handleOpenOverrideModal(override)}>
+													<IconButton variant="light" onClick={() => handleOpenOverrideModal(override)}>
 														<IconEdit />
-													</ActionIcon>
-													<ActionIcon variant="light" color="red" onClick={() => handleDeleteOverride(override)}>
+													</IconButton>
+													<IconButton variant="light" color="red" onClick={() => handleDeleteOverride(override)}>
 														<IconTrash />
-													</ActionIcon>
+													</IconButton>
 												</Group>
 											</Table.Td>
 										</Table.Tr>
@@ -895,22 +898,25 @@ export default function BoardConfigPage() {
 							{ value: "total_time", label: "Total Time - Sum of all tracked time" },
 							{ value: "time_by_role", label: "Time by Role - Breakdown by role" },
 							{ value: "remaining_budget", label: "Remaining Budget - Budget minus cost" },
+							{ value: "budget_used", label: "Budget Used - Total expenditure (Total Cost)" },
 						]}
 						value={columnForm.sync_purpose}
 						onChange={(val) => setColumnForm({ ...columnForm, sync_purpose: (val as SyncPurpose) || "total_time" })}
 					/>
 
-					<Select
-						label="Time Format"
-						description="How time values should be formatted"
-						data={[
-							{ value: "hours", label: "Hours (e.g., 2.5)" },
-							{ value: "seconds", label: "Seconds (e.g., 9000)" },
-							{ value: "hh:mm", label: "HH:MM (e.g., 02:30)" },
-						]}
-						value={columnForm.time_format}
-						onChange={(val) => setColumnForm({ ...columnForm, time_format: (val as TimeFormat) || "hours" })}
-					/>
+					{isTimePurpose(columnForm.sync_purpose as SyncPurpose) && (
+						<Select
+							label="Time Format"
+							description="How time values should be formatted"
+							data={[
+								{ value: "hours", label: "Hours (e.g., 2.5)" },
+								{ value: "seconds", label: "Seconds (e.g., 9000)" },
+								{ value: "hh:mm", label: "HH:MM (e.g., 02:30)" },
+							]}
+							value={columnForm.time_format}
+							onChange={(val) => setColumnForm({ ...columnForm, time_format: (val as TimeFormat) || "hours" })}
+						/>
+					)}
 
 					{columnForm.sync_purpose === "time_by_role" && <Switch label="Include detailed breakdown" description="Show role names and times in the column" checked={columnForm.include_breakdown} onChange={(e) => setColumnForm({ ...columnForm, include_breakdown: e.currentTarget.checked })} />}
 

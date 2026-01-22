@@ -79,6 +79,11 @@ type TaskGroup = {
 	}>;
 };
 
+export interface LinkedItem {
+	id: string;
+	boardId: string;
+}
+
 // Ensure MONDAY_API_TOKEN is set
 const token = process.env.MONDAY_API_TOKEN;
 if (!token) {
@@ -148,7 +153,7 @@ export async function getConnectedBoards(boardIds: string[]): Promise<Array<Boar
 // Get tasks (items and subitems) for a board with caching
 export async function getBoardTasks(
 	boardId: string,
-	searchTerm?: string
+	searchTerm?: string,
 ): Promise<{
 	groups: Array<TaskGroup>;
 }> {
@@ -404,6 +409,111 @@ export async function getUserTeams(userId: string): Promise<Array<{ id: string; 
 	} catch (error) {
 		console.error("Error in getUserTeams:", error);
 		// Don't fail the whole auth process if teams fetch fails, just return empty
+		return [];
+	}
+}
+
+/**
+ * Find items on a target board that are linked to a specific item on a source board
+ * via connect_boards (board_relation) columns.
+ */
+export async function findLinkedItems(boardId: string, itemId: string, targetBoardId: string): Promise<string[]> {
+	if (!boardId || !itemId || !targetBoardId) {
+		return [];
+	}
+
+	const query = `
+		query GetLinkedItems($boardId: [ID!], $itemId: [ID!]) {
+			boards(ids: $boardId) {
+				columns {
+					id
+					type
+					settings_str
+				}
+				items_page(limit: 1, query_params: { ids: $itemId }) {
+					items {
+						column_values {
+							id
+							value
+							... on BoardRelationValue {
+								linked_item_ids
+							}
+						}
+					}
+				}
+			}
+		}
+	`;
+
+	try {
+		const response: any = await client.request(query, {
+			boardId: [boardId],
+			itemId: [itemId],
+		});
+
+		if (response.error) {
+			console.error("Monday API error in findLinkedItems:", response.error?.message);
+			return [];
+		}
+
+		const board = response.boards?.[0];
+		if (!board) return [];
+
+		const item = board.items_page?.items?.[0];
+		if (!item) return [];
+
+		// 1. Identify columns that link to targetBoardId
+		const targetColumnIds = board.columns
+			.filter((col: any) => col.type === "board_relation" || col.type === "connect_boards")
+			.filter((col: any) => {
+				try {
+					const settings = JSON.parse(col.settings_str || "{}");
+					// Monday settings can use boardId, boardIds (array), or board_id
+					// We use string comparison to avoid type mismatches (Number vs String)
+					const boardIdMatch = settings.boardId?.toString() === targetBoardId.toString();
+					const boardIdsMatch = Array.isArray(settings.boardIds) && settings.boardIds.some((id: any) => id.toString() === targetBoardId.toString());
+					const board_idMatch = settings.board_id?.toString() === targetBoardId.toString();
+
+					return boardIdMatch || boardIdsMatch || board_idMatch;
+				} catch (e) {
+					return false;
+				}
+			})
+			.map((col: any) => col.id);
+
+		if (targetColumnIds.length === 0) {
+			console.log(`[findLinkedItems] No columns found on board ${boardId} that link to board ${targetBoardId}`);
+			return [];
+		}
+
+		// 2. Extract item IDs from those columns
+		const linkedIds = new Set<string>();
+		item.column_values
+			.filter((cv: any) => targetColumnIds.includes(cv.id))
+			.forEach((cv: any) => {
+				// New API behavior (2025-04+): use linked_item_ids field
+				if (Array.isArray(cv.linked_item_ids)) {
+					cv.linked_item_ids.forEach((id: string | number) => {
+						linkedIds.add(id.toString());
+					});
+				}
+				// Fallback for older API behavior or cached values
+				else if (cv.value) {
+					try {
+						const val = JSON.parse(cv.value);
+						if (Array.isArray(val.linkedPulseIds)) {
+							val.linkedPulseIds.forEach((p: any) => {
+								if (p.linkedPulseId) {
+									linkedIds.add(p.linkedPulseId.toString());
+								}
+							});
+						}
+					} catch (e) {}
+				}
+			});
+		return Array.from(linkedIds);
+	} catch (error) {
+		console.error("Error in findLinkedItems:", error);
 		return [];
 	}
 }

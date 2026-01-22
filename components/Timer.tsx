@@ -2,9 +2,9 @@
 "use client";
 
 import { Box, Flex } from "@mantine/core";
-import { useTimer } from "@/hooks/useTimer";
+import { useTimer } from "@/components/features/timer/hooks/useTimer";
 import TimerDisplay from "@/components/TimerDisplay";
-import TimerControls from "@/components/TimerControls";
+import TimerControls from "@/components/features/timer/TimerControls";
 import TimerCommentField from "@/components/TimerCommentField";
 
 /**
@@ -35,6 +35,7 @@ export default function Timer() {
 
 	return (
 		<Box className="timer-container" p="lg">
+			Timer component
 			<Flex direction="row" align="stretch" gap="xl">
 				<Flex direction="row" align="center" justify="center" gap="md">
 					{/* Timer Display - shows elapsed time and reset button */}
@@ -43,7 +44,6 @@ export default function Timer() {
 					{/* Timer Controls - play/pause, save as draft, save buttons */}
 					<TimerControls status={state.status} hasSession={hasSession} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSaveAsDraft={actions.saveAsDraft} onSave={actions.openSaveModal} />
 				</Flex>
-
 				{/* Comment Field */}
 				<TimerCommentField value={state.comment} onChange={actions.updateComment} disabled={!hasSession} />
 			</Flex>

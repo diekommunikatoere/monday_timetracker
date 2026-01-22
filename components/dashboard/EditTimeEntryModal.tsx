@@ -2,16 +2,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Flex, Text, TextInput, Modal, Button, Group } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
-import { TimePicker } from "@mantine/dates";
+import { Flex, Text, TextInput, Group } from "@mantine/core";
+import { Button, ButtonGroup, Modal } from "@/components";
+import { DatePicker, TimePicker } from "@/components";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntry } from "@/types/time-entry";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components";
 import mondaySdk from "monday-sdk-js";
 
 import "@mantine/dates/styles.css";
@@ -179,54 +179,61 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	};
 
 	return (
-		<Modal opened={show} onClose={onClose} title="Zeiteintrag bearbeiten" size="lg" padding="xl">
-			<Flex direction="column" gap="md">
-				{error && <Text c="dki-error">{error}</Text>}
+		<Modal show={show} onClose={onClose}>
+			<Modal.Header>
+				<Text size="lg" fw={600}>
+					Zeiteintrag bearbeiten
+				</Text>
+			</Modal.Header>
+			<Modal.Body>
+				<Flex direction="column" gap="md">
+					{error && <Text c="dki-error">{error}</Text>}
 
-				<Flex gap="md" direction="column">
-					<Flex gap="sm">
-						<TimePicker label="Dauer" withAsterisk value={duration} onChange={(value) => setDuration(value)} clearable style={{ flex: 2 }} />
-						<DatePickerInput label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
+					<Flex gap="md" direction="column">
+						<Flex gap="sm">
+							<TimePicker label="Dauer" withAsterisk value={duration} onChange={(value) => setDuration(value)} clearable style={{ flex: 2 }} />
+							<DatePicker label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
+						</Flex>
+						<Flex gap="sm">
+							<ButtonGroup flex={2}>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(15)}>
+									+15m
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(30)}>
+									+30m
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(60)}>
+									+1h
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(120)}>
+									+2h
+								</Button>
+							</ButtonGroup>
+							<ButtonGroup flex={1}>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(-15)}>
+									-15m
+								</Button>
+								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(-60)}>
+									-1h
+								</Button>
+							</ButtonGroup>
+						</Flex>
 					</Flex>
-					<Flex gap="sm">
-						<Button.Group flex={2}>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(15)}>
-								+15m
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(30)}>
-								+30m
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(60)}>
-								+1h
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(120)}>
-								+2h
-							</Button>
-						</Button.Group>
-						<Button.Group flex={1}>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(-15)}>
-								-15m
-							</Button>
-							<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(-60)}>
-								-1h
-							</Button>
-						</Button.Group>
-					</Flex>
+
+					<TaskItemSelector onSelectionChange={handleTaskSelection} />
+
+					<TextInput aria-label="Kommentar hinzufügen..." value={comment} onChange={(e) => setComment(e.currentTarget.value)} placeholder="Kommentar hinzufügen..." label="Kommentar" />
+
+					<Group justify="flex-end" mt="md">
+						<Button variant="default" onClick={onClose}>
+							Abbrechen
+						</Button>
+						<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving}>
+							{isSaving ? "Aktualisieren..." : "Aktualisieren"}
+						</Button>
+					</Group>
 				</Flex>
-
-				<TaskItemSelector onSelectionChange={handleTaskSelection} />
-
-				<TextInput aria-label="Kommentar hinzufügen..." value={comment} onChange={(e) => setComment(e.currentTarget.value)} placeholder="Kommentar hinzufügen..." label="Kommentar" />
-
-				<Group justify="flex-end" mt="md">
-					<Button variant="default" onClick={onClose}>
-						Abbrechen
-					</Button>
-					<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving}>
-						{isSaving ? "Aktualisieren..." : "Aktualisieren"}
-					</Button>
-				</Group>
-			</Flex>
+			</Modal.Body>
 		</Modal>
 	);
 }

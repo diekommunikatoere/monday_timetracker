@@ -1,10 +1,11 @@
-import { Button, Tooltip } from "@mantine/core";
-import { Icon } from "@/components/Icon";
+import { Tooltip } from "@mantine/core";
+import { Button } from "@/components/ui/buttons/Button";
+import { Icon } from "@/components";
 
 export default function ManualTimeEntryButton(props: { onClick: () => void }) {
 	return (
 		<Tooltip label="Manuell Zeit eintragen" position="top" withArrow>
-			<Button onClick={props.onClick} aria-label="Manuelle Zeiteingabe" aria-controls="manualTimeEntryModal" leftSection={<Icon name="add" color="#FFFFFF" />}>
+			<Button onClick={props.onClick} aria-label="Manuelle Zeiteingabe" aria-controls="manualTimeEntryModal" iconLeft={<Icon name="add" color="#FFFFFF" />}>
 				Zeit eintragen
 			</Button>
 		</Tooltip>

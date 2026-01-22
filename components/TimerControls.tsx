@@ -1,8 +1,10 @@
 // components/TimerControls.tsx
 "use client";
 
-import { ActionIcon, Button, Flex, Tooltip } from "@mantine/core";
-import { Icon } from "@/components/Icon";
+import { Tooltip } from "@mantine/core";
+import { Button, ButtonGroup } from "@/components";
+
+import { Icon } from "@/components";
 import type { TimerControlsProps } from "@/types/timer.types";
 import "@/public/css/components/TimerActionButtons.css";
 
@@ -31,7 +33,7 @@ export default function TimerControls({ status, hasSession, isSaving, onPlayPaus
 	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} /> : <Icon name="play" color={activeColor} />;
 
 	return (
-		<Button.Group>
+		<ButtonGroup>
 			<Tooltip label={isRunning ? "Timer pausieren" : "Timer starten"} position="top" withArrow>
 				<Button className="button button--timer play-pause" variant="filled" size="md" onClick={onPlayPause} disabled={isSaving}>
 					{PlayPauseIcon}
@@ -47,6 +49,6 @@ export default function TimerControls({ status, hasSession, isSaving, onPlayPaus
 					<Icon name="save" color={hasSession ? activeColor : disabledColor} />
 				</Button>
 			</Tooltip>
-		</Button.Group>
+		</ButtonGroup>
 	);
 }

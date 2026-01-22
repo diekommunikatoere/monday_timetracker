@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Flex, Text, Select, ComboboxItem, ComboboxItemGroup, Skeleton, ActionIcon, Tooltip, Loader } from "@mantine/core";
+import { Flex, Text, ComboboxItem, ComboboxItemGroup, Skeleton, Tooltip, Loader } from "@mantine/core";
+import { IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
@@ -343,7 +344,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				roleName: selectedRole?.label,
 			});
 		},
-		[selectedRole, onSelectionChange]
+		[selectedRole, onSelectionChange],
 	);
 
 	// Handle task selection
@@ -373,7 +374,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				roleName: selectedRole?.label,
 			});
 		},
-		[selectedBoard, selectedRole, onSelectionChange, tasks]
+		[selectedBoard, selectedRole, onSelectionChange, tasks],
 	);
 
 	// Handle role selection
@@ -393,7 +394,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				roleName: selectedOption?.label,
 			});
 		},
-		[selectedBoard, selectedTask, onSelectionChange]
+		[selectedBoard, selectedTask, onSelectionChange],
 	);
 
 	// Show loading indicator only for initial load, not background refetch
@@ -448,9 +449,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 						</label>
 						{selectedBoard && (
 							<Tooltip label="Aufgabenliste aktualisieren" position="left">
-								<ActionIcon variant="subtle" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
+								<IconButton variant="subtle" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
 									{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
-								</ActionIcon>
+								</IconButton>
 							</Tooltip>
 						)}
 					</Flex>

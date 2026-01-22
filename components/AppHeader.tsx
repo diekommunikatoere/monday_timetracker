@@ -3,12 +3,12 @@
 import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { Logo } from "./Logo";
-import Timer from "@/components/Timer";
+import TimerContainer from "./features/timer/TimerContainer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
 import { Flex, Tooltip } from "@mantine/core";
 import TaskItemSelector from "./TaskItemSelector";
 import { useModalStore } from "@/stores/modalStore";
-import ManualTimeEntryModal from "@/components/ManualTimeEntryModal";
+import { ManualTimeEntryModal } from "@/components/features/timer";
 import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 
 import "@/public/css/components/AppHeader.css";
@@ -37,7 +37,7 @@ export default function AppHeader(variant?) {
 						}}
 					/>
 				</Flex>
-				<Timer />
+				<TimerContainer />
 			</header>
 			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
 			<SaveTimerModal show={showTimerSave} onClose={closeTimerSave} />

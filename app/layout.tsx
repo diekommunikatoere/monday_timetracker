@@ -5,9 +5,11 @@ import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
 import "@/public/css/fonts.css";
 import "./globals.scss";
+import { themeTokens } from "@/components/ui/theme/tokens";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/ToastProvider";
 import { StoreProvider } from "@/components/StoreProvider";
+import { TimerProvider } from "@/components/features/timer/TimerProvider";
 import { createTheme, MantineProvider, ColorSchemeScript, colorsTuple } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 const theme = createTheme({
@@ -23,6 +25,8 @@ const theme = createTheme({
 	},
 	primaryColor: "dki-primary",
 	primaryShade: 7,
+	black: "#282616",
+	white: "#ffffff",
 	other: {},
 });
 
@@ -35,11 +39,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				<ColorSchemeScript />
 			</head>
 			<body>
-				<MantineProvider theme={theme}>
+				<MantineProvider theme={theme} cssVariablesResolver={themeTokens}>
 					<Notifications />
 					<QueryClientProvider client={queryClient}>
 						<StoreProvider>
-							<ToastProvider>{children}</ToastProvider>
+							<TimerProvider>
+								<ToastProvider>{children}</ToastProvider>
+							</TimerProvider>
 						</StoreProvider>
 					</QueryClientProvider>
 				</MantineProvider>
