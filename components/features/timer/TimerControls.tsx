@@ -41,12 +41,12 @@ export function TimerControls({ status, hasSession, hasComment, isSaving, onPlay
 				</IconButton>
 			</Tooltip>
 			<Tooltip label="Als Entwurf speichern" position="top" withArrow>
-				<IconButton className={`button button--timer draft" ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onSaveAsDraft} disabled={!hasSession || isSaving} loading={isSaving}>
+				<IconButton className={`button button--timer draft" ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onSaveAsDraft} disabled={!hasSession || !hasComment || isSaving} loading={isSaving}>
 					<Icon name="moveDown" color={hasSession ? activeColor : disabledColor} />
 				</IconButton>
 			</Tooltip>
 			<Tooltip label="Speichern" position="top" withArrow>
-				<IconButton className={`button button--timer save ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onSave} disabled={!hasSession || !hasComment || isSaving} loading={isSaving}>
+				<IconButton className={`button button--timer save ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onSave} disabled={!hasSession || isSaving} loading={isSaving}>
 					<Icon name="save" color={hasSession ? activeColor : disabledColor} />
 				</IconButton>
 			</Tooltip>
