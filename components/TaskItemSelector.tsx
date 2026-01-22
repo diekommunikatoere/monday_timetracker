@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Flex, Text, Select, ComboboxItem, ComboboxItemGroup, Skeleton, Tooltip, Loader } from "@mantine/core";
-import { IconButton } from "@/components";
+import { Flex, Text, ComboboxItem, ComboboxItemGroup, Skeleton, Tooltip, Loader } from "@mantine/core";
+import { IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
@@ -344,7 +344,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				roleName: selectedRole?.label,
 			});
 		},
-		[selectedRole, onSelectionChange]
+		[selectedRole, onSelectionChange],
 	);
 
 	// Handle task selection
@@ -374,7 +374,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				roleName: selectedRole?.label,
 			});
 		},
-		[selectedBoard, selectedRole, onSelectionChange, tasks]
+		[selectedBoard, selectedRole, onSelectionChange, tasks],
 	);
 
 	// Handle role selection
@@ -394,7 +394,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				roleName: selectedOption?.label,
 			});
 		},
-		[selectedBoard, selectedTask, onSelectionChange]
+		[selectedBoard, selectedTask, onSelectionChange],
 	);
 
 	// Show loading indicator only for initial load, not background refetch

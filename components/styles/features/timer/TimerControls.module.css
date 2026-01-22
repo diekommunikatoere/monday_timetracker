@@ -1,0 +1,16 @@
+.timerIconButton {
+	border-radius: 0;
+
+	&:disabled {
+		cursor: not-allowed;
+		background-color: var(--color--tertiary-light);
+	}
+
+	&:first-of-type {
+		border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
+	}
+
+	&:last-of-type {
+		border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
+	}
+}

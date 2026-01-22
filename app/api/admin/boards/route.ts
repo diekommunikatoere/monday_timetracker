@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
 	try {
 		const body = await request.json();
-		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, currency_symbol, sync_on_finalize, sync_total_time, sync_time_by_role, sync_remaining_budget } = body;
+		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, currency_symbol, sync_on_finalize, sync_total_time, sync_time_by_role, sync_remaining_budget, sync_budget_used, linked_board_id, sync_linked_items } = body;
 
 		// Validate required fields
 		if (!board_id || typeof board_id !== "string") {
@@ -65,6 +65,9 @@ export async function POST(request: NextRequest) {
 			sync_total_time: sync_total_time !== false,
 			sync_time_by_role: sync_time_by_role === true,
 			sync_remaining_budget: sync_remaining_budget === true,
+			sync_budget_used: sync_budget_used === true,
+			linked_board_id: linked_board_id || null,
+			sync_linked_items: sync_linked_items === true,
 		};
 
 		// Upsert - update if exists, insert if not
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
 	try {
 		const body = await request.json();
-		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, currency_symbol, sync_on_finalize, sync_total_time, sync_time_by_role, sync_remaining_budget } = body;
+		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, currency_symbol, sync_on_finalize, sync_total_time, sync_time_by_role, sync_remaining_budget, sync_budget_used, linked_board_id, sync_linked_items } = body;
 
 		// Validate required fields
 		if (!board_id) {
@@ -112,6 +115,9 @@ export async function PATCH(request: NextRequest) {
 		if (sync_total_time !== undefined) updateData.sync_total_time = sync_total_time;
 		if (sync_time_by_role !== undefined) updateData.sync_time_by_role = sync_time_by_role;
 		if (sync_remaining_budget !== undefined) updateData.sync_remaining_budget = sync_remaining_budget;
+		if (sync_budget_used !== undefined) updateData.sync_budget_used = sync_budget_used;
+		if (linked_board_id !== undefined) updateData.linked_board_id = linked_board_id || null;
+		if (sync_linked_items !== undefined) updateData.sync_linked_items = sync_linked_items;
 
 		const { data: board, error } = await supabaseAdmin.from("board_config").update(updateData).eq("board_id", board_id).select().single();
 

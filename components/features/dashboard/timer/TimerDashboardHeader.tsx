@@ -1,19 +1,17 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import dynamic from "next/dynamic";
-import { Logo } from "./Logo";
-import TimerContainer from "./features/timer/TimerContainer";
+import { Logo } from "@/components/Logo";
+import TimerContainer from "@/components/features/timer/TimerContainer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex, Tooltip } from "@mantine/core";
-import TaskItemSelector from "./TaskItemSelector";
+import { Flex } from "@mantine/core";
 import { useModalStore } from "@/stores/modalStore";
 import { ManualTimeEntryModal } from "@/components/features/timer";
 import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 
 import "@/public/css/components/AppHeader.css";
 
-export default function AppHeader(variant?) {
+export function TimerDashboardHeader(variant?) {
 	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
 	const { showTimerSave, closeTimerSave } = useModalStore((s) => s);
 
@@ -44,3 +42,5 @@ export default function AppHeader(variant?) {
 		</>
 	);
 }
+
+export default TimerDashboardHeader;

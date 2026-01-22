@@ -59,6 +59,9 @@ export type Database = {
 					sync_remaining_budget: boolean | null;
 					sync_time_by_role: boolean | null;
 					sync_total_time: boolean | null;
+					sync_budget_used: boolean | null;
+					linked_board_id: string | null;
+					sync_linked_items: boolean | null;
 					updated_at: string;
 				};
 				Insert: {
@@ -74,6 +77,9 @@ export type Database = {
 					sync_remaining_budget?: boolean | null;
 					sync_time_by_role?: boolean | null;
 					sync_total_time?: boolean | null;
+					sync_budget_used?: boolean | null;
+					linked_board_id?: string | null;
+					sync_linked_items?: boolean | null;
 					updated_at?: string;
 				};
 				Update: {
@@ -89,6 +95,9 @@ export type Database = {
 					sync_remaining_budget?: boolean | null;
 					sync_time_by_role?: boolean | null;
 					sync_total_time?: boolean | null;
+					sync_budget_used?: boolean | null;
+					linked_board_id?: string | null;
+					sync_linked_items?: boolean | null;
 					updated_at?: string;
 				};
 				Relationships: [];
@@ -135,7 +144,7 @@ export type Database = {
 						isOneToOne: false;
 						referencedRelation: "role";
 						referencedColumns: ["id"];
-					}
+					},
 				];
 			};
 			column_sync_config: {
@@ -188,7 +197,7 @@ export type Database = {
 						isOneToOne: false;
 						referencedRelation: "board_config";
 						referencedColumns: ["board_id"];
-					}
+					},
 				];
 			};
 			role: {
@@ -278,7 +287,7 @@ export type Database = {
 						isOneToOne: false;
 						referencedRelation: "user_profiles";
 						referencedColumns: ["id"];
-					}
+					},
 				];
 			};
 			time_entry: {
@@ -365,7 +374,7 @@ export type Database = {
 						isOneToOne: false;
 						referencedRelation: "user_profiles";
 						referencedColumns: ["id"];
-					}
+					},
 				];
 			};
 			timer_segment: {
@@ -400,7 +409,7 @@ export type Database = {
 						isOneToOne: false;
 						referencedRelation: "timer_session";
 						referencedColumns: ["id"];
-					}
+					},
 				];
 			};
 			timer_session: {
@@ -451,7 +460,7 @@ export type Database = {
 						isOneToOne: false;
 						referencedRelation: "user_profiles";
 						referencedColumns: ["id"];
-					}
+					},
 				];
 			};
 			user_profiles: {
@@ -581,22 +590,22 @@ export type Tables<
 		schema: keyof DatabaseWithoutInternals;
 	}
 		? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-		: never = never
+		: never = never,
 > = DefaultSchemaTableNameOrOptions extends {
 	schema: keyof DatabaseWithoutInternals;
 }
 	? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
 			Row: infer R;
-	  }
+		}
 		? R
 		: never
 	: DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-	? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-			Row: infer R;
-	  }
-		? R
-		: never
-	: never;
+		? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+				Row: infer R;
+			}
+			? R
+			: never
+		: never;
 
 export type TablesInsert<
 	DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
@@ -604,22 +613,22 @@ export type TablesInsert<
 		schema: keyof DatabaseWithoutInternals;
 	}
 		? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-		: never = never
+		: never = never,
 > = DefaultSchemaTableNameOrOptions extends {
 	schema: keyof DatabaseWithoutInternals;
 }
 	? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
 			Insert: infer I;
-	  }
+		}
 		? I
 		: never
 	: DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-	? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-			Insert: infer I;
-	  }
-		? I
-		: never
-	: never;
+		? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+				Insert: infer I;
+			}
+			? I
+			: never
+		: never;
 
 export type TablesUpdate<
 	DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
@@ -627,22 +636,22 @@ export type TablesUpdate<
 		schema: keyof DatabaseWithoutInternals;
 	}
 		? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-		: never = never
+		: never = never,
 > = DefaultSchemaTableNameOrOptions extends {
 	schema: keyof DatabaseWithoutInternals;
 }
 	? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
 			Update: infer U;
-	  }
+		}
 		? U
 		: never
 	: DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-	? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-			Update: infer U;
-	  }
-		? U
-		: never
-	: never;
+		? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+				Update: infer U;
+			}
+			? U
+			: never
+		: never;
 
 export type Enums<
 	DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
@@ -650,14 +659,14 @@ export type Enums<
 		schema: keyof DatabaseWithoutInternals;
 	}
 		? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-		: never = never
+		: never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
 	schema: keyof DatabaseWithoutInternals;
 }
 	? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
 	: DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-	? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-	: never;
+		? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+		: never;
 
 export type CompositeTypes<
 	PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
@@ -665,14 +674,14 @@ export type CompositeTypes<
 		schema: keyof DatabaseWithoutInternals;
 	}
 		? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-		: never = never
+		: never = never,
 > = PublicCompositeTypeNameOrOptions extends {
 	schema: keyof DatabaseWithoutInternals;
 }
 	? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
 	: PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-	? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-	: never;
+		? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+		: never;
 
 export const Constants = {
 	graphql_public: {
@@ -721,7 +730,7 @@ export interface CalculateRemainingBudgetResult {
 }
 
 // Sync purpose enum type
-export type SyncPurpose = "total_time" | "time_by_role" | "remaining_budget";
+export type SyncPurpose = "total_time" | "time_by_role" | "remaining_budget" | "budget_used";
 
 // Time format enum type
 export type TimeFormat = "hours" | "seconds" | "hh:mm";

@@ -1,0 +1,6 @@
+.timerContainer {
+	width: 100%;
+	padding: 8px;
+	background-color: var(--color--background-secondary);
+	border-radius: var(--border-radius--md);
+}

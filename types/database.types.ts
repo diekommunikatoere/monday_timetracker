@@ -75,7 +75,7 @@ export interface CalculateRemainingBudgetResult {
 /**
  * Sync purpose defines what type of data is being synced to monday.com columns
  */
-export type SyncPurpose = "total_time" | "time_by_role" | "remaining_budget";
+export type SyncPurpose = "total_time" | "time_by_role" | "remaining_budget" | "budget_used";
 
 /**
  * Time format options for displaying time in monday.com columns

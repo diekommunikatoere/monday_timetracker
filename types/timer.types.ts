@@ -105,6 +105,7 @@ export interface TimerDisplayProps {
 export interface TimerControlsProps {
 	status: TimerStatus;
 	hasSession: boolean;
+	hasComment: boolean;
 	isSaving: boolean;
 	onPlayPause: () => void;
 	onSaveAsDraft: () => void;

@@ -33,7 +33,7 @@ edit time entry start und endzeit fehlt
 - Running timer visible at all times and synced via Supabase (real-time).
 - Overview of today's `time entries`.
 - Overview of all `draft entries`.
-- Ability to manually enter time.
+- Ability to manually enter time (via button which opens a manual time entry modal).
 - "save as draft" is only available when a comment is provided (display error if not).
 - Timer should be the prominent feature on the dashboard.
 - Manual time entry and time entries overview are secondary features.

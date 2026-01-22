@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS public.column_sync_config (
     column_type TEXT NOT NULL, -- 'numbers', 'text', 'long_text', 'time_tracking'
     
     -- Sync purpose - what data to sync to this column
-    sync_purpose TEXT NOT NULL, -- 'total_time', 'time_by_role', 'remaining_budget'
+    sync_purpose TEXT NOT NULL, -- 'total_time', 'time_by_role', 'remaining_budget', 'budget_used'
     
     -- Format settings
     time_format TEXT DEFAULT 'hours', -- 'hours', 'seconds', 'hh:mm'
@@ -126,7 +126,7 @@ CREATE INDEX IF NOT EXISTS idx_column_sync_purpose ON public.column_sync_config(
 
 COMMENT ON TABLE public.column_sync_config IS 'Maps monday.com columns to sync purposes (total time, time by role, remaining budget)';
 COMMENT ON COLUMN public.column_sync_config.column_id IS 'Monday.com column ID to sync data to';
-COMMENT ON COLUMN public.column_sync_config.sync_purpose IS 'What data to sync: total_time, time_by_role, or remaining_budget';
+COMMENT ON COLUMN public.column_sync_config.sync_purpose IS 'What data to sync: total_time, time_by_role, remaining_budget, or budget_used';
 COMMENT ON COLUMN public.column_sync_config.time_format IS 'How to format time values: hours (decimal), seconds, or hh:mm';
 
 -- Add check constraint for valid sync purposes
@@ -135,7 +135,7 @@ DROP CONSTRAINT IF EXISTS column_sync_config_purpose_check;
 
 ALTER TABLE public.column_sync_config
 ADD CONSTRAINT column_sync_config_purpose_check
-CHECK (sync_purpose IN ('total_time', 'time_by_role', 'remaining_budget'));
+CHECK (sync_purpose IN ('total_time', 'time_by_role', 'remaining_budget', 'budget_used'));
 
 -- Add check constraint for valid time formats
 ALTER TABLE public.column_sync_config

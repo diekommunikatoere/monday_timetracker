@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { Flex, Text, TextInput, Group } from "@mantine/core";
 import { Button, ButtonGroup, Modal } from "@/components";
 import { DatePicker, TimePicker } from "@/components";
-import { formatTime } from "@/lib/utils";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";

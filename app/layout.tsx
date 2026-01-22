@@ -9,6 +9,7 @@ import { themeTokens } from "@/components/ui/theme/tokens";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/ToastProvider";
 import { StoreProvider } from "@/components/StoreProvider";
+import { TimerProvider } from "@/components/features/timer/TimerProvider";
 import { createTheme, MantineProvider, ColorSchemeScript, colorsTuple } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 const theme = createTheme({
@@ -42,7 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 					<Notifications />
 					<QueryClientProvider client={queryClient}>
 						<StoreProvider>
-							<ToastProvider>{children}</ToastProvider>
+							<TimerProvider>
+								<ToastProvider>{children}</ToastProvider>
+							</TimerProvider>
 						</StoreProvider>
 					</QueryClientProvider>
 				</MantineProvider>

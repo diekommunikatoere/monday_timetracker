@@ -1,6 +1,9 @@
--- Migration: function_get_user_time_entries
--- Retrieves time entries for a specific user with pagination
--- Returns entries ordered by start_time descending (newest first)
+-- Migration: 003_functions.sql
+-- All core RPC functions for the timetracker backend
+
+-- ============================================
+-- User & Time Entry Queries
+-- ============================================
 
 CREATE OR REPLACE FUNCTION get_user_time_entries(
     p_user_id UUID,
@@ -52,15 +55,16 @@ BEGIN
         te.updated_at
     FROM time_entry te
     WHERE te.user_id = p_user_id
+    AND te.deleted_at IS NULL
     ORDER BY te.start_time DESC
     LIMIT p_limit
     OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Migration: function_create_timer_session
--- Creates a new timer session with an associated draft time entry
--- Returns the created session and draft IDs
+-- ============================================
+-- Timer Session Management
+-- ============================================
 
 CREATE OR REPLACE FUNCTION create_timer_session(
     p_user_id UUID
@@ -87,10 +91,6 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Migration: function_get_active_timer_session
--- Retrieves the active timer session for a user
--- Returns NULL if no active session exists
 
 CREATE OR REPLACE FUNCTION get_active_timer_session(
     p_user_id UUID
@@ -124,14 +124,174 @@ BEGIN
         SELECT 1 FROM time_entry te
         WHERE te.id = ts.draft_id
         AND te.is_draft = true
+        AND te.deleted_at IS NULL
     )
     ORDER BY ts.created_at DESC
     LIMIT 1;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;-- Migration: function_finalize_time_entry
--- Finalizes a draft as a completed time entry (is_draft = false)
--- Includes monday.com integration fields and optional parameters
--- Allows finalizing draft entries that don't have an active session
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION get_timer_session_with_elapsed(p_user_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+DECLARE
+    v_session timer_session;
+    v_time_entry time_entry;
+    v_current_segment_duration BIGINT;
+    v_total_elapsed BIGINT;
+    v_server_time TIMESTAMPTZ;
+BEGIN
+    v_server_time := NOW();
+
+    SELECT * INTO v_session
+    FROM timer_session
+    WHERE user_id = p_user_id;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'session', NULL,
+            'server_time', v_server_time
+        );
+    END IF;
+
+    SELECT * INTO v_time_entry
+    FROM time_entry
+    WHERE id = v_session.draft_id;
+
+    v_total_elapsed := v_session.elapsed_time;
+
+    IF NOT v_session.is_paused THEN
+        SELECT COALESCE(
+            EXTRACT(EPOCH FROM (v_server_time - seg.start_time)) * 1000,
+            0
+        )::BIGINT INTO v_current_segment_duration
+        FROM timer_segment seg
+        WHERE seg.session_id = v_session.id
+            AND seg.end_time IS NULL
+        ORDER BY seg.start_time DESC
+        LIMIT 1;
+
+        v_total_elapsed := v_total_elapsed + COALESCE(v_current_segment_duration, 0);
+    END IF;
+
+    RETURN jsonb_build_object(
+        'session', jsonb_build_object(
+            'id', v_session.id,
+            'user_id', v_session.user_id,
+            'draft_id', v_session.draft_id,
+            'start_time', v_session.start_time,
+            'elapsed_time', v_session.elapsed_time,
+            'is_paused', v_session.is_paused,
+            'created_at', v_session.created_at,
+            'time_entry', CASE
+                WHEN v_time_entry IS NOT NULL THEN jsonb_build_object(
+                    'id', v_time_entry.id,
+                    'comment', v_time_entry.comment
+                )
+                ELSE NULL
+            END
+        ),
+        'calculated_elapsed_time_ms', v_total_elapsed,
+        'server_time', v_server_time
+    );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_current_elapsed_time(p_session_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+DECLARE
+    v_session timer_session;
+    v_current_segment_duration BIGINT;
+    v_total_elapsed BIGINT;
+    v_server_time TIMESTAMPTZ;
+BEGIN
+    v_server_time := NOW();
+
+    SELECT * INTO v_session
+    FROM timer_session
+    WHERE id = p_session_id;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'elapsed_time_ms', 0,
+            'server_time', v_server_time,
+            'error', 'Session not found'
+        );
+    END IF;
+
+    v_total_elapsed := v_session.elapsed_time;
+
+    IF NOT v_session.is_paused THEN
+        SELECT COALESCE(
+            EXTRACT(EPOCH FROM (v_server_time - seg.start_time)) * 1000,
+            0
+        )::BIGINT INTO v_current_segment_duration
+        FROM timer_segment seg
+        WHERE seg.session_id = p_session_id
+            AND seg.end_time IS NULL
+        ORDER BY seg.start_time DESC
+        LIMIT 1;
+
+        v_total_elapsed := v_total_elapsed + COALESCE(v_current_segment_duration, 0);
+    END IF;
+
+    RETURN jsonb_build_object(
+        'elapsed_time_ms', v_total_elapsed,
+        'server_time', v_server_time,
+        'is_paused', v_session.is_paused,
+        'stored_elapsed_time_ms', v_session.elapsed_time
+    );
+END;
+$$;
+
+-- ============================================
+-- Finalization Logic
+-- ============================================
+
+CREATE OR REPLACE FUNCTION finalize_segment(p_session_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+DECLARE
+  v_duration_ms BIGINT;
+  v_elapsed_ms INTEGER;
+BEGIN
+  WITH closed_segments AS (
+    UPDATE timer_segment
+    SET
+      end_time = now(),
+      duration = EXTRACT(EPOCH FROM (now() - start_time)) * 1000::BIGINT
+    WHERE session_id = p_session_id AND end_time IS NULL
+    RETURNING EXTRACT(EPOCH FROM (now() - start_time)) * 1000::BIGINT AS seg_duration_ms
+  )
+  SELECT COALESCE(SUM(seg_duration_ms), 0) INTO v_duration_ms
+  FROM closed_segments;
+
+  UPDATE timer_session
+  SET elapsed_time = elapsed_time + v_duration_ms::INTEGER
+  WHERE id = p_session_id
+  RETURNING elapsed_time INTO v_elapsed_ms;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Timer session not found: %', p_session_id;
+  END IF;
+
+  UPDATE timer_session
+  SET is_paused = true
+  WHERE id = p_session_id;
+
+  RETURN jsonb_build_object(
+    'elapsed_time_ms', v_elapsed_ms,
+    'duration_added_ms', v_duration_ms
+  );
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION finalize_time_entry(
     p_user_id UUID,
@@ -149,7 +309,6 @@ CREATE OR REPLACE FUNCTION finalize_time_entry(
     p_date TIMESTAMPTZ DEFAULT NULL
 )
 RETURNS jsonb AS $$
-
 DECLARE
   v_session timer_session;
   v_total_duration numeric;
@@ -159,7 +318,6 @@ DECLARE
   v_has_session boolean := false;
   v_end_time timestamptz;
 BEGIN
-  -- Verify ownership: check if draft exists and belongs to user
   IF NOT EXISTS (
     SELECT 1 FROM time_entry
     WHERE id = p_draft_id AND user_id = p_user_id
@@ -167,22 +325,18 @@ BEGIN
     RAISE EXCEPTION 'Draft not found or access denied for user %', p_user_id;
   END IF;
 
-  -- Try to fetch session via draft_id (may not exist for old drafts)
   SELECT ts.* INTO v_session
   FROM timer_session ts
   WHERE ts.draft_id = p_draft_id;
 
   v_has_session := FOUND;
 
-  -- If session exists, process segments
   IF v_has_session THEN
-    -- Step 1: Close any running segments (set end_time = now())
     UPDATE timer_segment
     SET end_time = now()
     WHERE session_id = v_session.id
       AND end_time IS NULL;
 
-    -- Step 2: Compute total duration in seconds from RUNNING segments only
     SELECT COALESCE(
       SUM(EXTRACT(epoch FROM (COALESCE(ts.end_time, now()) - ts.start_time))),
       0
@@ -190,12 +344,10 @@ BEGIN
     FROM timer_segment ts
     WHERE ts.session_id = v_session.id;
 
-    -- Step 3: Snapshot ALL segments as JSON array
     SELECT json_agg(row_to_json(ts) ORDER BY ts.start_time ASC) INTO v_segments
     FROM timer_segment ts
     WHERE ts.session_id = v_session.id;
 
-    -- Step 4: Update timer_session
     UPDATE timer_session
     SET
       timer_segments = v_segments,
@@ -205,18 +357,14 @@ BEGIN
     RETURNING * INTO v_updated_session;
   END IF;
 
-  -- Override duration if provided, otherwise use calculated duration
   IF p_duration IS NOT NULL THEN
     v_total_duration := p_duration;
   ELSIF NOT v_has_session THEN
-    -- If no session and no duration provided, this is an error
     RAISE EXCEPTION 'Duration must be provided when finalizing a draft without a session';
   END IF;
 
-  -- Determine end time: use provided date or now()
   v_end_time := COALESCE(p_date, now());
 
-  -- Step 5: Update time_entry as FINAL entry (is_draft = false)
   UPDATE time_entry
   SET
     task_name = p_task_name,
@@ -233,12 +381,11 @@ BEGIN
     is_draft = false,
     timer_session = CASE
       WHEN v_has_session THEN to_jsonb(v_updated_session)
-      ELSE timer_session -- Keep existing session data if any
+      ELSE timer_session
     END
   WHERE id = p_draft_id
   RETURNING * INTO v_updated_entry;
 
-  -- Return canonical updated records
   RETURN jsonb_build_object(
     'time_entry', row_to_json(v_updated_entry),
     'timer_session', CASE
@@ -250,10 +397,72 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Migration: function_soft_reset_timer
--- Soft resets a timer by creating a new draft and session
--- Keeps the old time entry but marks it as finalized
--- Used when user wants to start a new timer without saving the current one
+CREATE OR REPLACE FUNCTION finalize_draft(p_user_id uuid, p_draft_id uuid, p_task_name text, p_comment text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $$
+DECLARE
+  v_session timer_session;
+  v_total_duration numeric;
+  v_segments jsonb;
+  v_updated_session timer_session;
+  v_updated_entry time_entry;
+BEGIN
+  SELECT ts.* INTO v_session
+  FROM timer_session ts
+  JOIN time_entry te ON ts.draft_id = te.id
+  WHERE te.id = p_draft_id AND te.user_id = p_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Draft not found or access denied for user %', p_user_id;
+  END IF;
+
+  UPDATE timer_segment
+  SET end_time = now()
+  WHERE session_id = v_session.id
+    AND end_time IS NULL;
+
+  SELECT COALESCE(
+    SUM(EXTRACT(epoch FROM (COALESCE(ts.end_time, now()) - ts.start_time))),
+    0
+  ) INTO v_total_duration
+  FROM timer_segment ts
+  WHERE ts.session_id = v_session.id;
+
+  SELECT json_agg(row_to_json(ts) ORDER BY ts.start_time ASC) INTO v_segments
+  FROM timer_segment ts
+  WHERE ts.session_id = v_session.id;
+
+  UPDATE timer_session
+  SET
+    timer_segments = v_segments,
+    elapsed_time = v_total_duration::integer,
+    is_paused = false
+  WHERE id = v_session.id
+  RETURNING * INTO v_updated_session;
+
+  UPDATE time_entry
+  SET
+    task_name = p_task_name,
+    end_time = now(),
+    duration = v_total_duration::integer,
+    comment = p_comment,
+    timer_session = to_jsonb(v_updated_session)
+  WHERE id = p_draft_id
+  RETURNING * INTO v_updated_entry;
+
+  RETURN jsonb_build_object(
+    'time_entry', row_to_json(v_updated_entry),
+    'timer_session', row_to_json(v_updated_session),
+    'total_duration_seconds', v_total_duration::integer
+  );
+END;
+$$;
+
+-- ============================================
+-- Utility & Seeding
+-- ============================================
 
 CREATE OR REPLACE FUNCTION soft_reset_timer(
     p_user_id UUID,
@@ -265,7 +474,6 @@ DECLARE
     v_new_draft_id UUID;
     v_new_session_id UUID;
 BEGIN
-    -- Verify ownership of old draft
     IF NOT EXISTS (
         SELECT 1 FROM time_entry
         WHERE id = p_old_draft_id AND user_id = p_user_id
@@ -273,27 +481,43 @@ BEGIN
         RAISE EXCEPTION 'Draft not found or access denied';
     END IF;
 
-    -- Create new draft
     INSERT INTO time_entry (user_id, is_draft)
     VALUES (p_user_id, true)
     RETURNING id INTO v_new_draft_id;
 
-    -- Create new session
     INSERT INTO timer_session (user_id, draft_id, elapsed_time, is_paused)
     VALUES (p_user_id, v_new_draft_id, 0, false)
     RETURNING id INTO v_new_session_id;
 
-    -- Return new IDs
     RETURN jsonb_build_object(
         'draft_id', v_new_draft_id,
         'session_id', v_new_session_id
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
--- Migration: function_get_item_time_by_role
--- Aggregates time entries by role for a specific item
--- Optionally filters by user
--- Returns role breakdown with total seconds and entry count
+
+CREATE OR REPLACE FUNCTION add_default_roles()
+ RETURNS void
+ LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO public.role (name, description, hourly_rate)
+    VALUES
+        ('Geschäftsführung', 'Leitung und strategische Entscheidungen', 150),
+        ('Projektleitung', 'Projektmanagement und Teamführung', 110),
+        ('Assistenz', 'Unterstützung der Geschäftsführung und Teams', 70),
+        ('Graphik', 'Graphikdesign und Multimedia', 95),
+        ('Webentwicklung', 'Webentwicklung und Programmierung', 105),
+        ('Medical Writing', 'Medizinische Fachtexte und Dokumentation', 115),
+        ('Copy Writing', 'Texterstellung und Content Marketing', 105),
+        ('Social Media', 'Social Media Management und Marketing', 0),
+        ('SEO/SEA/GEO', 'Suchmaschinenoptimierung, Suchmaschinenwerbung und KI-Optimierung', 0),
+        ('Meeting', 'Meetings und Calls', 0),
+        ('Intern oder Akquise', 'Interne Aufgaben, Akquise oder Weiterbildung', 0)
+    ON CONFLICT (name) DO UPDATE SET
+        hourly_rate = EXCLUDED.hourly_rate;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION get_item_time_by_role(
     p_item_id TEXT,
@@ -316,6 +540,7 @@ BEGIN
     LEFT JOIN role r ON te.role_id = r.id
     WHERE te.item_id = p_item_id
       AND te.is_draft = false
+      AND te.deleted_at IS NULL
       AND (p_user_id IS NULL OR te.user_id = p_user_id)
       AND te.role_id IS NOT NULL
     GROUP BY te.role_id, r.name

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import type { ColumnSyncConfigInsert, ColumnSyncConfigUpdate } from "@/types/database";
+import { isPurposeCompatible, isTimePurpose } from "@/lib/monday/utils";
+import type { ColumnSyncConfigInsert, ColumnSyncConfigUpdate, SyncPurpose } from "@/types/database";
 
 /**
  * GET /api/admin/boards/[boardId]/columns
@@ -53,8 +54,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 			return NextResponse.json({ error: "Column type is required" }, { status: 400 });
 		}
 
-		if (!sync_purpose || !["total_time", "time_by_role", "remaining_budget"].includes(sync_purpose)) {
-			return NextResponse.json({ error: "Valid sync purpose is required (total_time, time_by_role, remaining_budget)" }, { status: 400 });
+		const validPurposes: SyncPurpose[] = ["total_time", "time_by_role", "remaining_budget", "budget_used"];
+		if (!sync_purpose || !validPurposes.includes(sync_purpose as SyncPurpose)) {
+			return NextResponse.json({ error: `Valid sync purpose is required (${validPurposes.join(", ")})` }, { status: 400 });
+		}
+
+		// Validate column compatibility
+		if (!isPurposeCompatible(column_type, sync_purpose as SyncPurpose)) {
+			return NextResponse.json({ error: `Column type '${column_type}' is not compatible with purpose '${sync_purpose}'` }, { status: 400 });
 		}
 
 		// Check if this column or purpose already exists for this board
@@ -83,7 +90,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 			column_name,
 			column_type,
 			sync_purpose,
-			time_format: time_format || "hours",
+			time_format: isTimePurpose(sync_purpose as SyncPurpose) ? time_format || "hours" : null,
 			include_breakdown: include_breakdown === true,
 			sync_enabled: sync_enabled !== false,
 		};
@@ -125,6 +132,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		};
 
 		if (column_name !== undefined) updateData.column_name = column_name;
+
+		// Handle time_format based on purpose if purpose is being updated (though purpose is usually fixed)
+		// For now, we just ensure that if it's provided, we respect it, but we should ideally check the existing purpose
 		if (time_format !== undefined) updateData.time_format = time_format;
 		if (include_breakdown !== undefined) updateData.include_breakdown = include_breakdown;
 		if (sync_enabled !== undefined) updateData.sync_enabled = sync_enabled;
