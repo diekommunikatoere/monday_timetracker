@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 					is_active,
 					color_hex
 				)
-			`
+			`,
 			)
 			.eq("board_id", boardId)
 			.order("created_at", { ascending: true });

@@ -37,6 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		}
 
 		const { itemId } = await params;
+		const itemIds = [itemId];
 
 		// Validate itemId
 		if (!itemId) {
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 		// Use the database function to get time breakdown by role
 		const { data: breakdown, error: breakdownError } = await supabaseAdmin.rpc("get_item_time_by_role", {
-			p_item_id: itemId,
+			p_item_ids: itemIds,
 			p_user_id: userOnly ? userProfile.id : null,
 		});
 
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 		// Get total time
 		const { data: totalTime, error: totalError } = await supabaseAdmin.rpc("get_item_total_time", {
-			p_item_id: itemId,
+			p_item_ids: itemIds,
 			p_user_id: userOnly ? userProfile.id : null,
 		});
 

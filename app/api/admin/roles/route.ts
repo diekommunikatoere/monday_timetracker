@@ -146,8 +146,9 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ error: "Role ID is required" }, { status: 400 });
 		}
 
+		console.log(`[DEBUG] Checking if role ID ${id} is in use in time_entry table`);
 		// Check if role is in use
-		const { count } = await supabaseAdmin.from("time_entry").select("*", { count: "exact", head: true }).eq("role", id);
+		const { count } = await supabaseAdmin.from("time_entry").select("*", { count: "exact", head: true }).eq("role_id", id);
 
 		if (count && count > 0 && hardDelete) {
 			return NextResponse.json(
@@ -155,7 +156,7 @@ export async function DELETE(request: NextRequest) {
 					error: "Cannot delete role that is in use. Deactivate it instead.",
 					timeEntriesCount: count,
 				},
-				{ status: 409 }
+				{ status: 409 },
 			);
 		}
 

@@ -13,7 +13,7 @@ import { CalculateRemainingBudgetResult } from "@/types/database";
 
 export interface BudgetResponse {
 	success: boolean;
-	itemId: string;
+	itemIds: Array<string>;
 	boardId: string;
 	budgetAmount: number;
 	totalCost: number;
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		}
 
 		const { itemId } = await params;
+		const itemIds = [itemId];
 
 		// Validate itemId
 		if (!itemId) {
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		// Use the database function to calculate remaining budget
 		const { data: budgetResult, error: budgetError } = await supabaseAdmin.rpc("calculate_remaining_budget", {
 			p_board_id: boardId,
-			p_item_id: itemId,
+			p_item_ids: itemIds,
 			p_budget_amount: budgetAmount,
 			p_user_id: userId,
 		});
@@ -105,7 +106,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		if (includeBreakdown) {
 			// Get detailed breakdown from time entries with role rates
 			const { data: timeBreakdown } = await supabaseAdmin.rpc("get_item_time_by_role", {
-				p_item_id: itemId,
+				p_item_ids: itemIds,
 				p_user_id: userId,
 			});
 
@@ -135,7 +136,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 		const response: BudgetResponse = {
 			success: true,
-			itemId,
+			itemIds: itemIds,
 			boardId,
 			budgetAmount: Number(typedResult.budget_amount),
 			totalCost: Number(typedResult.total_cost),

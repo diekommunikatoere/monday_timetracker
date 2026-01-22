@@ -425,7 +425,7 @@ export async function softDeleteTimeEntry(id: string, userId: string): Promise<{
 			boardId: data.board_id,
 			deletedAt: data.deleted_at,
 		}),
-		5 // 5 seconds TTL
+		5, // 5 seconds TTL
 	);
 
 	// Generate undo token (JWT with 5s expiry)
@@ -434,7 +434,7 @@ export async function softDeleteTimeEntry(id: string, userId: string): Promise<{
 			entryId: id,
 			userId,
 			exp: Date.now() + 5000, // 5 seconds from now
-		})
+		}),
 	).toString("base64");
 
 	// Invalidate cache

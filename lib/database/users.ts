@@ -90,7 +90,7 @@ export async function updateUserProfile(
 	updates: {
 		email?: string;
 		name?: string;
-	}
+	},
 ): Promise<UserProfile> {
 	const { data, error } = await supabaseAdmin.from("user_profiles").update(updates).eq("id", userId).select().single();
 
