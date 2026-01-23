@@ -29,6 +29,7 @@ interface TaskItemSelectorProps {
 		itemId?: string;
 		role?: string;
 	};
+	subItemsOnly?: boolean;
 }
 
 // Option type
@@ -81,7 +82,7 @@ const invalidateAndRefetchTasks = async (boardId: string): Promise<boolean> => {
 	}
 };
 
-export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues }: TaskItemSelectorProps) {
+export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues, subItemsOnly }: TaskItemSelectorProps) {
 	// State management for selections
 	const [tasks, setTasks] = useState<ComboboxItemGroup[]>([]);
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
@@ -290,13 +291,15 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		if (tasksData?.groups) {
 			const mappedTasks: ComboboxItemGroup[] = tasksData.groups.map((group) => ({
 				group: group.label,
-				items: group.options.map((option) => ({
-					value: option.value,
-					label: option.label,
-					name: option.name,
-					parentItemId: option.parentItemId,
-					parentItemName: option.parentItemName,
-				})),
+				items: group.options
+					.filter((option) => !subItemsOnly || !!option.parentItemId)
+					.map((option) => ({
+						value: option.value,
+						label: option.label,
+						name: option.name,
+						parentItemId: option.parentItemId,
+						parentItemName: option.parentItemName,
+					})),
 			}));
 			setTasks(mappedTasks);
 			setError(null);

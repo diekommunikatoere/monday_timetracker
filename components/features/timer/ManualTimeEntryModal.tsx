@@ -262,7 +262,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 					</Flex>
 
 					{/* Task Selector (Board, Task, Role) */}
-					<TaskItemSelector onSelectionChange={handleTaskSelection} />
+					<TaskItemSelector onSelectionChange={handleTaskSelection} subItemsOnly={true} />
 
 					{/* Comment Input */}
 					<TextInput label="Kommentar" value={comment} onChange={(event) => setComment(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
