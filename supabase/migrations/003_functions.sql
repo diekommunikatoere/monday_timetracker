@@ -36,16 +36,16 @@ BEGIN
     SELECT
         te.id,
         te.user_id,
-        te.task_name,
+        COALESCE(mi.name, 'Unbenannter Zeiteintrag') as task_name,
         te.start_time,
         te.end_time,
         te.duration,
         te.board_id,
-        te.board_name,
+        mb.name as board_name,
         te.item_id,
-        te.item_name,
+        mi.name as item_name,
         te.parent_item_id,
-        te.parent_item_name,
+        mpi.name as parent_item_name,
         te.role_id,
         te.comment,
         te.is_draft,
@@ -54,6 +54,9 @@ BEGIN
         te.created_at,
         te.updated_at
     FROM time_entry te
+    LEFT JOIN monday_board mb ON te.board_id = mb.id
+    LEFT JOIN monday_item mi ON te.item_id = mi.id
+    LEFT JOIN monday_item mpi ON te.parent_item_id = mpi.id
     WHERE te.user_id = p_user_id
     AND te.deleted_at IS NULL
     ORDER BY te.start_time DESC

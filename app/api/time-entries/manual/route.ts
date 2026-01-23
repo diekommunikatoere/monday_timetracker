@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { syncAfterFinalize } from "@/lib/columnSync";
+import { insertTimeEntry } from "@/lib/database";
 
 interface ManualTimeEntryRequest {
 	userId: string;
@@ -90,23 +91,9 @@ export async function POST(request: NextRequest) {
 			finalDuration = duration;
 		}
 
-		// 1. Update dimension tables if names are provided
-		if (boardId && boardName) {
-			await (supabaseAdmin.from("monday_board" as any) as any).upsert({ id: boardId, name: boardName }, { onConflict: "id" });
-		}
-
-		if (itemId && itemName) {
-			await (supabaseAdmin.from("monday_item" as any) as any).upsert({ id: itemId, name: itemName, board_id: boardId, parent_item_id: parentItemId }, { onConflict: "id" });
-		}
-
-		if (parentItemId && parentItemName) {
-			await (supabaseAdmin.from("monday_item" as any) as any).upsert({ id: parentItemId, name: parentItemName, board_id: boardId }, { onConflict: "id" });
-		}
-
-		// 2. Insert the time entry directly (no draft needed for manual entries)
-		const { data, error } = await supabaseAdmin
-			.from("time_entry")
-			.insert({
+		// 1. Insert the time entry (this also handles dimension table updates)
+		const timeEntry = await insertTimeEntry(
+			{
 				user_id: userId,
 				comment: comment || null,
 				board_id: boardId || null,
@@ -117,27 +104,30 @@ export async function POST(request: NextRequest) {
 				start_time: finalStartTime,
 				end_time: finalEndTime,
 				is_draft: false,
-			} as any)
-			.select()
-			.single();
+				// Dimension metadata for UPSERTing
+				board_name: boardName,
+				item_name: itemName,
+				parent_item_name: parentItemName,
+			},
+			userId,
+		);
 
-		if (error) {
-			console.error("Error creating manual time entry:", error);
-			return NextResponse.json({ error: error.message || "Failed to create time entry" }, { status: 500 });
+		if (!timeEntry) {
+			return NextResponse.json({ error: "Failed to create time entry" }, { status: 500 });
 		}
 
-		// Trigger column sync after successful manual entry creation
+		// 2. Trigger column sync after successful manual entry creation
 		// This runs asynchronously and doesn't block the response
-		if (boardId && itemId && data?.id) {
+		if (boardId && itemId && timeEntry.id) {
 			// Don't await - let it run in the background
-			syncAfterFinalize(itemId, boardId, userProfile.id, data.id).catch((syncError) => {
+			syncAfterFinalize(itemId, boardId, userProfile.id, timeEntry.id).catch((syncError) => {
 				console.error("[ColumnSync] Background sync failed:", syncError);
 			});
 		}
 
 		return NextResponse.json({
 			success: true,
-			data,
+			data: timeEntry,
 		});
 	} catch (error) {
 		console.error("Error in manual time entry endpoint:", error);

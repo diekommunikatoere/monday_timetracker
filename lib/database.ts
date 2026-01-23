@@ -10,6 +10,51 @@ type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
 type TimerSessionInsert = Database["public"]["Tables"]["timer_session"]["Insert"];
 type TimerSegmentInsert = Database["public"]["Tables"]["timer_segment"]["Insert"];
 
+// ============================================
+// Dimension Management Helpers
+// ============================================
+
+export interface DimensionMetadata {
+	board_name?: string;
+	item_name?: string;
+	parent_item_name?: string;
+}
+
+/**
+ * Upsert a Monday board into the dimension table
+ */
+export async function upsertMondayBoard(id: string, name: string) {
+	if (!id || !name) return;
+
+	const { error } = await supabaseAdmin.from("monday_board").upsert({ id, name, updated_at: new Date().toISOString() }, { onConflict: "id" });
+
+	if (error) {
+		console.error(`Error upserting monday_board ${id}:`, error);
+	}
+}
+
+/**
+ * Upsert a Monday item into the dimension table
+ */
+export async function upsertMondayItem(id: string, name: string, boardId: string, parentItemId?: string | null) {
+	if (!id || !name || !boardId) return;
+
+	const { error } = await supabaseAdmin.from("monday_item").upsert(
+		{
+			id,
+			name,
+			board_id: boardId,
+			parent_item_id: parentItemId || null,
+			updated_at: new Date().toISOString(),
+		},
+		{ onConflict: "id" },
+	);
+
+	if (error) {
+		console.error(`Error upserting monday_item ${id}:`, error);
+	}
+}
+
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_PREFIX = "time_entry:";
 
@@ -65,13 +110,29 @@ export async function getTimeEntryById(id: string): Promise<TimeEntry | null> {
 }
 
 // Insert time entry
-export async function insertTimeEntry(entry: TimeEntryInsert, userId: string): Promise<TimeEntry> {
+export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata, userId: string): Promise<TimeEntry> {
 	// Make sure user_id is provided
 	if (!entry.user_id) {
 		throw new Error("user_id is required to create a time entry");
 	}
 
-	const { data, error } = await supabaseAdmin.from("time_entry").insert(entry).select().single();
+	// Extract dimension metadata
+	const { board_name, item_name, parent_item_name, ...cleanEntry } = entry;
+
+	// UPSERT dimension tables if names are provided
+	if (cleanEntry.board_id && board_name) {
+		await upsertMondayBoard(cleanEntry.board_id, board_name);
+	}
+
+	if (cleanEntry.item_id && item_name) {
+		await upsertMondayItem(cleanEntry.item_id, item_name, cleanEntry.board_id!, cleanEntry.parent_item_id);
+	}
+
+	if (cleanEntry.parent_item_id && parent_item_name) {
+		await upsertMondayItem(cleanEntry.parent_item_id, parent_item_name, cleanEntry.board_id!);
+	}
+
+	const { data, error } = await supabaseAdmin.from("time_entry").insert(cleanEntry).select().single();
 
 	if (error) {
 		console.error("Error inserting time entry:", error);
@@ -331,7 +392,7 @@ export async function resumeTimer(sessionId: string, userId: string) {
  * Update a time entry by ID with optimistic locking
  * Returns both old and new entry states for sync comparison
  */
-export async function updateTimeEntry(id: string, updates: TimeEntryUpdate, userId: string, expectedUpdatedAt?: string): Promise<{ old: TimeEntry; new: TimeEntry }> {
+export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & DimensionMetadata, userId: string, expectedUpdatedAt?: string): Promise<{ old: TimeEntry; new: TimeEntry }> {
 	// Fetch old entry first
 	const oldEntry = await getTimeEntryById(id);
 	if (!oldEntry) {
@@ -351,11 +412,30 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate, user
 		throw error;
 	}
 
+	// Extract dimension metadata
+	const { board_name, item_name, parent_item_name, ...cleanUpdates } = updates;
+
+	// UPSERT dimension tables if names are provided
+	if (cleanUpdates.board_id && board_name) {
+		await upsertMondayBoard(cleanUpdates.board_id, board_name);
+	}
+
+	// Use board_id from updates or fallback to old entry
+	const boardId = cleanUpdates.board_id || oldEntry.board_id;
+
+	if (cleanUpdates.item_id && item_name && boardId) {
+		await upsertMondayItem(cleanUpdates.item_id, item_name, boardId, cleanUpdates.parent_item_id || oldEntry.parent_item_id);
+	}
+
+	if (cleanUpdates.parent_item_id && parent_item_name && boardId) {
+		await upsertMondayItem(cleanUpdates.parent_item_id, parent_item_name, boardId);
+	}
+
 	// Update entry
 	const { data, error } = await supabaseAdmin
 		.from("time_entry")
 		.update({
-			...updates,
+			...cleanUpdates,
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", id)

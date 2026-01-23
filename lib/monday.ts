@@ -1,6 +1,7 @@
 import { ApiClient, ClientError } from "@mondaydotcomorg/api";
 import { NextRequest } from "next/server";
 import { cacheHelper } from "./redis";
+import { upsertMondayBoard, upsertMondayItem } from "./database";
 
 // Cache TTL constants (in seconds)
 const CACHE_TTL = {
@@ -131,6 +132,12 @@ export async function getConnectedBoards(boardIds: string[]): Promise<Array<Boar
 		}
 
 		const boards = response.boards || [];
+
+		// UPSERT boards into dimension table
+		for (const board of boards) {
+			await upsertMondayBoard(board.id.toString(), board.name);
+		}
+
 		const result = boards.map((board) => ({
 			value: board.id.toString(),
 			label: board.name,
@@ -231,6 +238,21 @@ export async function getBoardTasks(
 	// Transform to grouped options (preserving original logic for subitems)
 	if (!board || !board.groups) {
 		return { groups: [] };
+	}
+
+	// UPSERT items into dimension table
+	for (const [groupId, items] of itemsByGroup.entries()) {
+		for (const item of items) {
+			// Upsert the main item
+			await upsertMondayItem(item.id.toString(), item.name, boardId, null);
+
+			// Upsert subitems if they exist
+			if (item.subitems && item.subitems.length > 0) {
+				for (const subitem of item.subitems) {
+					await upsertMondayItem(subitem.id.toString(), subitem.name, boardId, item.id.toString());
+				}
+			}
+		}
 	}
 
 	const groupedOptions: TaskGroup[] = board.groups
