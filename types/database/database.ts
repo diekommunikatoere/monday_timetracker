@@ -37,7 +37,6 @@ export type Database = {
       board_config: {
         Row: {
           board_id: string
-          board_name: string
           budget_column_id: string | null
           budget_column_type: string | null
           created_at: string
@@ -55,7 +54,6 @@ export type Database = {
         }
         Insert: {
           board_id: string
-          board_name: string
           budget_column_id?: string | null
           budget_column_type?: string | null
           created_at?: string
@@ -73,7 +71,6 @@ export type Database = {
         }
         Update: {
           board_id?: string
-          board_name?: string
           budget_column_id?: string | null
           budget_column_type?: string | null
           created_at?: string
@@ -189,6 +186,83 @@ export type Database = {
           },
         ]
       }
+      monday_board: {
+        Row: {
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monday_column: {
+        Row: {
+          board_id: string
+          id: string
+          monday_column_id: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          board_id: string
+          id?: string
+          monday_column_id: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          board_id?: string
+          id?: string
+          monday_column_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monday_column_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "monday_board"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monday_item: {
+        Row: {
+          board_id: string
+          id: string
+          name: string
+          parent_item_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          board_id: string
+          id: string
+          name: string
+          parent_item_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          board_id?: string
+          id?: string
+          name?: string
+          parent_item_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       role: {
         Row: {
           color_hex: string | null
@@ -282,7 +356,6 @@ export type Database = {
       time_entry: {
         Row: {
           board_id: string | null
-          board_name: string | null
           comment: string | null
           created_at: string
           deleted_at: string | null
@@ -292,20 +365,16 @@ export type Database = {
           id: string
           is_draft: boolean
           item_id: string | null
-          item_name: string | null
           parent_item_id: string | null
-          parent_item_name: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          task_name: string | null
           timer_session: Json | null
           updated_at: string
           user_id: string
         }
         Insert: {
           board_id?: string | null
-          board_name?: string | null
           comment?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -315,20 +384,16 @@ export type Database = {
           id?: string
           is_draft?: boolean
           item_id?: string | null
-          item_name?: string | null
           parent_item_id?: string | null
-          parent_item_name?: string | null
           role_id?: string | null
           start_time?: string
           synced_to_monday?: boolean
-          task_name?: string | null
           timer_session?: Json | null
           updated_at?: string
           user_id: string
         }
         Update: {
           board_id?: string | null
-          board_name?: string | null
           comment?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -338,18 +403,29 @@ export type Database = {
           id?: string
           is_draft?: boolean
           item_id?: string | null
-          item_name?: string | null
           parent_item_id?: string | null
-          parent_item_name?: string | null
           role_id?: string | null
           start_time?: string
           synced_to_monday?: boolean
-          task_name?: string | null
           timer_session?: Json | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_time_entry_board"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "monday_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_time_entry_item"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "monday_item"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "time_entry_role_id_fkey"
             columns: ["role_id"]
