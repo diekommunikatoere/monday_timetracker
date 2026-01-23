@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 		const { searchParams } = new URL(request.url);
 		const boardId = searchParams.get("boardId");
 
-		let query = supabaseAdmin.from("board_config").select("*").order("board_name", { ascending: true });
+		let query = supabaseAdmin.from("board_config").select("*, monday_board(name)");
 
 		if (boardId) {
 			query = query.eq("board_id", boardId);
@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
 		const { data: boards, error } = await query;
 
 		if (error) {
-			console.error("Error fetching board configs:", error);
-			return NextResponse.json({ error: "Failed to fetch board configurations" }, { status: 500 });
+			console.error("Error fetching board configs. Query:", query, "Error:", error);
+			return NextResponse.json({ error: `Failed to fetch board configurations: ${error.message}` }, { status: 500 });
 		}
 
 		return NextResponse.json({
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
 	try {
 		const body = await request.json();
-		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, currency_symbol, sync_on_finalize, sync_total_time, sync_time_by_role, sync_remaining_budget, sync_budget_used, linked_board_id, sync_linked_items } = body;
+		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, sync_on_finalize, sync_budget_used, linked_board_id, sync_linked_items } = body;
 
 		// Validate required fields
 		if (!board_id || typeof board_id !== "string") {
@@ -56,18 +56,13 @@ export async function POST(request: NextRequest) {
 
 		const boardData: BoardConfigInsert = {
 			board_id,
-			board_name: board_name.trim(),
 			sync_enabled: sync_enabled !== false, // Default to true
 			budget_column_id: budget_column_id || null,
 			budget_column_type: budget_column_type || null,
-			currency_symbol: currency_symbol || "€",
 			sync_on_finalize: sync_on_finalize !== false,
-			sync_total_time: sync_total_time !== false,
-			sync_time_by_role: sync_time_by_role === true,
-			sync_remaining_budget: sync_remaining_budget === true,
-			sync_budget_used: sync_budget_used === true,
+			sync_budget_used: sync_budget_used !== false,
 			linked_board_id: linked_board_id || null,
-			sync_linked_items: sync_linked_items === true,
+			sync_linked_items: sync_linked_items !== false,
 		};
 
 		// Upsert - update if exists, insert if not
@@ -95,7 +90,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
 	try {
 		const body = await request.json();
-		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, currency_symbol, sync_on_finalize, sync_total_time, sync_time_by_role, sync_remaining_budget, sync_budget_used, linked_board_id, sync_linked_items } = body;
+		const { board_id, sync_enabled, budget_column_id, budget_column_type, sync_on_finalize, sync_budget_used, linked_board_id, sync_linked_items } = body;
 
 		// Validate required fields
 		if (!board_id) {
@@ -106,15 +101,10 @@ export async function PATCH(request: NextRequest) {
 			updated_at: new Date().toISOString(),
 		};
 
-		if (board_name !== undefined) updateData.board_name = board_name.trim();
 		if (sync_enabled !== undefined) updateData.sync_enabled = sync_enabled;
 		if (budget_column_id !== undefined) updateData.budget_column_id = budget_column_id || null;
 		if (budget_column_type !== undefined) updateData.budget_column_type = budget_column_type || null;
-		if (currency_symbol !== undefined) updateData.currency_symbol = currency_symbol;
 		if (sync_on_finalize !== undefined) updateData.sync_on_finalize = sync_on_finalize;
-		if (sync_total_time !== undefined) updateData.sync_total_time = sync_total_time;
-		if (sync_time_by_role !== undefined) updateData.sync_time_by_role = sync_time_by_role;
-		if (sync_remaining_budget !== undefined) updateData.sync_remaining_budget = sync_remaining_budget;
 		if (sync_budget_used !== undefined) updateData.sync_budget_used = sync_budget_used;
 		if (linked_board_id !== undefined) updateData.linked_board_id = linked_board_id || null;
 		if (sync_linked_items !== undefined) updateData.sync_linked_items = sync_linked_items;
@@ -149,10 +139,6 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ error: "Board ID is required" }, { status: 400 });
 		}
 
-		// Delete related records first (cascading)
-		await supabaseAdmin.from("column_sync_config").delete().eq("board_id", boardId);
-		await supabaseAdmin.from("board_role_override").delete().eq("board_id", boardId);
-
 		const { error } = await supabaseAdmin.from("board_config").delete().eq("board_id", boardId);
 
 		if (error) {
@@ -162,7 +148,7 @@ export async function DELETE(request: NextRequest) {
 
 		return NextResponse.json({
 			success: true,
-			message: "Board configuration deleted",
+			message: "Board configuration deleted successfully",
 		});
 	} catch (error) {
 		console.error("Error in DELETE /api/admin/boards:", error);

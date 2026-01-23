@@ -38,14 +38,10 @@ export default function AdminPage() {
 		board_id: "",
 		board_name: "",
 		sync_enabled: true,
-		currency_symbol: "€",
 		sync_on_finalize: true,
-		sync_total_time: true,
-		sync_time_by_role: false,
-		sync_remaining_budget: false,
-		sync_budget_used: false,
+		sync_budget_used: true,
 		linked_board_id: "",
-		sync_linked_items: false,
+		sync_linked_items: true,
 	});
 	const [savingBoard, setSavingBoard] = useState(false);
 
@@ -210,14 +206,10 @@ export default function AdminPage() {
 			setEditingBoard(board);
 			setBoardForm({
 				board_id: board.board_id,
-				board_name: board.board_name,
-				sync_enabled: board.sync_enabled,
-				currency_symbol: board.currency_symbol,
-				sync_on_finalize: board.sync_on_finalize,
-				sync_total_time: board.sync_total_time,
-				sync_time_by_role: board.sync_time_by_role,
-				sync_remaining_budget: board.sync_remaining_budget,
-				sync_budget_used: board.sync_budget_used,
+				board_name: (board as any).monday_board?.name || "Unbenanntes Board",
+				sync_enabled: board.sync_enabled || false,
+				sync_on_finalize: board.sync_on_finalize || false,
+				sync_budget_used: board.sync_budget_used || false,
 				linked_board_id: board.linked_board_id || "",
 				sync_linked_items: board.sync_linked_items || false,
 			});
@@ -227,14 +219,10 @@ export default function AdminPage() {
 				board_id: "",
 				board_name: "",
 				sync_enabled: true,
-				currency_symbol: "€",
 				sync_on_finalize: true,
-				sync_total_time: true,
-				sync_time_by_role: false,
-				sync_remaining_budget: false,
-				sync_budget_used: false,
+				sync_budget_used: true,
 				linked_board_id: "",
-				sync_linked_items: false,
+				sync_linked_items: true,
 			});
 		}
 		setBoardModalOpen(true);
@@ -286,7 +274,8 @@ export default function AdminPage() {
 	};
 
 	const handleDeleteBoard = async (board: BoardConfig) => {
-		if (!confirm(`Are you sure you want to delete the configuration for "${board.board_name}"?`)) {
+		const boardName = (board as any).monday_board?.name || board.board_id;
+		if (!confirm(`Are you sure you want to delete the configuration for "${boardName}"?`)) {
 			return;
 		}
 
@@ -455,7 +444,7 @@ export default function AdminPage() {
 								{boards.map((board) => (
 									<div key={board.board_id} className="board-card">
 										<div className="board-card-header">
-											<span className="board-card-name">{board.board_name}</span>
+											<span className="board-card-name">{(board as any).monday_board?.name || board.board_id}</span>
 											<span className={`board-sync-badge ${board.sync_enabled ? "enabled" : "disabled"}`}>{board.sync_enabled ? "Sync Enabled" : "Sync Disabled"}</span>
 										</div>
 										<div className="board-card-details">
@@ -465,9 +454,6 @@ export default function AdminPage() {
 											</div>
 											<div className="board-sync-options">
 												{board.sync_on_finalize && <Badge size="xs">Sync on Finalize</Badge>}
-												{board.sync_total_time && <Badge size="xs">Total Time</Badge>}
-												{board.sync_time_by_role && <Badge size="xs">Time by Role</Badge>}
-												{board.sync_remaining_budget && <Badge size="xs">Remaining Budget</Badge>}
 												{board.sync_budget_used && <Badge size="xs">Budget Used</Badge>}
 											</div>
 										</div>
@@ -529,20 +515,12 @@ export default function AdminPage() {
 						<TextInput label="Board Name" placeholder="e.g., Project Board" value={boardForm.board_name} onChange={(e) => setBoardForm({ ...boardForm, board_name: e.target.value })} required />
 					</Group>
 
-					<Select label="Currency Symbol" value={boardForm.currency_symbol} onChange={(val) => setBoardForm({ ...boardForm, currency_symbol: val || "€" })} data={["€", "$", "£", "CHF", "¥"]} />
-
 					<Box className="form-section">
 						<Text className="form-section-title">Sync Options</Text>
 						<Stack gap="sm">
 							<Switch label="Enable Sync" description="Master toggle for all sync operations" checked={boardForm.sync_enabled} onChange={(e) => setBoardForm({ ...boardForm, sync_enabled: e.currentTarget.checked })} />
 
 							<Switch label="Sync on Finalize" description="Automatically sync when time entries are finalized" checked={boardForm.sync_on_finalize} onChange={(e) => setBoardForm({ ...boardForm, sync_on_finalize: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
-
-							<Switch label="Sync Total Time" description="Update a column with total tracked time" checked={boardForm.sync_total_time} onChange={(e) => setBoardForm({ ...boardForm, sync_total_time: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
-
-							<Switch label="Sync Time by Role" description="Update a column with time breakdown by role" checked={boardForm.sync_time_by_role} onChange={(e) => setBoardForm({ ...boardForm, sync_time_by_role: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
-
-							<Switch label="Sync Remaining Budget" description="Calculate and sync remaining budget based on tracked time" checked={boardForm.sync_remaining_budget} onChange={(e) => setBoardForm({ ...boardForm, sync_remaining_budget: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
 
 							<Switch label="Sync Budget Used" description="Sync total expenditure (Total Cost) to a separate column" checked={boardForm.sync_budget_used} onChange={(e) => setBoardForm({ ...boardForm, sync_budget_used: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
 

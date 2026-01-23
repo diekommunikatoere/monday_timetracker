@@ -40,16 +40,12 @@ export type Database = {
           budget_column_id: string | null
           budget_column_type: string | null
           created_at: string
-          currency_symbol: string | null
           id: string
           linked_board_id: string | null
           sync_budget_used: boolean | null
           sync_enabled: boolean | null
           sync_linked_items: boolean | null
           sync_on_finalize: boolean | null
-          sync_remaining_budget: boolean | null
-          sync_time_by_role: boolean | null
-          sync_total_time: boolean | null
           updated_at: string
         }
         Insert: {
@@ -57,16 +53,12 @@ export type Database = {
           budget_column_id?: string | null
           budget_column_type?: string | null
           created_at?: string
-          currency_symbol?: string | null
           id?: string
           linked_board_id?: string | null
           sync_budget_used?: boolean | null
           sync_enabled?: boolean | null
           sync_linked_items?: boolean | null
           sync_on_finalize?: boolean | null
-          sync_remaining_budget?: boolean | null
-          sync_time_by_role?: boolean | null
-          sync_total_time?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -74,16 +66,12 @@ export type Database = {
           budget_column_id?: string | null
           budget_column_type?: string | null
           created_at?: string
-          currency_symbol?: string | null
           id?: string
           linked_board_id?: string | null
           sync_budget_used?: boolean | null
           sync_enabled?: boolean | null
           sync_linked_items?: boolean | null
           sync_on_finalize?: boolean | null
-          sync_remaining_budget?: boolean | null
-          sync_time_by_role?: boolean | null
-          sync_total_time?: boolean | null
           updated_at?: string
         }
         Relationships: []
@@ -158,7 +146,7 @@ export type Database = {
           include_breakdown?: boolean | null
           last_synced_at?: string | null
           sync_enabled?: boolean | null
-          sync_purpose: string
+          sync_purpose?: string
           time_format?: string | null
           updated_at?: string
         }

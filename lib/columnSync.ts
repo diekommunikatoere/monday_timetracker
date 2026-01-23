@@ -40,13 +40,9 @@ export interface BoardConfig {
 	boardName: string;
 	syncEnabled: boolean;
 	syncOnFinalize: boolean;
-	syncTotalTime: boolean;
-	syncTimeByRole: boolean;
-	syncRemainingBudget: boolean;
 	syncBudgetUsed: boolean;
 	linkedBoardId: string | null;
 	syncLinkedItems: boolean;
-	currencySymbol: string;
 	budgetColumnId: string | null;
 	budgetColumnType: string | null;
 }
@@ -192,13 +188,9 @@ export async function getBoardConfig(boardId: string): Promise<BoardConfig | nul
 		boardName: (data as any).monday_board?.name || "Unbenanntes Board",
 		syncEnabled: data.sync_enabled,
 		syncOnFinalize: data.sync_on_finalize,
-		syncTotalTime: data.sync_total_time,
-		syncTimeByRole: data.sync_time_by_role,
-		syncRemainingBudget: data.sync_remaining_budget,
 		syncBudgetUsed: data.sync_budget_used,
 		linkedBoardId: data.linked_board_id,
 		syncLinkedItems: data.sync_linked_items,
-		currencySymbol: data.currency_symbol,
 		budgetColumnId: data.budget_column_id,
 		budgetColumnType: data.budget_column_type,
 	};
@@ -670,19 +662,11 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
 	const enabledMappings = columnMappings.filter((mapping) => {
 		let isEnabled = false;
 		switch (mapping.syncPurpose) {
-			case "total_time":
-				isEnabled = boardConfig.syncTotalTime;
-				break;
-			case "time_by_role":
-				isEnabled = boardConfig.syncTimeByRole;
-				break;
-			case "remaining_budget":
-				isEnabled = boardConfig.syncRemainingBudget;
-				break;
 			case "budget_used":
 				isEnabled = boardConfig.syncBudgetUsed;
 				break;
 			default:
+				// Other purposes are now considered legacy or always enabled if mapped
 				isEnabled = true;
 		}
 		if (!isEnabled) {
@@ -707,8 +691,11 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
 	};
 
 	// Recursive sync for linked items (if enabled and not already in a recursive call)
+	// MON-228: syncLinkedItems is now effectively mandatory if linkedBoardId is set
+	const shouldSyncLinked = !isRecursiveCall && boardConfig.linkedBoardId && (boardConfig.syncLinkedItems || true);
+
 	console.log(`[ColumnSync] Checking for recursive sync: isRecursiveCall=${isRecursiveCall}, syncLinkedItems=${boardConfig.syncLinkedItems}, linkedBoardId=${boardConfig.linkedBoardId}`);
-	if (!isRecursiveCall && boardConfig.syncLinkedItems && boardConfig.linkedBoardId) {
+	if (shouldSyncLinked && boardConfig.linkedBoardId) {
 		try {
 			console.log(`[ColumnSync] Searching for linked items on board ${boardConfig.linkedBoardId} for item ${itemId}`);
 			const linkedItemIds = await findLinkedItems(boardId, itemId, boardConfig.linkedBoardId);

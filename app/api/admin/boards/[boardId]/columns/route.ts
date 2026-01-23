@@ -89,9 +89,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 			column_id,
 			column_name,
 			column_type,
-			sync_purpose,
-			time_format: isTimePurpose(sync_purpose as SyncPurpose) ? time_format || "hours" : null,
-			include_breakdown: include_breakdown === true,
+			sync_purpose: "budget_used",
+			time_format: "hours",
+			include_breakdown: false,
 			sync_enabled: sync_enabled !== false,
 		};
 
@@ -133,10 +133,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 		if (column_name !== undefined) updateData.column_name = column_name;
 
-		// Handle time_format based on purpose if purpose is being updated (though purpose is usually fixed)
-		// For now, we just ensure that if it's provided, we respect it, but we should ideally check the existing purpose
-		if (time_format !== undefined) updateData.time_format = time_format;
-		if (include_breakdown !== undefined) updateData.include_breakdown = include_breakdown;
+		// MON-228: We force budget_used and standard formats for new/updated configs
+		updateData.sync_purpose = "budget_used";
+		updateData.time_format = "hours";
+		updateData.include_breakdown = false;
+
 		if (sync_enabled !== undefined) updateData.sync_enabled = sync_enabled;
 
 		const { data: config, error } = await supabaseAdmin.from("column_sync_config").update(updateData).eq("board_id", boardId).eq("column_id", column_id).select().single();

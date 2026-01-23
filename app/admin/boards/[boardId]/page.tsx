@@ -521,9 +521,9 @@ export default function BoardConfigPage() {
 
 	// Purpose display names
 	const purposeLabels: Record<SyncPurpose, string> = {
-		total_time: "Total Time",
-		time_by_role: "Time by Role",
-		remaining_budget: "Remaining Budget",
+		total_time: "Total Time (Legacy)",
+		time_by_role: "Time by Role (Legacy)",
+		remaining_budget: "Remaining Budget (Legacy)",
 		budget_used: "Budget Used",
 	};
 
@@ -582,7 +582,7 @@ export default function BoardConfigPage() {
 			<Breadcrumbs mb="md">
 				<Anchor href="/admin">Admin</Anchor>
 				<Anchor href="/admin">Boards</Anchor>
-				<Text>{boardConfig.board_name}</Text>
+				<Text>{(boardConfig as any).board_name || boardConfig.board_id}</Text>
 			</Breadcrumbs>
 
 			{error && <div className="admin-error">{error}</div>}
@@ -591,7 +591,7 @@ export default function BoardConfigPage() {
 				<Flex justify="space-between" align="center">
 					<div>
 						<Text size="xl" fw={600}>
-							{boardConfig.board_name}
+							{(boardConfig as any).board_name || boardConfig.board_id}
 						</Text>
 						<Text size="sm" c="dimmed">
 							Board ID: {boardConfig.board_id}
@@ -890,35 +890,6 @@ export default function BoardConfigPage() {
 						))}
 
 					{editingColumn && <TextInput label="Column" value={`${columnForm.column_name} (${columnForm.column_type})`} disabled />}
-
-					<Select
-						label="Sync Purpose"
-						description="What data should be synced to this column"
-						data={[
-							{ value: "total_time", label: "Total Time - Sum of all tracked time" },
-							{ value: "time_by_role", label: "Time by Role - Breakdown by role" },
-							{ value: "remaining_budget", label: "Remaining Budget - Budget minus cost" },
-							{ value: "budget_used", label: "Budget Used - Total expenditure (Total Cost)" },
-						]}
-						value={columnForm.sync_purpose}
-						onChange={(val) => setColumnForm({ ...columnForm, sync_purpose: (val as SyncPurpose) || "total_time" })}
-					/>
-
-					{isTimePurpose(columnForm.sync_purpose as SyncPurpose) && (
-						<Select
-							label="Time Format"
-							description="How time values should be formatted"
-							data={[
-								{ value: "hours", label: "Hours (e.g., 2.5)" },
-								{ value: "seconds", label: "Seconds (e.g., 9000)" },
-								{ value: "hh:mm", label: "HH:MM (e.g., 02:30)" },
-							]}
-							value={columnForm.time_format}
-							onChange={(val) => setColumnForm({ ...columnForm, time_format: (val as TimeFormat) || "hours" })}
-						/>
-					)}
-
-					{columnForm.sync_purpose === "time_by_role" && <Switch label="Include detailed breakdown" description="Show role names and times in the column" checked={columnForm.include_breakdown} onChange={(e) => setColumnForm({ ...columnForm, include_breakdown: e.currentTarget.checked })} />}
 
 					<Switch label="Enable sync" description="Toggle sync for this column mapping" checked={columnForm.sync_enabled} onChange={(e) => setColumnForm({ ...columnForm, sync_enabled: e.currentTarget.checked })} />
 
