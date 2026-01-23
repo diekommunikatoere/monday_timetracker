@@ -102,29 +102,18 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithRole[]> {
 	console.log(`Fetching time entries for userId: ${userId}`);
 
-	/* const cacheKey = `${CACHE_PREFIX}user:${userId}`;
-
-	// Try cache first
-	const cached = await cacheHelper.get<TimeEntry[]>(cacheKey);
-	if (cached) {
-		console.log(`✅ Cache hit: getUserTimeEntries(${userId})`);
-		return cached;
-	} */
-
-	// Fetch from database
-	const { data, error } = await supabaseAdmin.from("time_entry").select("* , role(name)").eq("user_id", userId).is("deleted_at", null).gt("duration", 0).order("created_at", { ascending: false });
-	console.log(`Fetched user time entries for userId: ${userId}`, data);
+	// Fetch from database using RPC to get joined names
+	const { data, error } = await supabaseAdmin.rpc("get_user_time_entries", {
+		p_user_id: userId,
+		p_limit: 100,
+	} as any);
 
 	if (error) {
 		console.error("Error fetching user time entries:", error);
 		throw error;
 	}
 
-	// Cache the result
-	/* await cacheHelper.set(cacheKey, data, CACHE_TTL);
-	console.log(`💾 Cached: getUserTimeEntries(${userId})`); */
-
-	return data;
+	return data as any;
 }
 
 // Get current timer session

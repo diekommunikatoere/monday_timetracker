@@ -90,25 +90,34 @@ export async function POST(request: NextRequest) {
 			finalDuration = duration;
 		}
 
-		// Insert the time entry directly (no draft needed for manual entries)
+		// 1. Update dimension tables if names are provided
+		if (boardId && boardName) {
+			await (supabaseAdmin.from("monday_board" as any) as any).upsert({ id: boardId, name: boardName }, { onConflict: "id" });
+		}
+
+		if (itemId && itemName) {
+			await (supabaseAdmin.from("monday_item" as any) as any).upsert({ id: itemId, name: itemName, board_id: boardId, parent_item_id: parentItemId }, { onConflict: "id" });
+		}
+
+		if (parentItemId && parentItemName) {
+			await (supabaseAdmin.from("monday_item" as any) as any).upsert({ id: parentItemId, name: parentItemName, board_id: boardId }, { onConflict: "id" });
+		}
+
+		// 2. Insert the time entry directly (no draft needed for manual entries)
 		const { data, error } = await supabaseAdmin
 			.from("time_entry")
 			.insert({
 				user_id: userId,
-				task_name: taskName,
 				comment: comment || null,
 				board_id: boardId || null,
-				board_name: boardName || null,
 				item_id: itemId || null,
-				item_name: itemName || null,
 				parent_item_id: parentItemId || null,
-				parent_item_name: parentItemName || null,
 				role_id: roleId || null,
 				duration: finalDuration,
 				start_time: finalStartTime,
 				end_time: finalEndTime,
 				is_draft: false,
-			})
+			} as any)
 			.select()
 			.single();
 

@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 			p_role_id: roleId || null,
 			p_duration: duration, // Pass the duration override
 			p_date: date ? new Date(date).toISOString() : null, // Pass the date override
-		});
+		} as any);
 
 		if (error) {
 			console.error("Error finalizing time entry:", error);

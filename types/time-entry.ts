@@ -1,5 +1,5 @@
 export interface TimeEntry {
-	id: number;
+	id: string;
 	user_id: string; // Supabase auth user UUID
 	task_name: string;
 	start_time: string; // ISO 8601 timestamp string

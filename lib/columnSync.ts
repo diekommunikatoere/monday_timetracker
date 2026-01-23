@@ -181,7 +181,7 @@ export function formatTimeByRoleJson(breakdown: RoleTimeBreakdown[]): string {
  * Get board configuration
  */
 export async function getBoardConfig(boardId: string): Promise<BoardConfig | null> {
-	const { data, error } = await supabaseAdmin.from("board_config").select("*").eq("board_id", boardId).single();
+	const { data, error } = await supabaseAdmin.from("board_config").select("*, monday_board(name)").eq("board_id", boardId).single();
 
 	if (error || !data) {
 		return null;
@@ -189,7 +189,7 @@ export async function getBoardConfig(boardId: string): Promise<BoardConfig | nul
 
 	return {
 		boardId: data.board_id,
-		boardName: data.board_name,
+		boardName: (data as any).monday_board?.name || "Unbenanntes Board",
 		syncEnabled: data.sync_enabled,
 		syncOnFinalize: data.sync_on_finalize,
 		syncTotalTime: data.sync_total_time,
