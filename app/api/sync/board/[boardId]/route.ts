@@ -180,10 +180,7 @@ export async function GET(request: NextRequest, { params }: Props) {
 				? {
 						syncEnabled: boardConfig.syncEnabled,
 						syncOnFinalize: boardConfig.syncOnFinalize,
-						syncTotalTime: boardConfig.syncTotalTime,
-						syncTimeByRole: boardConfig.syncTimeByRole,
-						syncRemainingBudget: boardConfig.syncRemainingBudget,
-				  }
+					}
 				: null,
 			statistics: {
 				last24Hours: {

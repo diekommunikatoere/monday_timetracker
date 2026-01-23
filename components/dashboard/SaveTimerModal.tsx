@@ -23,7 +23,7 @@ interface SaveTimerModalProps {
 	show: boolean;
 	onClose: () => void;
 	initialData?: {
-		draftId?: number;
+		draftId?: string;
 		taskSelection?: TaskSelection;
 		comment?: string;
 		date?: Date;
