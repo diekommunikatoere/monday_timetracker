@@ -74,7 +74,15 @@ export type Database = {
           sync_on_finalize?: boolean | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_board_config_monday_board"
+            columns: ["board_id"]
+            isOneToOne: true
+            referencedRelation: "monday_board"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       board_role_override: {
         Row: {
