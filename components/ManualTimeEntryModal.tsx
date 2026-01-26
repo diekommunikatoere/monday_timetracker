@@ -111,7 +111,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 		const newEndTime = addSecondsToTimeString(startTime, durationSeconds);
 		updateSource.current = "duration";
 		setEndTime(newEndTime);
-	}, [duration, durationToSeconds]); // Note: removed startTime from deps since we only want to react to duration changes here
+	}, [duration, durationToSeconds, startTime]);
 
 	// Sync: When start_time changes (user input), recalculate duration = end_time - new_start_time
 	const handleStartTimeChange = useCallback(
@@ -121,7 +121,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 			const newDurationSeconds = calculateDurationBetweenTimes(newStartTime, endTime);
 			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
 		},
-		[endTime, secondsToDuration]
+		[endTime, secondsToDuration],
 	);
 
 	// Sync: When end_time changes (user input), recalculate duration = new_end_time - start_time
@@ -132,7 +132,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 			const newDurationSeconds = calculateDurationBetweenTimes(startTime, newEndTime);
 			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
 		},
-		[startTime, secondsToDuration]
+		[startTime, secondsToDuration],
 	);
 
 	const handleTaskSelection = (taskData: TaskSelection) => {
