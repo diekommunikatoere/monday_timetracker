@@ -13,6 +13,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import mondaySdk from "monday-sdk-js";
 import { Icon } from "@/components";
+import { roundDuration } from "@/lib/utils";
 
 import "@mantine/dates/styles.css";
 import "@/public/css/components/SaveTimerModal.css";
@@ -105,7 +106,9 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			} else {
 				setSelectedTask(null);
 				setDate(new Date());
-				setDuration(formatDurationFromMs(elapsedTime));
+				// Round the elapsed time for display
+				const roundedSeconds = roundDuration(Math.floor(elapsedTime / 1000));
+				setDuration(formatDurationFromMs(roundedSeconds * 1000));
 				setLocalComment(""); // Clear local comment when not using initialData
 			}
 		}

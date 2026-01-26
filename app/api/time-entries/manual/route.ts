@@ -3,6 +3,7 @@ import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { syncAfterFinalize } from "@/lib/columnSync";
 import { insertTimeEntry } from "@/lib/database";
+import { roundDuration } from "@/lib/utils";
 
 interface ManualTimeEntryRequest {
 	userId: string;
@@ -87,8 +88,8 @@ export async function POST(request: NextRequest) {
 			}
 
 			finalStartTime = new Date(date).toISOString();
-			finalEndTime = new Date(new Date(date).getTime() + duration * 1000).toISOString();
-			finalDuration = duration;
+			finalDuration = roundDuration(duration);
+			finalEndTime = new Date(new Date(date).getTime() + finalDuration * 1000).toISOString();
 		}
 
 		// 1. Insert the time entry (this also handles dimension table updates)

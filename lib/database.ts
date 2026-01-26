@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { cacheHelper } from "@/lib/redis";
 import type { Database, FinalizeSegmentResult } from "@/types/database";
 import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
+import { roundDuration } from "./utils";
 
 type TimeEntry = Database["public"]["Tables"]["time_entry"]["Row"];
 type TimeEntryWithRole = FrontendTimeEntry;
@@ -133,6 +134,11 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 
 	if (cleanEntry.parent_item_id && parent_item_name) {
 		await upsertMondayItem(cleanEntry.parent_item_id, parent_item_name, cleanEntry.board_id!);
+	}
+
+	// Apply rounding logic
+	if (cleanEntry.duration !== undefined && cleanEntry.duration !== null) {
+		cleanEntry.duration = roundDuration(cleanEntry.duration);
 	}
 
 	const { data, error } = await supabaseAdmin.from("time_entry").insert(cleanEntry).select().single();
@@ -432,6 +438,11 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 
 	if (cleanUpdates.parent_item_id && parent_item_name && boardId) {
 		await upsertMondayItem(cleanUpdates.parent_item_id, parent_item_name, boardId);
+	}
+
+	// Apply rounding logic
+	if (cleanUpdates.duration !== undefined && cleanUpdates.duration !== null) {
+		cleanUpdates.duration = roundDuration(cleanUpdates.duration);
 	}
 
 	// Update entry

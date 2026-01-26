@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { syncAfterFinalize } from "@/lib/columnSync";
+import { roundDuration } from "@/lib/utils";
 
 interface FinalizeTimeEntryRequest {
 	draftId: string;
@@ -58,7 +59,8 @@ export async function POST(request: NextRequest) {
 			}
 
 			// Calculate new timestamps
-			const newDuration = duration !== undefined ? duration : draft.duration;
+			const rawDuration = duration !== undefined ? duration : draft.duration;
+			const newDuration = roundDuration(rawDuration);
 			const newStartTime = date ? new Date(date).toISOString() : draft.start_time;
 			const newEndTime = new Date(new Date(newStartTime).getTime() + newDuration * 1000).toISOString();
 

@@ -62,6 +62,21 @@ export function formatTime(seconds: number): string {
 }
 
 /**
+ * Round duration in seconds according to business rules:
+ * - 0 seconds remains 0 seconds
+ * - 1-59 seconds rounds up to 60 seconds (1 minute)
+ * - 60 seconds or more remains unchanged
+ * @param seconds - Duration in seconds
+ * @returns Rounded duration in seconds
+ */
+export function roundDuration(seconds: number): number {
+	if (seconds > 0 && seconds < 60) {
+		return 60;
+	}
+	return seconds;
+}
+
+/**
  *
  * - only create segments when timer is running
  * - when pausing, close current segment and don't create a new segment

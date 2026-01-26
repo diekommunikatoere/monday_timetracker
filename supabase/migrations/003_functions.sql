@@ -300,7 +300,10 @@ BEGIN
     UPDATE public.timer_session
     SET
       timer_segments = v_segments,
-      elapsed_time = COALESCE(p_duration, v_total_duration::integer),
+      elapsed_time = CASE 
+        WHEN COALESCE(p_duration, v_total_duration::integer) > 0 AND COALESCE(p_duration, v_total_duration::integer) < 60 THEN 60
+        ELSE COALESCE(p_duration, v_total_duration::integer)
+      END,
       is_paused = false
     WHERE id = v_session.id
     RETURNING * INTO v_updated_session;
@@ -315,11 +318,17 @@ BEGIN
 
   IF p_duration IS NOT NULL THEN
     v_total_duration := p_duration;
-    v_end_time := v_start_time + (v_total_duration || ' seconds')::interval;
   ELSE
     v_end_time := now();
     v_total_duration := extract(epoch from (v_end_time - v_start_time))::integer;
   END IF;
+
+  -- Apply rounding logic: 1-59 seconds rounds up to 60
+  IF v_total_duration > 0 AND v_total_duration < 60 THEN
+    v_total_duration := 60;
+  END IF;
+
+  v_end_time := v_start_time + (v_total_duration || ' seconds')::interval;
 
   -- 4. Update time entry
   UPDATE public.time_entry
