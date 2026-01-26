@@ -10,10 +10,13 @@ import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import type { Role, BoardConfig } from "@/types/database";
 
+import { ConfigurationWizard } from "@/components/features/admin/ConfigurationWizard";
+
 import "@/public/css/components/AdminPage.css";
 
 export default function AdminPage() {
 	const [activeTab, setActiveTab] = useState<string | null>("roles");
+	const [showWizard, setShowWizard] = useState(false);
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [boards, setBoards] = useState<BoardConfig[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -44,6 +47,7 @@ export default function AdminPage() {
 		sync_linked_items: true,
 	});
 	const [savingBoard, setSavingBoard] = useState(false);
+	const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({});
 
 	// Monday context
 	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
@@ -306,6 +310,38 @@ export default function AdminPage() {
 		}
 	};
 
+	const handleSyncBoard = async (boardId: string) => {
+		setSyncingBoards((prev) => ({ ...prev, [boardId]: true }));
+		try {
+			const response = await fetch(`/api/sync/board/${boardId}`, {
+				method: "POST",
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to trigger sync");
+			}
+
+			notifications.show({
+				title: "Sync Started",
+				message: `Sync triggered for ${data.itemsToSync || "all"} items. This may take a moment.`,
+				color: "blue",
+			});
+
+			// Refresh boards to get updated sync status
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Sync Error",
+				message: err instanceof Error ? err.message : "Failed to trigger sync",
+				color: "red",
+			});
+		} finally {
+			setSyncingBoards((prev) => ({ ...prev, [boardId]: false }));
+		}
+	};
+
 	// Show loading state while initializing
 	if (mondayLoading) {
 		return (
@@ -424,12 +460,19 @@ export default function AdminPage() {
 								<h2>Board Configurations</h2>
 								<p className="admin-section-description">Configure which boards sync time data to monday.com columns.</p>
 							</div>
-							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBoardModal()}>
-								Add Board
-							</Button>
+							<Group>
+								<Button variant="light" leftSection={<Icon name="settings" size={21} />} onClick={() => setShowWizard(!showWizard)}>
+									{showWizard ? "Show Table View" : "Guided Configuration"}
+								</Button>
+								<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBoardModal()}>
+									Add Board
+								</Button>
+							</Group>
 						</div>
 
-						{loading ? (
+						{showWizard ? (
+							<ConfigurationWizard />
+						) : loading ? (
 							<div className="admin-loading">
 								<Loader />
 							</div>
@@ -444,7 +487,18 @@ export default function AdminPage() {
 								{boards.map((board) => (
 									<div key={board.board_id} className="board-card">
 										<div className="board-card-header">
-											<span className="board-card-name">{(board as any).monday_board?.name || board.board_id}</span>
+											<Flex align="center" gap="xs">
+												<div
+													className="status-indicator"
+													style={{
+														width: 10,
+														height: 10,
+														borderRadius: "50%",
+														backgroundColor: (board as any).config_status === "GREEN" ? "var(--mantine-color-green-6)" : (board as any).config_status === "YELLOW" ? "var(--mantine-color-yellow-6)" : "var(--mantine-color-red-6)",
+													}}
+												/>
+												<span className="board-card-name">{(board as any).monday_board?.name || board.board_id}</span>
+											</Flex>
 											<span className={`board-sync-badge ${board.sync_enabled ? "enabled" : "disabled"}`}>{board.sync_enabled ? "Sync Enabled" : "Sync Disabled"}</span>
 										</div>
 										<div className="board-card-details">
@@ -452,12 +506,34 @@ export default function AdminPage() {
 												<span className="board-detail-label">Board ID</span>
 												<span className="board-detail-value">{board.board_id}</span>
 											</div>
+											{(board as any).last_sync && (
+												<div className="board-detail-row">
+													<span className="board-detail-label">Last Synced</span>
+													<span className="board-detail-value">{new Date((board as any).last_sync).toLocaleString()}</span>
+												</div>
+											)}
+											{(board as any).validation_errors?.length > 0 && (
+												<div className="board-detail-row" style={{ marginTop: 4 }}>
+													<Flex gap={4} wrap="wrap">
+														{(board as any).validation_errors.map((err: string) => (
+															<Badge key={err} color="red" size="xs" variant="light">
+																{err}
+															</Badge>
+														))}
+													</Flex>
+												</div>
+											)}
 											<div className="board-sync-options">
 												{board.sync_on_finalize && <Badge size="xs">Sync on Finalize</Badge>}
 												{board.sync_budget_used && <Badge size="xs">Budget Used</Badge>}
 											</div>
 										</div>
 										<div className="board-card-actions">
+											<Tooltip label="Sync board now">
+												<IconButton variant="light" color="blue" onClick={() => handleSyncBoard(board.board_id)} loading={syncingBoards[board.board_id]}>
+													<Icon name="sync" size={21} />
+												</IconButton>
+											</Tooltip>
 											<Tooltip label="Edit configuration">
 												<IconButton variant="light" onClick={() => handleOpenBoardModal(board)}>
 													<Icon name="edit" size={21} />

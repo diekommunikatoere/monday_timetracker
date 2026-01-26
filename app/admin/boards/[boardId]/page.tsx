@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
 import { Button, IconButton } from "@/components";
@@ -572,7 +573,7 @@ export default function BoardConfigPage() {
 		<div id="admin-app">
 			<header className="admin-header">
 				<Flex align="center" gap={16}>
-					<Button variant="subtle" leftSection={<IconArrowLeft />} onClick={() => router.push("/admin")}>
+					<Button variant="subtle" leftSection={<IconArrowLeft />} onClick={() => router.back()}>
 						Back
 					</Button>
 					<Logo size={{ width: 150, height: 26 }} style="brand" />
@@ -580,9 +581,13 @@ export default function BoardConfigPage() {
 			</header>
 
 			<Breadcrumbs mb="md">
-				<Anchor href="/admin">Admin</Anchor>
-				<Anchor href="/admin">Boards</Anchor>
-				<Text>{(boardConfig as any).board_name || boardConfig.board_id}</Text>
+				<Anchor component={Link} href="/admin">
+					Admin
+				</Anchor>
+				<Anchor component={Link} href="/admin?tab=boards">
+					Boards
+				</Anchor>
+				<Text>{(boardConfig as any).monday_board?.name || (boardConfig as any).board_name || boardConfig.board_id}</Text>
 			</Breadcrumbs>
 
 			{error && <div className="admin-error">{error}</div>}

@@ -235,6 +235,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 		);
 	}
 
+	console.log("Rendering TimeEntriesTable with entries:", timeEntries);
+
 	return (
 		<>
 			<Table striped highlightOnHover withColumnBorders withTableBorder withRowBorders>

@@ -25,9 +25,54 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: `Failed to fetch board configurations: ${error.message}` }, { status: 500 });
 		}
 
+		// Fetch last sync for each board
+		const boardIds = boards?.map((b) => b.board_id) || [];
+		let lastSyncs: Record<string, any> = {};
+
+		if (boardIds.length > 0) {
+			const { data: syncLogs } = await supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false });
+
+			// Group by board_id and take the first (latest) one
+			if (syncLogs) {
+				syncLogs.forEach((log: any) => {
+					if (!lastSyncs[log.board_id]) {
+						lastSyncs[log.board_id] = log;
+					}
+				});
+			}
+		}
+
+		const boardsWithStatus = boards?.map((board) => {
+			const lastSync = lastSyncs[board.board_id];
+			const validationErrors: string[] = [];
+
+			// Mandatory linking errors (RED)
+			if (!board.budget_column_id) {
+				validationErrors.push("Missing Budget Column");
+			}
+			if (board.sync_linked_items && !board.linked_board_id) {
+				validationErrors.push("Missing Linked Board");
+			}
+
+			let configStatus = "GREEN";
+			if (validationErrors.length > 0) {
+				configStatus = "RED";
+			} else if (!board.sync_enabled || (lastSync && !lastSync.success)) {
+				configStatus = "YELLOW";
+			}
+
+			return {
+				...board,
+				last_sync: lastSync?.created_at || null,
+				sync_success: lastSync?.success ?? null,
+				config_status: configStatus,
+				validation_errors: validationErrors,
+			};
+		});
+
 		return NextResponse.json({
 			success: true,
-			boards: boards || [],
+			boards: boardsWithStatus || [],
 			count: boards?.length || 0,
 		});
 	} catch (error) {

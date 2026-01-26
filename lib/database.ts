@@ -1,9 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { cacheHelper } from "@/lib/redis";
 import type { Database, FinalizeSegmentResult } from "@/types/database";
+import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
 
 type TimeEntry = Database["public"]["Tables"]["time_entry"]["Row"];
-type TimeEntryWithRole = TimeEntry & { role: { name: string } };
+type TimeEntryWithRole = FrontendTimeEntry;
 type TimeEntryInsert = Database["public"]["Tables"]["time_entry"]["Insert"];
 type TimeEntryUpdate = Database["public"]["Tables"]["time_entry"]["Update"];
 type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
@@ -18,6 +19,8 @@ export interface DimensionMetadata {
 	board_name?: string;
 	item_name?: string;
 	parent_item_name?: string;
+	role_name?: string;
+	task_name?: string;
 }
 
 /**
@@ -116,8 +119,8 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 		throw new Error("user_id is required to create a time entry");
 	}
 
-	// Extract dimension metadata
-	const { board_name, item_name, parent_item_name, ...cleanEntry } = entry;
+	// Extract dimension metadata and other non-database fields
+	const { board_name, item_name, parent_item_name, role_name, task_name, ...cleanEntry } = entry;
 
 	// UPSERT dimension tables if names are provided
 	if (cleanEntry.board_id && board_name) {
@@ -412,8 +415,8 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 		throw error;
 	}
 
-	// Extract dimension metadata
-	const { board_name, item_name, parent_item_name, ...cleanUpdates } = updates;
+	// Extract dimension metadata and other non-database fields
+	const { board_name, item_name, parent_item_name, role_name, task_name, id: _id, ...cleanUpdates } = updates;
 
 	// UPSERT dimension tables if names are provided
 	if (cleanUpdates.board_id && board_name) {
