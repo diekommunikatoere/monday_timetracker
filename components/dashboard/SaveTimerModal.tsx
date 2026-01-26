@@ -231,6 +231,36 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 		[startTime, secondsToDuration, isLocked],
 	);
 
+	// Handle setting start time to now with duration consistency
+	const handleStartTimeNowClick = useCallback(() => {
+		const now = getCurrentTimeString();
+		const currentDurationSeconds = calculateDurationBetweenTimes(startTime, endTime);
+		updateSource.current = "times";
+
+		// Update Start Time to Now and shift End Time to maintain duration
+		setStartTime(now);
+		const newEndTime = addSecondsToTimeString(now, currentDurationSeconds);
+		setEndTime(newEndTime);
+
+		// Manual adjustment via "Now" button unlocks the end time
+		if (isLocked) setIsLocked(false);
+	}, [startTime, endTime, isLocked]);
+
+	// Handle setting end time to now with duration consistency
+	const handleEndTimeNowClick = useCallback(() => {
+		const now = getCurrentTimeString();
+		const currentDurationSeconds = calculateDurationBetweenTimes(startTime, endTime);
+		updateSource.current = "times";
+
+		// Update End Time to Now and shift Start Time to maintain duration
+		setEndTime(now);
+		const newStartTime = subtractSecondsFromTimeString(now, currentDurationSeconds);
+		setStartTime(newStartTime);
+
+		// Manual adjustment via "Now" button unlocks the end time
+		if (isLocked) setIsLocked(false);
+	}, [startTime, endTime, isLocked]);
+
 	const handleTaskSelection = (taskData: TaskSelection) => {
 		setSelectedTask(taskData);
 	};
@@ -349,13 +379,32 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 					<Flex gap="md" direction="column">
 						<Flex gap="sm">
-							<TimeInput label="Startzeit" value={startTime} onChange={(event) => handleStartTimeChange(event.currentTarget.value)} style={{ flex: 1 }} />
+							<TimeInput
+								label="Startzeit"
+								value={startTime}
+								onChange={(event) => handleStartTimeChange(event.currentTarget.value)}
+								leftSection={
+									<Tooltip label="Jetzt" position="top" withArrow>
+										<IconButton variant="filled" color="var(--color--background-secondary)" onClick={handleStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
+											<Icon name="today" size={16} color="var(--color--text-secondary)" />
+										</IconButton>
+									</Tooltip>
+								}
+								style={{ flex: 1 }}
+							/>
 							<TimeInput
 								label="Endzeit"
 								value={endTime}
 								onChange={(event) => handleEndTimeChange(event.currentTarget.value)}
 								style={{ flex: 1 }}
 								disabled={isLocked}
+								leftSection={
+									<Tooltip label="Jetzt" position="top" withArrow>
+										<IconButton variant="filled" color="var(--color--background-secondary)" onClick={handleEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
+											<Icon name="today" size={16} color="var(--color--text-secondary)" />
+										</IconButton>
+									</Tooltip>
+								}
 								rightSection={
 									<Tooltip label={isLocked ? "Endzeit fixiert (Live)" : "Endzeit fixieren"} position="top" withArrow>
 										<IconButton variant="filled" color={isLocked ? "var(--color--primary)" : "var(--color--background-secondary)"} onClick={() => setIsLocked(!isLocked)} aria-label="Endzeit fixieren">

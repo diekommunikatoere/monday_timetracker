@@ -31,4 +31,5 @@ export { default as save } from "@/components/icons/Save";
 export { default as search } from "@/components/icons/Search";
 export { default as settings } from "@/components/icons/Settings";
 export { default as star } from "@/components/icons/Star";
+export { default as today } from "@/components/icons/Today";
 export { default as unlock } from "@/components/icons/Unlock";
