@@ -1,0 +1,9 @@
+.selectOption {
+	&[aria-selected="true"] {
+		background-color: var(--color--background-secondary);
+	}
+	svg {
+		color: var(--color--primary);
+		opacity: 1;
+	}
+}

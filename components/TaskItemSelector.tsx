@@ -9,6 +9,8 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
 import RefreshIcon from "@/components/icons/Refresh";
 
+import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
+
 // Selection data type passed to parent
 export interface TaskSelection {
 	boardId?: string;
@@ -180,8 +182,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// OPTIMIZATION: Prefetch tasks for all boards when boards are loaded
 	useEffect(() => {
 		if (boards.length > 0) {
-			console.log(`[TaskItemSelector] Prefetching tasks for ${boards.length} boards`);
-
 			// Prefetch with a slight stagger to avoid overwhelming the API
 			boards.forEach((board: DropdownOption, index: number) => {
 				setTimeout(() => {
@@ -249,7 +249,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				await queryClient.invalidateQueries({
 					queryKey: ["tasks", selectedBoard.value],
 				});
-				console.log(`[TaskItemSelector] Tasks refreshed for board ${selectedBoard.value}`);
 			} else {
 				setError("Fehler beim Aktualisieren der Aufgaben");
 			}
@@ -353,8 +352,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Handle task selection
 	const handleTaskChange = useCallback(
 		(value: string | null, option: ComboboxItem) => {
-			console.log("handleTaskChange", value, option);
-
 			// Find the full option object from state to ensure we have all properties
 			// Mantine's Select might strip extra properties from the option argument
 			let fullOption: DropdownOption | null = null;
@@ -430,7 +427,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 							Board auswählen
 						</Text>
 					</label>
-					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" />
+					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" classNames={{ option: styles.selectOption }} />
 				</div>
 			)}
 
@@ -476,6 +473,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 								</Text>
 							) : undefined
 						}
+						classNames={{ option: styles.selectOption }}
 					/>
 				</div>
 			)}
@@ -495,7 +493,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 							Rolle auswählen
 						</Text>
 					</label>
-					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" />
+					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" classNames={{ option: styles.selectOption }} />
 				</div>
 			)}
 		</Flex>
