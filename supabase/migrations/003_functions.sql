@@ -39,7 +39,7 @@ BEGIN
     SELECT
         te.id,
         te.user_id,
-        COALESCE(mi.name, 'Unbenannter Zeiteintrag') as task_name,
+        COALESCE(mi.name, 'Unzugeordneter Zeiteintrag') as task_name,
         te.start_time,
         te.end_time,
         te.duration,
@@ -241,7 +241,8 @@ CREATE OR REPLACE FUNCTION public.finalize_time_entry(
     p_duration INTEGER DEFAULT NULL,
     p_parent_item_id TEXT DEFAULT NULL,
     p_parent_item_name TEXT DEFAULT NULL,
-    p_date TIMESTAMPTZ DEFAULT NULL
+    p_date TIMESTAMPTZ DEFAULT NULL,
+    p_is_draft BOOLEAN DEFAULT false
 )
 RETURNS jsonb AS $$
 DECLARE
@@ -341,7 +342,7 @@ BEGIN
     item_id = p_item_id,
     role_id = p_role_id,
     parent_item_id = p_parent_item_id,
-    is_draft = false,
+    is_draft = p_is_draft,
     timer_session = CASE
       WHEN v_has_session THEN to_jsonb(v_updated_session)
       ELSE timer_session
@@ -369,7 +370,8 @@ BEGIN
         p_user_id := p_user_id,
         p_draft_id := p_draft_id,
         p_task_name := p_task_name,
-        p_comment := p_comment
+        p_comment := p_comment,
+        p_is_draft := true
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

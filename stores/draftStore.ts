@@ -114,7 +114,7 @@ export const useDraftStore = create<DraftState>()(
 				set({ isSaving: true, error: null });
 
 				try {
-					const finalTaskName = taskName && taskName.trim() ? taskName : "Ungespeicherter Zeiteintrag";
+					const finalTaskName = taskName && taskName.trim() ? taskName : "Unzugeordneter Zeiteintrag";
 					console.log("finalizing draft with: ", userProfileId, draftId, finalTaskName, comment);
 
 					// Call RPC with supabase user_id (from user_profiles.id mapped from monday_user_id)
@@ -167,6 +167,6 @@ export const useDraftStore = create<DraftState>()(
 				taskName: state.taskName,
 				// Don't persist saving states or timers
 			}),
-		}
-	)
+		},
+	),
 );
