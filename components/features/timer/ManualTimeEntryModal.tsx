@@ -216,7 +216,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	};
 
 	return (
-		<Modal show={show} onClose={onClose}>
+		<Modal show={show} onClose={onClose} size={"lg"}>
 			<Modal.Header>Zeit eintragen</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">

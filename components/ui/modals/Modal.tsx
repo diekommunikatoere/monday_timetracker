@@ -10,9 +10,10 @@ import "@/components/styles/ui/modals/Modal.module.css";
 
 const ModalRoot: React.FC<ModalProps> & ModalCompoundComponent = ({ children, show = false, onClose, ...props }) => {
 	return (
-		<MantineModal opened={show} onClose={onClose || (() => {})} className="modal" {...props}>
-			{children}
-		</MantineModal>
+		<MantineModal.Root opened={show} onClose={onClose || (() => {})} className="modal" {...props}>
+			<MantineModal.Overlay />
+			<MantineModal.Content>{children}</MantineModal.Content>
+		</MantineModal.Root>
 	);
 };
 

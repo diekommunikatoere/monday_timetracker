@@ -224,12 +224,8 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	};
 
 	return (
-		<Modal show={show} onClose={onClose}>
-			<Modal.Header>
-				<Text size="lg" fw={600}>
-					Timer speichern
-				</Text>
-			</Modal.Header>
+		<Modal show={show} onClose={onClose} size={"lg"}>
+			<Modal.Header>Zeiteintrag speichern</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
 					{error && <Text c="dki-error">{error}</Text>}

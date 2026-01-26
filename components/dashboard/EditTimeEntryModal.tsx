@@ -179,12 +179,8 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	};
 
 	return (
-		<Modal show={show} onClose={onClose}>
-			<Modal.Header>
-				<Text size="lg" fw={600}>
-					Zeiteintrag bearbeiten
-				</Text>
-			</Modal.Header>
+		<Modal show={show} onClose={onClose} size={"lg"}>
+			<Modal.Header>Zeiteintrag bearbeiten</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
 					{error && <Text c="dki-error">{error}</Text>}

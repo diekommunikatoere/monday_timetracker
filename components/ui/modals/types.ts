@@ -3,6 +3,7 @@ import { ModalProps as MantineModalProps } from "@mantine/core";
 
 export interface ModalProps extends Omit<MantineModalProps, "opened" | "onClose"> {
 	children: React.ReactNode;
+	title?: string;
 	show?: boolean;
 	onClose?: () => void;
 }
