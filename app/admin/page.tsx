@@ -47,7 +47,7 @@ export default function AdminPage() {
 	const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({});
 
 	// Monday context
-	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
+	const { rawContext, initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
 	const isAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
 
 	// Initialize Monday context on mount
@@ -308,10 +308,20 @@ export default function AdminPage() {
 	};
 
 	const handleSyncBoard = async (boardId: string) => {
+		console.log(`[handleSyncBoard] Syncing board ${boardId}`);
+		console.log(`[handleSyncBoard] rawContext available:`, !!rawContext);
+
 		setSyncingBoards((prev) => ({ ...prev, [boardId]: true }));
 		try {
+			const headers: Record<string, string> = {};
+			if (rawContext) {
+				headers["monday-context"] = JSON.stringify(rawContext);
+				console.log("[handleSyncBoard] Added monday-context header");
+			}
+
 			const response = await fetch(`/api/sync/board/${boardId}`, {
 				method: "POST",
+				headers,
 			});
 
 			const data = await response.json();
@@ -517,23 +527,23 @@ export default function AdminPage() {
 										</div>
 										<div className="board-card-actions">
 											<Tooltip label="Sync board now">
-												<IconButton variant="light" color="blue" onClick={() => handleSyncBoard(board.board_id)} loading={syncingBoards[board.board_id]}>
-													<Icon name="sync" size={21} />
+												<IconButton variant="filled" color="var(--color--background-secondary)" onClick={() => handleSyncBoard(board.board_id)} loading={syncingBoards[board.board_id]}>
+													<Icon name="refresh" size={21} color={"var(--color--text-primary)"} />
 												</IconButton>
 											</Tooltip>
 											<Tooltip label="Edit configuration">
-												<IconButton variant="light" onClick={() => handleOpenBoardModal(board)}>
-													<Icon name="edit" size={21} />
+												<IconButton variant="filled" color="var(--color--background-secondary)" onClick={() => handleOpenBoardModal(board)}>
+													<Icon name="edit" size={21} color={"var(--color--text-primary)"} />
 												</IconButton>
 											</Tooltip>
 											<Tooltip label="Configure columns">
-												<IconLink variant="light" href={`/admin/boards/${board.board_id}`}>
-													<Icon name="settings" size={21} />
+												<IconLink variant="filled" color="var(--color--background-secondary)" href={`/admin/boards/${board.board_id}`}>
+													<Icon name="settings" size={21} color={"var(--color--text-primary)"} />
 												</IconLink>
 											</Tooltip>
 											<Tooltip label="Delete configuration">
-												<IconButton variant="light" color="red" onClick={() => handleDeleteBoard(board)}>
-													<Icon name="delete" size={21} />
+												<IconButton variant="filled" color="var(--color--primary)" onClick={() => handleDeleteBoard(board)}>
+													<Icon name="delete" size={21} color={"var(--color--text-on-primary)"} />
 												</IconButton>
 											</Tooltip>
 										</div>
