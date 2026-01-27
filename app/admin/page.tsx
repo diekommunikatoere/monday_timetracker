@@ -10,13 +10,10 @@ import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import type { Role, BoardConfig } from "@/types/database";
 
-import { ConfigurationWizard } from "@/components/features/admin/ConfigurationWizard";
-
 import "@/public/css/components/AdminPage.css";
 
 export default function AdminPage() {
 	const [activeTab, setActiveTab] = useState<string | null>("roles");
-	const [showWizard, setShowWizard] = useState(false);
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [boards, setBoards] = useState<BoardConfig[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -460,19 +457,9 @@ export default function AdminPage() {
 								<h2>Board Configurations</h2>
 								<p className="admin-section-description">Configure which boards sync time data to monday.com columns.</p>
 							</div>
-							<Group>
-								<Button variant="light" leftSection={<Icon name="settings" size={21} />} onClick={() => setShowWizard(!showWizard)}>
-									{showWizard ? "Show Table View" : "Guided Configuration"}
-								</Button>
-								<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBoardModal()}>
-									Add Board
-								</Button>
-							</Group>
 						</div>
 
-						{showWizard ? (
-							<ConfigurationWizard />
-						) : loading ? (
+						{loading ? (
 							<div className="admin-loading">
 								<Loader />
 							</div>

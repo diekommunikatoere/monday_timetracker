@@ -14,6 +14,7 @@ import { useToast } from "@/components/ToastProvider";
 import { Icon } from "@/components";
 import mondaySdk from "monday-sdk-js";
 import { ButtonGroup } from "@/components";
+import { combineDateAndTime } from "@/lib/utils";
 
 const monday = mondaySdk();
 
@@ -169,9 +170,8 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 			console.log("selectedTask", selectedTask);
 
 			// Build full ISO date-time strings from date + time inputs
-			const dateStr = date.toISOString().split("T")[0]; // YYYY-MM-DD
-			const startTimeIso = `${dateStr}T${startTime}:00`;
-			const endTimeIso = `${dateStr}T${endTime}:00`;
+			const startTimeIso = combineDateAndTime(date, startTime);
+			const endTimeIso = combineDateAndTime(date, endTime);
 
 			// Create manual time entry
 			const response = await fetch("/api/time-entries/manual", {

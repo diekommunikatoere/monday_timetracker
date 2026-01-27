@@ -77,6 +77,20 @@ export function roundDuration(seconds: number): number {
 }
 
 /**
+ * Combines a Date object and a HH:MM time string into a UTC ISO string,
+ * treating the time string as being in the user's local timezone.
+ * @param date - The Date object representing the day
+ * @param timeStr - The time string in "HH:MM" format (local time)
+ * @returns UTC ISO string
+ */
+export function combineDateAndTime(date: Date, timeStr: string): string {
+	const [hours, minutes] = timeStr.split(":").map(Number);
+	const combined = new Date(date);
+	combined.setHours(hours, minutes, 0, 0);
+	return combined.toISOString();
+}
+
+/**
  *
  * - only create segments when timer is running
  * - when pausing, close current segment and don't create a new segment

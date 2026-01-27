@@ -14,7 +14,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import mondaySdk from "monday-sdk-js";
 import { Icon } from "@/components";
-import { roundDuration } from "@/lib/utils";
+import { roundDuration, combineDateAndTime } from "@/lib/utils";
 
 import "@mantine/dates/styles.css";
 import "@/public/css/components/SaveTimerModal.css";
@@ -287,10 +287,29 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			// Use actual task name from selection, with fallback
 			const taskName = selectedTask.itemName || "Unbenannter Zeit-Eintrag";
 
+			// Build full ISO date-time strings from date + time inputs
+			const startTimeIso = combineDateAndTime(date, startTime);
+			const endTimeIso = combineDateAndTime(date, endTime);
+
 			// Get fresh context for the API call
 			const context = rawContext || (await monday.get("context"));
 
-			console.log("Trying to save time entry with: ", { draftId: activeDraftId, taskName, comment, boardId: selectedTask.boardId, boardName: selectedTask.boardName, itemId: selectedTask.itemId, itemName: selectedTask.itemName, parentItemId: selectedTask.parentItemId || null, parentItemName: selectedTask.parentItemName || null, roleId: selectedTask.roleId, duration: durationSeconds, date: date.toISOString() });
+			console.log("Trying to save time entry with: ", {
+				draftId: activeDraftId,
+				taskName,
+				comment,
+				boardId: selectedTask.boardId,
+				boardName: selectedTask.boardName,
+				itemId: selectedTask.itemId,
+				itemName: selectedTask.itemName,
+				parentItemId: selectedTask.parentItemId || null,
+				parentItemName: selectedTask.parentItemName || null,
+				roleId: selectedTask.roleId,
+				duration: durationSeconds,
+				date: date.toISOString(),
+				startTime: startTimeIso,
+				endTime: endTimeIso,
+			});
 
 			// Call API route to finalize time entry
 			const response = await fetch("/api/time-entries/finalize", {
@@ -312,6 +331,8 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 					roleId: selectedTask.roleId,
 					duration: durationSeconds,
 					date: date.toISOString(),
+					startTime: startTimeIso,
+					endTime: endTimeIso,
 				}),
 			});
 

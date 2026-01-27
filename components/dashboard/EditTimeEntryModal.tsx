@@ -14,6 +14,7 @@ import { useToast } from "@/components/ToastProvider";
 import { TimeEntry } from "@/types/time-entry";
 import { Icon } from "@/components";
 import mondaySdk from "monday-sdk-js";
+import { combineDateAndTime } from "@/lib/utils";
 
 import "@mantine/dates/styles.css";
 
@@ -257,21 +258,10 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 		setError(null);
 
 		try {
-			console.log("patching entry", entry.id, "with data: ", {
-				id: entry.id,
-				task_name: taskName || selectedTask.itemName,
-				comment,
-				board_id: selectedTask.boardId,
-				board_name: selectedTask.boardName,
-				item_id: selectedTask.itemId,
-				item_name: selectedTask.itemName,
-				parent_item_id: selectedTask.parentItemId || null,
-				parent_item_name: selectedTask.parentItemName || null,
-				role_id: selectedTask.roleId,
-				duration: durationSeconds,
-				start_time: date.toISOString(),
-				expectedUpdatedAt: entry.updated_at,
-			});
+			// Build full ISO date-time strings from date + time inputs
+			const startTimeIso = combineDateAndTime(date, startTime);
+			const endTimeIso = combineDateAndTime(date, endTime);
+
 			const response = await fetch(`/api/time-entries/${entry.id}`, {
 				method: "PATCH",
 				headers: {
@@ -290,7 +280,8 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 					parent_item_name: selectedTask.parentItemName || null,
 					role_id: selectedTask.roleId,
 					duration: durationSeconds,
-					start_time: date.toISOString(),
+					start_time: startTimeIso,
+					end_time: endTimeIso,
 					expectedUpdatedAt: entry.updated_at, // Optimistic locking
 				}),
 			});

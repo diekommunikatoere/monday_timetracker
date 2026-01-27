@@ -17,6 +17,8 @@ interface FinalizeTimeEntryRequest {
 	roleId?: string;
 	duration?: number; // in seconds, optional override
 	date?: string; // ISO date string, optional override
+	startTime?: string; // ISO date-time string (preferred)
+	endTime?: string; // ISO date-time string (preferred)
 }
 
 export async function POST(request: NextRequest) {
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: FinalizeTimeEntryRequest = await request.json();
-		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date } = body;
+		const { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date, startTime, endTime } = body;
 
 		// Validate required fields
 		if (!draftId) {
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// If duration and date are provided, update the draft entry first
-		if (duration !== undefined || date !== undefined) {
+		if (duration !== undefined || date !== undefined || startTime || endTime) {
 			// Get the current draft to calculate new timestamps
 			const { data: draft, error: draftError } = await supabaseAdmin.from("time_entry").select("start_time, duration").eq("id", draftId).single();
 
@@ -61,16 +63,25 @@ export async function POST(request: NextRequest) {
 			// Calculate new timestamps
 			const rawDuration = duration !== undefined ? duration : draft.duration;
 			const newDuration = roundDuration(rawDuration);
-			const newStartTime = date ? new Date(date).toISOString() : draft.start_time;
-			const newEndTime = new Date(new Date(newStartTime).getTime() + newDuration * 1000).toISOString();
+
+			let finalStartTime: string;
+			let finalEndTime: string;
+
+			if (startTime && endTime) {
+				finalStartTime = new Date(startTime).toISOString();
+				finalEndTime = new Date(endTime).toISOString();
+			} else {
+				finalStartTime = date ? new Date(date).toISOString() : draft.start_time;
+				finalEndTime = new Date(new Date(finalStartTime).getTime() + newDuration * 1000).toISOString();
+			}
 
 			// Update the draft with new duration and timestamps
 			const { error: updateError } = await supabaseAdmin
 				.from("time_entry")
 				.update({
 					duration: newDuration,
-					start_time: newStartTime,
-					end_time: newEndTime,
+					start_time: finalStartTime,
+					end_time: finalEndTime,
 				})
 				.eq("id", draftId);
 

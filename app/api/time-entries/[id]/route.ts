@@ -20,8 +20,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		const body = await request.json();
 		const { expectedUpdatedAt, ...updates } = body;
 
-		console.log("[API] PATCH request:", request);
-		console.log("params: ", paramsData);
 		console.log("[API] Updating time entry:", id, "with updates:", updates, "by user:", userId);
 
 		// Update time entry with optimistic locking
@@ -45,7 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 						error: "Concurrent modification detected",
 						message: "This entry was modified by another user. Please refresh and try again.",
 					},
-					{ status: 409 }
+					{ status: 409 },
 				);
 			}
 			throw error;
