@@ -108,7 +108,6 @@ export interface TimerControlsProps {
 	hasComment: boolean;
 	isSaving: boolean;
 	onPlayPause: () => void;
-	onSaveAsDraft: () => void;
 	onSave: () => void;
 }
 
@@ -119,6 +118,9 @@ export interface TimerCommentFieldProps {
 	value: string;
 	onChange: (value: string) => void;
 	disabled: boolean;
+	hasSession: boolean;
+	isSaving: boolean;
+	onSaveAsDraft: () => void;
 }
 
 // ============================================

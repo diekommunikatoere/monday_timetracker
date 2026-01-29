@@ -44,11 +44,11 @@ export function TimerContainer() {
 					<TimerDisplay elapsedTime={state.elapsedTime} status={state.status} onReset={actions.reset} disabled={!hasSession || state.isSaving} />
 
 					{/* Timer Controls - play/pause, save as draft, save buttons */}
-					<TimerControls status={state.status} hasSession={hasSession} hasComment={!!state.comment} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSaveAsDraft={actions.saveAsDraft} onSave={actions.openSaveModal} />
+					<TimerControls status={state.status} hasSession={hasSession} hasComment={!!state.comment} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSave={actions.openSaveModal} />
 				</Flex>
 
 				{/* Comment Field */}
-				<TimerComment value={state.comment} onChange={actions.updateComment} disabled={!hasSession} />
+				<TimerComment value={state.comment} onChange={actions.updateComment} disabled={!hasSession} hasSession={hasSession} isSaving={state.isSaving} onSaveAsDraft={actions.saveAsDraft} />
 			</Flex>
 		</Box>
 	);

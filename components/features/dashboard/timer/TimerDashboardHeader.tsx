@@ -27,7 +27,7 @@ export function TimerDashboardHeader(variant?) {
 		<>
 			<header id="appHeader" className={`widget-header ${variant}`}>
 				<Flex align="center" gap={16}>
-					<Logo size={{ width: 231, height: 40 }} style="brand" />
+					<Logo size={{ width: 186, height: 32 }} style="brand" />
 
 					<ManualTimeEntryButton
 						onClick={() => {

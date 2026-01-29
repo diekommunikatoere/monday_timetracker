@@ -1,5 +1,6 @@
 export { Icon } from "@/components/ui/icons/Icon";
 export { default as add } from "@/components/icons/Add";
+export { default as archive } from "@/components/icons/Archive";
 export { default as arrowBack } from "@/components/icons/ArrowBack";
 export { default as calendar } from "@/components/icons/Calendar";
 export { default as cancel } from "@/components/icons/Cancel";

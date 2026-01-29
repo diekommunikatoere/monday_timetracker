@@ -1,9 +1,8 @@
 // components/features/timer/TimerControls.tsx
 "use client";
 
-import { Tooltip } from "@mantine/core";
-import { IconButton, ButtonGroup } from "@/components";
-
+import { Flex, Tooltip } from "@mantine/core";
+import { IconButton } from "@/components";
 import { Icon } from "@/components";
 import type { TimerControlsProps } from "@/types/timer.types";
 import styles from "@/components/styles/features/timer/TimerControls.module.css";
@@ -24,33 +23,28 @@ import styles from "@/components/styles/features/timer/TimerControls.module.css"
  * @param onSaveAsDraft - Callback for save as draft button
  * @param onSave - Callback for save button (opens modal)
  */
-export function TimerControls({ status, hasSession, hasComment, isSaving, onPlayPause, onSaveAsDraft, onSave }: TimerControlsProps) {
+export function TimerControls({ status, hasSession, hasComment, isSaving, onPlayPause, onSave }: TimerControlsProps) {
 	const isRunning = status === "running";
 
 	const activeColor = "white";
 	const disabledColor = "var(--color--tertiary)";
 
 	// Determine which icon to show for play/pause button
-	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} /> : <Icon name="play" color={activeColor} />;
+	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} size={21} /> : <Icon name="play" color={activeColor} size={21} />;
 
 	return (
-		<ButtonGroup>
+		<Flex direction="row" align="center" justify="center" gap="4px">
 			<Tooltip label={isRunning ? "Timer pausieren" : "Timer starten"} position="top" withArrow>
-				<IconButton className={`button button--timer play-pause ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onPlayPause} disabled={isSaving} loading={isSaving}>
+				<IconButton className={`button button--timer play-pause ${styles.timerIconButton}`} variant="filled" size="lg" onClick={onPlayPause} disabled={isSaving} loading={isSaving}>
 					{PlayPauseIcon}
 				</IconButton>
 			</Tooltip>
-			<Tooltip label="Als Entwurf speichern" position="top" withArrow>
-				<IconButton className={`button button--timer draft" ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onSaveAsDraft} disabled={!hasSession || /* !hasComment || */ isSaving} loading={isSaving}>
-					<Icon name="moveDown" color={hasSession ? activeColor : disabledColor} />
-				</IconButton>
-			</Tooltip>
 			<Tooltip label="Speichern" position="top" withArrow>
-				<IconButton className={`button button--timer save ${styles.timerIconButton}`} variant="filled" size="xl" onClick={onSave} disabled={!hasSession || isSaving} loading={isSaving}>
-					<Icon name="save" color={hasSession ? activeColor : disabledColor} />
+				<IconButton className={`button button--timer save ${styles.timerIconButton}`} variant="filled" size="lg" onClick={onSave} disabled={!hasSession || isSaving} loading={isSaving}>
+					<Icon name="save" color={hasSession ? activeColor : disabledColor} size={21} />
 				</IconButton>
 			</Tooltip>
-		</ButtonGroup>
+		</Flex>
 	);
 }
 
