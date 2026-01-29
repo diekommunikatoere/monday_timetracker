@@ -27,48 +27,7 @@ interface EditTimeEntryModalProps {
 	onSaved: () => void;
 }
 
-// Helper to get current time as HH:MM string
-const getCurrentTimeString = (): string => {
-	const now = new Date();
-	return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-};
-
-// Helper to add duration (in seconds) to a time string HH:MM and return new HH:MM
-const addSecondsToTimeString = (timeStr: string, seconds: number): string => {
-	const [hours, minutes] = timeStr.split(":").map(Number);
-	const totalMinutes = (hours || 0) * 60 + (minutes || 0) + Math.floor(seconds / 60);
-	const newHours = Math.floor(totalMinutes / 60) % 24; // Wrap around at 24 hours
-	const newMinutes = totalMinutes % 60;
-	return `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`;
-};
-
-// Helper to subtract duration (in seconds) from a time string HH:MM and return new HH:MM
-const subtractSecondsFromTimeString = (timeStr: string, seconds: number): string => {
-	const [hours, minutes] = timeStr.split(":").map(Number);
-	let totalMinutes = (hours || 0) * 60 + (minutes || 0) - Math.floor(seconds / 60);
-	if (totalMinutes < 0) {
-		totalMinutes += 24 * 60; // Wrap around for previous day
-	}
-	const newHours = Math.floor(totalMinutes / 60) % 24;
-	const newMinutes = totalMinutes % 60;
-	return `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`;
-};
-
-// Helper to calculate duration in seconds between two time strings HH:MM
-const calculateDurationBetweenTimes = (startTime: string, endTime: string): number => {
-	const [startHours, startMinutes] = startTime.split(":").map(Number);
-	const [endHours, endMinutes] = endTime.split(":").map(Number);
-
-	const startTotalMinutes = (startHours || 0) * 60 + (startMinutes || 0);
-	let endTotalMinutes = (endHours || 0) * 60 + (endMinutes || 0);
-
-	// Handle case where end time is before start time (next day)
-	if (endTotalMinutes < startTotalMinutes) {
-		endTotalMinutes += 24 * 60; // Add 24 hours
-	}
-
-	return (endTotalMinutes - startTotalMinutes) * 60; // Return seconds
-};
+import { getCurrentTimeString, addSecondsToTimeString, subtractSecondsFromTimeString, calculateDurationBetweenTimes, durationToSeconds, secondsToDuration } from "@/lib/utils";
 
 export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: EditTimeEntryModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
