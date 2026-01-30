@@ -8,6 +8,7 @@ import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
+import { APP_VERSION } from "@/lib/version";
 
 console.log("DashboardPage component loaded");
 
@@ -54,7 +55,7 @@ export default function DashboardPage() {
 				<TimerDashboardHeader variant="dashboard" />
 				<TimeEntriesTable timeEntries={timeEntries} loading={loading} error={error} onRefetch={() => refetch(userId!)} />
 				<Flex style={{ position: "fixed", bottom: 10, right: 10, fontFamily: "var(--font--mono)", fontSize: "12px", lineHeight: "1", backgroundColor: "var(--color--background-secondary)", padding: "4px 8px", borderRadius: "4px", borderWidth: "1px", borderColor: "var(--color--primary)" }} direction="column" align="flex-end" gap="xs">
-					<span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+					<span>v{APP_VERSION}</span>
 				</Flex>
 			</div>
 		</TimeEntriesProvider>

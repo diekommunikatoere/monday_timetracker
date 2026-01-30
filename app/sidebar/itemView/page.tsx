@@ -12,6 +12,7 @@ import { TimeEntry } from "@/types/time-entry";
 import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
 import { useUserStore } from "@/stores/userStore";
 import { formatDuration } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 
 export default function ItemViewPage() {
 	const userId = useUserStore((state) => state.supabaseUser?.id);
@@ -118,6 +119,10 @@ export default function ItemViewPage() {
 					onSaved={() => refetch()}
 				/>
 			)}
+
+			<Flex style={{ position: "fixed", bottom: 10, right: 10, fontFamily: "var(--font--mono)", fontSize: "12px", lineHeight: "1", backgroundColor: "var(--color--background-secondary)", padding: "4px 8px", borderRadius: "4px", borderWidth: "1px", borderColor: "var(--color--primary)" }} direction="column" align="flex-end" gap="xs">
+				<span>v{APP_VERSION}</span>
+			</Flex>
 		</Flex>
 	);
 }
