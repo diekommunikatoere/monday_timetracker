@@ -302,18 +302,20 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			}));
 			setTasks(mappedTasks);
 			setError(null);
+		}
+	}, [tasksData, subItemsOnly]);
 
-			// Set initial task if provided
-			if (initialValues?.itemId && mappedTasks.length > 0 && !selectedTask) {
-				const allItems = mappedTasks.flatMap((group) => group.items);
-				const initialTask = allItems.find((task) => (task as DropdownOption).value === initialValues.itemId);
-				if (initialTask) {
-					// Need to cast because ComboboxItem doesn't guarantee label is string, but we know it is
-					setSelectedTask(initialTask as DropdownOption);
-				}
+	// Set initial task if provided
+	useEffect(() => {
+		if (initialValues?.itemId && tasks.length > 0 && !selectedTask) {
+			const allItems = tasks.flatMap((group) => group.items);
+			const initialTask = allItems.find((task) => (task as DropdownOption).value === initialValues.itemId);
+			if (initialTask) {
+				// Need to cast because ComboboxItem doesn't guarantee label is string, but we know it is
+				setSelectedTask(initialTask as DropdownOption);
 			}
 		}
-	}, [tasksData, initialValues?.itemId, selectedTask]);
+	}, [initialValues?.itemId, tasks, selectedTask]);
 
 	// Handle tasks error
 	useEffect(() => {

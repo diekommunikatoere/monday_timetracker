@@ -3,24 +3,20 @@
 
 import { Table, Checkbox, Center, Loader, Text } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
-import { TimeEntryRow } from "./TimeEntryRow";
 import { useMemo } from "react";
+import { ColumnDef } from "@/components/ui/tables/types";
 
 export interface TimeEntryTableProps {
 	timeEntries: TimeEntry[];
+	columns: ColumnDef<TimeEntry>[];
 	loading?: boolean;
 	error?: string | null;
-	selectedIds: string[];
-	onSelectRow: (id: string, selected: boolean) => void;
-	onSelectAll: (selected: boolean) => void;
-	onEdit?: (entry: TimeEntry) => void;
-	onDelete?: (entry: TimeEntry) => void;
-	currentUserId: string | undefined;
-	showUserColumn?: boolean;
-	showCheckbox?: boolean;
+	selectedIds?: string[];
+	onSelectRow?: (id: string, selected: boolean) => void;
+	onSelectAll?: (selected: boolean) => void;
 }
 
-export function TimeEntryTable({ timeEntries, loading, error, selectedIds, onSelectRow, onSelectAll, onEdit, onDelete, currentUserId, showCheckbox = false, showUserColumn = false }: TimeEntryTableProps) {
+export function TimeEntryTable({ timeEntries, columns, loading, error, selectedIds = [], onSelectRow, onSelectAll }: TimeEntryTableProps) {
 	const selectAllState = useMemo(() => {
 		const total = timeEntries.length;
 		const selected = selectedIds.length;
@@ -54,27 +50,28 @@ export function TimeEntryTable({ timeEntries, loading, error, selectedIds, onSel
 		);
 	}
 
+	const visibleColumns = columns.filter((col) => !col.hidden);
+
 	return (
-		<Table striped highlightOnHover withColumnBorders withTableBorder withRowBorders>
+		<Table highlightOnHover withColumnBorders withTableBorder withRowBorders>
 			<Table.Thead>
 				<Table.Tr bg="white">
-					{showCheckbox && (
-						<Table.Th style={{ width: 40 }}>
-							<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => onSelectAll(e.currentTarget.checked)} aria-label="Alle Zeiteinträge auswählen" />
+					{visibleColumns.map((col) => (
+						<Table.Th key={col.id} fw={600} style={{ width: col.width }} ta={col.align || "left"}>
+							{typeof col.header === "function" ? col.header({ data: timeEntries }) : col.header}
 						</Table.Th>
-					)}
-					{showUserColumn && <Table.Th fw={600}>Benutzer</Table.Th>}
-					<Table.Th fw={600}>Rolle</Table.Th>
-					<Table.Th fw={600}>Kommentar</Table.Th>
-					<Table.Th fw={600}>Datum</Table.Th>
-					<Table.Th fw={600}>Start</Table.Th>
-					<Table.Th fw={600}>Ende</Table.Th>
-					<Table.Th fw={600}>Gesamtzeit</Table.Th>
+					))}
 				</Table.Tr>
 			</Table.Thead>
 			<Table.Tbody>
-				{timeEntries.map((entry) => (
-					<TimeEntryRow key={entry.id} entry={entry} currentUserId={currentUserId} isSelected={selectedIds.includes(entry.id)} onSelect={onSelectRow} onEdit={onEdit} onDelete={onDelete} showUserColumn={showUserColumn} showCheckbox={showCheckbox} />
+				{timeEntries.map((entry, rowIndex) => (
+					<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id) ? "var(--color--primary-selected)" : undefined}>
+						{visibleColumns.map((col) => (
+							<Table.Td key={col.id} ta={col.align || "left"}>
+								{col.cell({ row: entry, index: rowIndex })}
+							</Table.Td>
+						))}
+					</Table.Tr>
 				))}
 			</Table.Tbody>
 		</Table>

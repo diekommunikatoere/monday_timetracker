@@ -13,6 +13,7 @@ import EditTimeEntryModal from "./EditTimeEntryModal";
 import BulkActionButtons from "./BulkActionButtons";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
+import { getDashboardColumns } from "../shared/time-entries/TimeEntryTableConfigs";
 import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
@@ -186,9 +187,17 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 		}
 	};
 
+	const columns = getDashboardColumns({
+		onEdit: handleEdit,
+		onDelete: handleDelete,
+		onSelectRow: handleRowSelect,
+		onSelectAll: handleSelectAll,
+		selectedIds,
+	});
+
 	return (
 		<>
-			<TimeEntryTable timeEntries={timeEntries} loading={loading} error={error} selectedIds={selectedIds} onSelectRow={handleRowSelect} onSelectAll={handleSelectAll} onEdit={handleEdit} onDelete={handleDelete} currentUserId={userId} showCheckbox={true} />
+			<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} />
 
 			<SaveTimerModal
 				show={showSaveModal}

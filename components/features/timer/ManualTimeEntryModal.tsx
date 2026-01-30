@@ -42,7 +42,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 			setSelectedTask(null);
 			setError(null);
 		}
-	}, [show, handlers]);
+	}, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleSave = async () => {
 		if (!selectedTask?.itemId || !userProfile?.id) {

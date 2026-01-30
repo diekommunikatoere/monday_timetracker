@@ -7,6 +7,7 @@ import { Icon } from "@/components";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
+import { getSidebarColumns } from "../shared/time-entries/TimeEntryTableConfigs";
 import { formatDuration } from "@/lib/utils";
 import { TimeEntry } from "@/types/time-entry";
 import { useToast } from "@/components/ToastProvider";
@@ -98,6 +99,11 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 
 	console.log("Grouped Entries:", groupedEntries);
 
+	const columns = getSidebarColumns({
+		onEdit,
+		onDelete: handleDeleteRequest,
+	});
+
 	return (
 		<Flex direction="column" style={{ height: "100%" }}>
 			{/* Aggregations by Role */}
@@ -148,7 +154,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 									</Group>
 								</Accordion.Control>
 								<Accordion.Panel>
-									<TimeEntryTable timeEntries={group.entries} selectedIds={selectedIds} onSelectRow={handleSelectRow} onSelectAll={handleSelectAll} onEdit={onEdit} onDelete={handleDeleteRequest} currentUserId={currentUserId} showUserColumn={false} />
+									<TimeEntryTable timeEntries={group.entries} columns={columns} />
 								</Accordion.Panel>
 							</Accordion.Item>
 						))}

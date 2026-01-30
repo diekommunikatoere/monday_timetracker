@@ -1,7 +1,7 @@
 // components/shared/hooks/useTimeEntryForm.ts
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { getCurrentTimeString, addSecondsToTimeString, subtractSecondsFromTimeString, calculateDurationBetweenTimes, durationToSeconds, secondsToDuration } from "@/lib/utils";
 
 export interface TimeEntryFormValues {
@@ -117,10 +117,19 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 		setIsLocked(!isLocked);
 	}, [isLocked]);
 
-	return {
-		values: { date, duration, startTime, endTime, comment },
-		isLocked,
-		handlers: {
+	const values = useMemo(
+		() => ({
+			date,
+			duration,
+			startTime,
+			endTime,
+			comment,
+		}),
+		[date, duration, startTime, endTime, comment],
+	);
+
+	const handlersObject = useMemo(
+		() => ({
 			setDate,
 			setComment,
 			handleStartTimeChange,
@@ -130,6 +139,13 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 			handleStartTimeNow,
 			handleEndTimeNow,
 			toggleLock,
-		},
+		}),
+		[setDate, setComment, handleStartTimeChange, handleEndTimeChange, handleDurationChange, adjustDuration, handleStartTimeNow, handleEndTimeNow, toggleLock],
+	);
+
+	return {
+		values,
+		isLocked,
+		handlers: handlersObject,
 	};
 }
