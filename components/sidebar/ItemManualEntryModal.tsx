@@ -1,54 +1,38 @@
-// components/features/timer/ManualTimeEntryModal.tsx
+// components/sidebar/ItemManualEntryModal.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { Group, Flex, Text } from "@mantine/core";
 import { Button, Modal } from "@/components";
-import TaskItemSelector, { TaskSelection } from "@/components/TaskItemSelector";
 import { useUserStore } from "@/stores/userStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { useMondayStore } from "@/stores/mondayStore";
+import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useToast } from "@/components/ToastProvider";
+import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
+import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { combineDateAndTime, durationToSeconds } from "@/lib/utils";
-import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFields";
-import { useTimeEntryForm } from "../../shared/hooks/useTimeEntryForm";
-import mondaySdk from "monday-sdk-js";
 
-const monday = mondaySdk();
-
-interface ManualTimeEntryModalProps {
+export interface ItemManualEntryModalProps {
 	show: boolean;
 	onClose: () => void;
+	itemId: string;
+	boardId: string;
+	itemName: string;
+	boardName: string;
+	roleId: string;
+	roleName: string;
 }
 
-export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProps) {
-	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
+export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, roleId, roleName }: ItemManualEntryModalProps) {
+	const { values, isLocked, handlers } = useTimeEntryForm();
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const { values, isLocked, handlers } = useTimeEntryForm();
-
-	const { refetch } = useTimeEntriesStore();
-	const { rawContext } = useMondayStore();
+	const { refetch } = useItemTimeEntriesStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
-	// Reset form when modal opens
-	useEffect(() => {
-		if (show) {
-			handlers.setDate(new Date());
-			handlers.handleDurationChange("00:00");
-			handlers.setComment("");
-			setSelectedTask(null);
-			setError(null);
-		}
-	}, [show, handlers]);
-
 	const handleSave = async () => {
-		if (!selectedTask?.itemId || !userProfile?.id) {
-			console.error("Cannot save: missing required data");
-			return;
-		}
+		if (!userProfile?.id) return;
 
 		const durationSeconds = durationToSeconds(values.duration);
 		if (durationSeconds === 0) {
@@ -60,7 +44,6 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 		setError(null);
 
 		try {
-			const context = rawContext || (await monday.get("context"));
 			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = combineDateAndTime(values.date, values.endTime);
 
@@ -68,19 +51,16 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"monday-context": JSON.stringify(context),
+					userId: userProfile.id,
 				},
 				body: JSON.stringify({
-					userId: userProfile.id,
-					taskName: selectedTask.itemName,
+					task_name: itemName,
 					comment: values.comment,
-					boardId: selectedTask.boardId,
-					boardName: selectedTask.boardName,
-					itemId: selectedTask.itemId,
-					itemName: selectedTask.itemName,
-					parentItemId: selectedTask.parentItemId,
-					parentItemName: selectedTask.parentItemName,
-					roleId: selectedTask.roleId,
+					board_id: boardId,
+					board_name: boardName,
+					item_id: itemId,
+					item_name: itemName,
+					role_id: roleId,
 					duration: durationSeconds,
 					date: values.date.toISOString(),
 					startTime: startTimeIso,
@@ -94,7 +74,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 			}
 
 			showToast("Zeiteintrag gespeichert.", "positive", 2000);
-			refetch(userProfile.id);
+			refetch();
 			onClose();
 		} catch (err: any) {
 			setError(err.message || "Fehler beim Speichern");
@@ -138,17 +118,13 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 							],
 							onAdjust: handlers.adjustDuration,
 						}}
-						taskSelector={{
-							show: true,
-							node: <TaskItemSelector onSelectionChange={setSelectedTask} subItemsOnly={true} />,
-						}}
 					/>
 
 					<Group justify="flex-end" mt="md">
 						<Button variant="default" onClick={onClose}>
 							Abbrechen
 						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving}>
+						<Button onClick={handleSave} loading={isSaving}>
 							Speichern
 						</Button>
 					</Group>
@@ -157,5 +133,3 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 		</Modal>
 	);
 }
-
-export default ManualTimeEntryModal;

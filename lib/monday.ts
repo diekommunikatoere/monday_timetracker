@@ -539,3 +539,49 @@ export async function findLinkedItems(boardId: string, itemId: string, targetBoa
 		return [];
 	}
 }
+
+/**
+ * Get item details including parent item and board
+ */
+export async function getItemDetails(itemId: string) {
+	const query = `
+		query GetItemDetails($itemId: [ID!]) {
+			items(ids: $itemId) {
+				id
+				name
+				board {
+					id
+					name
+				}
+				parent_item {
+					id
+					name
+					board {
+						id
+						name
+					}
+				}
+			}
+		}
+	`;
+
+	try {
+		const response: any = await client.request(query, { itemId: [itemId] });
+		const item = response.items?.[0];
+		if (!item) return null;
+
+		return {
+			id: item.id,
+			name: item.name,
+			boardId: item.board?.id,
+			boardName: item.board?.name,
+			parentItemId: item.parent_item?.id,
+			parentItemName: item.parent_item?.name,
+			parentBoardId: item.parent_item?.board?.id,
+			parentBoardName: item.parent_item?.board?.name,
+		};
+	} catch (error) {
+		console.error("Error in getItemDetails:", error);
+		return null;
+	}
+}
