@@ -159,7 +159,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 						}}
 						taskSelector={{
 							show: true,
-							node: <TaskItemSelector onSelectionChange={setSelectedTask} initialSelection={selectedTask || undefined} />,
+							node: <TaskItemSelector onSelectionChange={setSelectedTask} initialValues={selectedTask || undefined} />,
 						}}
 					/>
 
