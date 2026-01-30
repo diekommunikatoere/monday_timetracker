@@ -29,6 +29,7 @@ export { default as refresh } from "@/components/icons/Refresh";
 export { default as remove } from "@/components/icons/Remove";
 export { default as reset } from "@/components/icons/Reset";
 export { default as save } from "@/components/icons/Save";
+export { default as saveClock } from "@/components/icons/SaveClock";
 export { default as search } from "@/components/icons/Search";
 export { default as settings } from "@/components/icons/Settings";
 export { default as star } from "@/components/icons/Star";
