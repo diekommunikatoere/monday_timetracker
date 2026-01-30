@@ -28,7 +28,7 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 
 			// OPTIMIZATION: Fetch context and user data in PARALLEL
 			// This reduces initialization time by ~30-50%
-			const [contextResult, userResult] = await Promise.all([monday.get("context"), monday.api(`query { me { id name email } }`)]);
+			const [contextResult, userResult] = await Promise.all([monday.get("context"), monday.api(`query { me { id name email photo_original photo_small photo_thumb photo_thumb_small photo_tiny } }`)]);
 
 			console.log(`[initializeMondayContext] Parallel fetch complete - ${Date.now() - startTime}ms`);
 
@@ -45,6 +45,15 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				accountId: contextResult.data.account.id,
 				email: userResult?.data?.me?.email || null,
 				name: userResult?.data?.me?.name || null,
+				photoUrls: userResult?.data?.me
+					? {
+							original: userResult.data.me.photo_original,
+							small: userResult.data.me.photo_small,
+							thumb: userResult.data.me.photo_thumb,
+							thumb_small: userResult.data.me.photo_thumb_small,
+							tiny: userResult.data.me.photo_tiny,
+						}
+					: null,
 				isAdmin: contextResult.data.user.isAdmin || false,
 				isGuest: contextResult.data.user.isGuest || false,
 				isViewOnly: contextResult.data.user.isViewOnly || false,

@@ -379,23 +379,38 @@ export async function getMondayContext(request: NextRequest) {
 	}
 }
 
-// Get teams for a specific user - with Redis caching
-export async function getUserTeams(userId: string): Promise<Array<{ id: string; name: string }>> {
+// Get details for a specific user including teams and photos - with Redis caching
+export async function getUserDetails(userId: string): Promise<{
+	teams: Array<{ id: string; name: string }>;
+	photo_urls: {
+		original: string | null;
+		small: string | null;
+		thumb: string | null;
+		thumb_small: string | null;
+		tiny: string | null;
+	};
+}> {
 	if (!userId) {
-		return [];
+		return {
+			teams: [],
+			photo_urls: { original: null, small: null, thumb: null, thumb_small: null, tiny: null },
+		};
 	}
 
 	const startTime = Date.now();
-	const cacheKey = `monday:user_teams:${userId}`;
+	const cacheKey = `monday:user_details:${userId}`;
 
 	// Try cache first
-	const cached = await cacheHelper.get<Array<{ id: string; name: string }>>(cacheKey);
+	const cached = await cacheHelper.get<{
+		teams: Array<{ id: string; name: string }>;
+		photo_urls: any;
+	}>(cacheKey);
 	if (cached) {
-		console.log(`[getUserTeams] Cache HIT - ${Date.now() - startTime}ms`);
+		console.log(`[getUserDetails] Cache HIT - ${Date.now() - startTime}ms`);
 		return cached;
 	}
 
-	console.log("[getUserTeams] Cache MISS - fetching from API");
+	console.log("[getUserDetails] Cache MISS - fetching from API");
 
 	const query = `
 		query {
@@ -404,6 +419,11 @@ export async function getUserTeams(userId: string): Promise<Array<{ id: string; 
 					id
 					name
 				}
+				photo_original
+				photo_small
+				photo_thumb
+				photo_thumb_small
+				photo_tiny
 			}
 		}
 	`;
@@ -412,27 +432,53 @@ export async function getUserTeams(userId: string): Promise<Array<{ id: string; 
 		const response: any = await client.request(query);
 
 		if (response.error) {
-			console.error("Monday API error in getUserTeams:", response.error?.message);
-			throw new Error(response.error?.message || "Failed to fetch user teams");
+			console.error("Monday API error in getUserDetails:", response.error?.message);
+			throw new Error(response.error?.message || "Failed to fetch user details");
 		}
 
 		const users = response.users || [];
 		let teams: Array<{ id: string; name: string }> = [];
+		let photo_urls = {
+			original: null,
+			small: null,
+			thumb: null,
+			thumb_small: null,
+			tiny: null,
+		};
 
-		if (users.length > 0 && users[0].teams) {
-			teams = users[0].teams;
+		if (users.length > 0) {
+			if (users[0].teams) {
+				teams = users[0].teams;
+			}
+			photo_urls = {
+				original: users[0].photo_original,
+				small: users[0].photo_small,
+				thumb: users[0].photo_thumb,
+				thumb_small: users[0].photo_thumb_small,
+				tiny: users[0].photo_tiny,
+			};
 		}
 
-		// Cache the result
-		await cacheHelper.set(cacheKey, teams, CACHE_TTL.USER_TEAMS);
+		const result = { teams, photo_urls };
 
-		console.log(`[getUserTeams] API fetch complete - ${Date.now() - startTime}ms`);
-		return teams;
+		// Cache the result
+		await cacheHelper.set(cacheKey, result, CACHE_TTL.USER_TEAMS);
+
+		console.log(`[getUserDetails] API fetch complete - ${Date.now() - startTime}ms`);
+		return result;
 	} catch (error) {
-		console.error("Error in getUserTeams:", error);
-		// Don't fail the whole auth process if teams fetch fails, just return empty
-		return [];
+		console.error("Error in getUserDetails:", error);
+		return {
+			teams: [],
+			photo_urls: { original: null, small: null, thumb: null, thumb_small: null, tiny: null },
+		};
 	}
+}
+
+// Get teams for a specific user - with Redis caching
+export async function getUserTeams(userId: string): Promise<Array<{ id: string; name: string }>> {
+	const details = await getUserDetails(userId);
+	return details.teams;
 }
 
 /**
@@ -537,5 +583,51 @@ export async function findLinkedItems(boardId: string, itemId: string, targetBoa
 	} catch (error) {
 		console.error("Error in findLinkedItems:", error);
 		return [];
+	}
+}
+
+/**
+ * Get item details including parent item and board
+ */
+export async function getItemDetails(itemId: string) {
+	const query = `
+		query GetItemDetails($itemId: [ID!]) {
+			items(ids: $itemId) {
+				id
+				name
+				board {
+					id
+					name
+				}
+				parent_item {
+					id
+					name
+					board {
+						id
+						name
+					}
+				}
+			}
+		}
+	`;
+
+	try {
+		const response: any = await client.request(query, { itemId: [itemId] });
+		const item = response.items?.[0];
+		if (!item) return null;
+
+		return {
+			id: item.id,
+			name: item.name,
+			boardId: item.board?.id,
+			boardName: item.board?.name,
+			parentItemId: item.parent_item?.id,
+			parentItemName: item.parent_item?.name,
+			parentBoardId: item.parent_item?.board?.id,
+			parentBoardName: item.parent_item?.board?.name,
+		};
+	} catch (error) {
+		console.error("Error in getItemDetails:", error);
+		return null;
 	}
 }

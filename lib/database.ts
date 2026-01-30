@@ -113,6 +113,25 @@ export async function getTimeEntryById(id: string): Promise<TimeEntry | null> {
 	return data;
 }
 
+/**
+ * Get time entries for a specific item across all users
+ */
+export async function getItemTimeEntries(itemId: string, boardId: string, startDate?: string, endDate?: string): Promise<FrontendTimeEntry[]> {
+	const { data, error } = await supabaseAdmin.rpc("get_item_time_entries" as any, {
+		p_item_id: itemId,
+		p_board_id: boardId,
+		p_start_date: startDate || null,
+		p_end_date: endDate || null,
+	});
+
+	if (error) {
+		console.error(`Error fetching time entries for item ${itemId}:`, error);
+		throw error;
+	}
+
+	return data as unknown as FrontendTimeEntry[];
+}
+
 // Insert time entry
 export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata, userId: string): Promise<TimeEntry> {
 	// Make sure user_id is provided
@@ -126,6 +145,14 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 	// UPSERT dimension tables if names are provided
 	if (cleanEntry.board_id && board_name) {
 		await upsertMondayBoard(cleanEntry.board_id, board_name);
+	}
+
+	// For subitems, ensure we use the parent's board_id if available
+	if (cleanEntry.parent_item_id) {
+		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", cleanEntry.parent_item_id).single();
+		if (parentItem?.board_id) {
+			cleanEntry.board_id = parentItem.board_id;
+		}
 	}
 
 	if (cleanEntry.item_id && item_name) {
@@ -427,6 +454,15 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 	// UPSERT dimension tables if names are provided
 	if (cleanUpdates.board_id && board_name) {
 		await upsertMondayBoard(cleanUpdates.board_id, board_name);
+	}
+
+	// For subitems, ensure we use the parent's board_id if available
+	const parentItemId = cleanUpdates.parent_item_id || oldEntry.parent_item_id;
+	if (parentItemId) {
+		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", parentItemId).single();
+		if (parentItem?.board_id) {
+			cleanUpdates.board_id = parentItem.board_id;
+		}
 	}
 
 	// Use board_id from updates or fallback to old entry

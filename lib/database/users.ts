@@ -8,7 +8,7 @@ type UserProfileInsert = Database["public"]["Tables"]["user_profiles"]["Insert"]
  * Find or create a user profile based on Monday.com user ID
  * This is the main function you'll use when the app loads
  */
-export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAccountId: string, email?: string, name?: string, teamIds?: string[]): Promise<UserProfile> {
+export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAccountId: string, email?: string, name?: string, teamIds?: string[], photoUrls?: any): Promise<UserProfile> {
 	// First, try to find existing user by Monday ID
 	const { data: existingUser, error: findError } = await supabaseAdmin.from("user_profiles").select("*").eq("monday_user_id", mondayUserId).single();
 
@@ -23,6 +23,7 @@ export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAcc
 		if (email) updates.email = email;
 		if (name) updates.name = name;
 		if (teamIds) updates.team_ids = teamIds;
+		if (photoUrls) updates.photo_urls = photoUrls;
 
 		const { data: updatedUser, error: updateError } = await supabaseAdmin.from("user_profiles").update(updates).eq("id", existingUser.id).select().single();
 
@@ -51,6 +52,7 @@ export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAcc
 		email: email || null,
 		name: name || null,
 		team_ids: teamIds || null,
+		photo_urls: photoUrls || null,
 	};
 
 	const { data: createdUser, error: createError } = await supabaseAdmin.from("user_profiles").insert(newUser).select().single();

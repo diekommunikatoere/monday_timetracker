@@ -15,6 +15,8 @@ CREATE OR REPLACE FUNCTION public.get_user_time_entries(
 RETURNS TABLE (
     id UUID,
     user_id UUID,
+    user_name TEXT,
+    user_photo_urls JSONB,
     task_name TEXT,
     start_time TIMESTAMPTZ,
     end_time TIMESTAMPTZ,
@@ -39,6 +41,8 @@ BEGIN
     SELECT
         te.id,
         te.user_id,
+        up.name as user_name,
+        up.photo_urls as user_photo_urls,
         COALESCE(mi.name, 'Unzugeordneter Zeiteintrag') as task_name,
         te.start_time,
         te.end_time,
@@ -58,6 +62,7 @@ BEGIN
         te.created_at,
         te.updated_at
     FROM public.time_entry te
+    LEFT JOIN public.user_profiles up ON te.user_id = up.id
     LEFT JOIN public.monday_board mb ON te.board_id = mb.id
     LEFT JOIN public.monday_item mi ON te.item_id = mi.id
     LEFT JOIN public.monday_item mpi ON te.parent_item_id = mpi.id

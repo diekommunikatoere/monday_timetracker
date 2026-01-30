@@ -13,3 +13,4 @@ export * from "./ui/modals/Modal";
 export * from "./ui/modals/ModalHeader";
 export * from "./ui/modals/ModalBody";
 export * from "./ui/modals/ModalFooter";
+export { Logo } from "./Logo";

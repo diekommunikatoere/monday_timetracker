@@ -1,6 +1,14 @@
 export interface TimeEntry {
 	id: string;
 	user_id: string; // Supabase auth user UUID
+	user_name?: string;
+	user_photo_urls?: {
+		original: string | null;
+		small: string | null;
+		thumb: string | null;
+		thumb_small: string | null;
+		tiny: string | null;
+	} | null;
 	task_name: string;
 	start_time: string; // ISO 8601 timestamp string
 	end_time: string; // ISO 8601 timestamp string
