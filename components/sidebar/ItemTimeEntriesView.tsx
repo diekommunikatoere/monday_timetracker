@@ -3,6 +3,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Flex, Text, Card, Group, Badge, Divider, ScrollArea, Accordion } from "@mantine/core";
+import { Icon } from "@/components";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
@@ -27,6 +28,8 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [pendingDelete, setPendingDelete] = useState<TimeEntry | null>(null);
+
+	const [open, setOpen] = useState<string[] | null>(null);
 
 	useEffect(() => {
 		setItemContext(itemId, boardId);
@@ -124,10 +127,10 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 						<Text>Keine Zeiteinträge gefunden.</Text>
 					</Flex>
 				) : (
-					<Accordion multiple>
+					<Accordion multiple value={open || []} onChange={(values) => setOpen(values.length > 0 ? values : null)} disableChevronRotation>
 						{groupedEntries.map((group) => (
 							<Accordion.Item key={group.userId} value={group.userId}>
-								<Accordion.Control>
+								<Accordion.Control chevron={open && open.includes(group.userId) ? <Icon name={"collapse"} size={16} /> : <Icon name={"expand"} size={16} />}>
 									<Group justify="space-between" pr="md">
 										<Text fw={600}>{group.userName}</Text>
 										<Badge variant="light" size="lg">
