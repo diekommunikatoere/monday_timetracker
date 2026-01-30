@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Flex, Text, Card, Group, Badge, Divider, ScrollArea, Accordion } from "@mantine/core";
+import { Flex, Text, Card, Group, Badge, Divider, ScrollArea, Accordion, Avatar } from "@mantine/core";
 import { Icon } from "@/components";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
@@ -81,12 +81,14 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 	};
 
 	const groupedEntries = useMemo(() => {
-		const groups: Record<string, { userId: string; userName: string; entries: TimeEntry[]; totalDuration: number }> = {};
+		const groups: Record<string, { userId: string; userName: string; userPhotoUrl: string | null; entries: TimeEntry[]; totalDuration: number }> = {};
 		timeEntries.forEach((entry) => {
 			const userId = entry.user_id;
 			const userName = (entry as any).user_name || durationByUser[userId]?.userName || "Unbekannter Benutzer";
+			const userPhotoUrl = (entry as any).user_photo_urls?.thumb_small || null;
+
 			if (!groups[userId]) {
-				groups[userId] = { userId, userName, entries: [], totalDuration: 0 };
+				groups[userId] = { userId, userName, userPhotoUrl, entries: [], totalDuration: 0 };
 			}
 			groups[userId].entries.push(entry);
 			groups[userId].totalDuration += entry.duration;
@@ -94,10 +96,12 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 		return Object.values(groups).sort((a, b) => b.totalDuration - a.totalDuration);
 	}, [timeEntries, durationByUser]);
 
+	console.log("Grouped Entries:", groupedEntries);
+
 	return (
-		<Flex direction="column" gap="md" p="md" style={{ height: "100%" }}>
+		<Flex direction="column" style={{ height: "100%" }}>
 			{/* Aggregations by Role */}
-			<Group gap="sm">
+			<Group gap="sm" p="sm">
 				{Object.values(durationByRole).map((role) => (
 					<Card key={role.roleId} withBorder padding="xs" radius="md" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
 						<Text size="xs" c="dimmed" tt="uppercase" fw={700}>
@@ -132,7 +136,12 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 							<Accordion.Item key={group.userId} value={group.userId}>
 								<Accordion.Control chevron={open && open.includes(group.userId) ? <Icon name={"collapse"} size={16} /> : <Icon name={"expand"} size={16} />}>
 									<Group justify="space-between" pr="md">
-										<Text fw={600}>{group.userName}</Text>
+										<Flex direction="row" align="center" gap="sm">
+											<Avatar src={group.userPhotoUrl} alt={group.userName} radius="xl" size="sm">
+												{group.userName.charAt(0)}
+											</Avatar>
+											<Text fw={600}>{group.userName}</Text>
+										</Flex>
 										<Badge variant="light" size="lg">
 											{formatDuration(group.totalDuration)}
 										</Badge>

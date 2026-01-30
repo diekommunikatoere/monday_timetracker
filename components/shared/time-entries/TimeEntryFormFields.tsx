@@ -2,7 +2,7 @@
 
 import { Flex, Group, TextInput, Tooltip } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
-import { Button, ButtonGroup, DatePicker, Icon, IconButton } from "@/components";
+import { Button, ButtonGroup, DatePicker, Icon, IconButton, Select } from "@/components";
 
 export type TimeEntryQuickAdjust = {
 	label: string;
@@ -41,10 +41,18 @@ export interface TimeEntryFormFieldsProps {
 		show: boolean;
 		node: React.ReactNode;
 	};
+	// Role selection
+	roleSelector?: {
+		show: boolean;
+		roles: { label: string; value: string }[];
+		selectedRoleId: string;
+		onRoleChange: (roleId: string) => void;
+		loading?: boolean;
+	};
 }
 
 export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
-	const { date, onDateChange, duration, onDurationChange, startTime, onStartTimeChange, endTime, onEndTimeChange, comment, onCommentChange, isLocked, onLockToggle, onStartTimeNowClick, onEndTimeNowClick, quickAdjustments, taskSelector } = props;
+	const { date, onDateChange, duration, onDurationChange, startTime, onStartTimeChange, endTime, onEndTimeChange, comment, onCommentChange, isLocked, onLockToggle, onStartTimeNowClick, onEndTimeNowClick, quickAdjustments, taskSelector, roleSelector } = props;
 
 	return (
 		<Flex direction="column" gap="md">
@@ -157,6 +165,9 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 
 			{/* Task selector */}
 			{taskSelector?.show ? taskSelector.node : null}
+
+			{/* Role selector */}
+			{roleSelector?.show && <Select label="Rolle" placeholder="Rolle auswählen..." data={roleSelector.roles} value={roleSelector.selectedRoleId} onChange={(val) => roleSelector.onRoleChange(val || "")} disabled={roleSelector.loading} searchable />}
 
 			{/* Comment */}
 			<TextInput label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />

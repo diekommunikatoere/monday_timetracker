@@ -17,9 +17,10 @@ export interface TimeEntryTableProps {
 	onDelete?: (entry: TimeEntry) => void;
 	currentUserId: string | undefined;
 	showUserColumn?: boolean;
+	showCheckbox?: boolean;
 }
 
-export function TimeEntryTable({ timeEntries, loading, error, selectedIds, onSelectRow, onSelectAll, onEdit, onDelete, currentUserId, showUserColumn = false }: TimeEntryTableProps) {
+export function TimeEntryTable({ timeEntries, loading, error, selectedIds, onSelectRow, onSelectAll, onEdit, onDelete, currentUserId, showCheckbox = false, showUserColumn = false }: TimeEntryTableProps) {
 	const selectAllState = useMemo(() => {
 		const total = timeEntries.length;
 		const selected = selectedIds.length;
@@ -57,9 +58,11 @@ export function TimeEntryTable({ timeEntries, loading, error, selectedIds, onSel
 		<Table striped highlightOnHover withColumnBorders withTableBorder withRowBorders>
 			<Table.Thead>
 				<Table.Tr bg="white">
-					<Table.Th style={{ width: 40 }}>
-						<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => onSelectAll(e.currentTarget.checked)} aria-label="Alle Zeiteinträge auswählen" />
-					</Table.Th>
+					{showCheckbox && (
+						<Table.Th style={{ width: 40 }}>
+							<Checkbox checked={selectAllState.checked} indeterminate={selectAllState.indeterminate} onChange={(e) => onSelectAll(e.currentTarget.checked)} aria-label="Alle Zeiteinträge auswählen" />
+						</Table.Th>
+					)}
 					{showUserColumn && <Table.Th fw={600}>Benutzer</Table.Th>}
 					<Table.Th fw={600}>Rolle</Table.Th>
 					<Table.Th fw={600}>Kommentar</Table.Th>
@@ -71,7 +74,7 @@ export function TimeEntryTable({ timeEntries, loading, error, selectedIds, onSel
 			</Table.Thead>
 			<Table.Tbody>
 				{timeEntries.map((entry) => (
-					<TimeEntryRow key={entry.id} entry={entry} currentUserId={currentUserId} isSelected={selectedIds.includes(entry.id)} onSelect={onSelectRow} onEdit={onEdit} onDelete={onDelete} showUserColumn={showUserColumn} />
+					<TimeEntryRow key={entry.id} entry={entry} currentUserId={currentUserId} isSelected={selectedIds.includes(entry.id)} onSelect={onSelectRow} onEdit={onEdit} onDelete={onDelete} showUserColumn={showUserColumn} showCheckbox={showCheckbox} />
 				))}
 			</Table.Tbody>
 		</Table>

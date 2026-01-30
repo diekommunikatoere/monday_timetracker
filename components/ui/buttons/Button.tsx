@@ -4,7 +4,7 @@ import { Button as MantineButton } from "@mantine/core";
 import { ButtonProps } from "./types";
 import "@/components/styles/ui/buttons/Button.module.css";
 
-export function Button(props: ButtonProps) {
+export function Button({ iconLeft, iconRight, children, onClick, loading, disabled, ...props }: ButtonProps) {
 	let className = props.className || "";
 
 	if (props.variant) {
@@ -14,8 +14,8 @@ export function Button(props: ButtonProps) {
 	}
 
 	return (
-		<MantineButton className={`button ${className}`} loading={props.loading} disabled={props.disabled} leftSection={props.iconLeft} rightSection={props.iconRight} onClick={props.onClick} {...props}>
-			{props.children}
+		<MantineButton className={`button ${className}`} loading={loading} disabled={disabled} leftSection={iconLeft} rightSection={iconRight} onClick={onClick} {...props}>
+			{children}
 		</MantineButton>
 	);
 }

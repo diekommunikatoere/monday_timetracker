@@ -3,13 +3,19 @@
 
 import { useState, useEffect } from "react";
 import { Group, Flex, Text } from "@mantine/core";
-import { Button, Modal } from "@/components";
+import { Button, Modal, Select } from "@/components";
 import { useUserStore } from "@/stores/userStore";
+import { useMondayStore } from "@/stores/mondayStore";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { combineDateAndTime, durationToSeconds } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
+import mondaySdk from "monday-sdk-js";
+
+const monday = mondaySdk();
 
 export interface ItemManualEntryModalProps {
 	show: boolean;
@@ -23,12 +29,35 @@ export interface ItemManualEntryModalProps {
 }
 
 export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, roleId, roleName }: ItemManualEntryModalProps) {
-	const { values, isLocked, handlers } = useTimeEntryForm();
+	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [selectedRoleId, setSelectedRoleId] = useState<string>(roleId);
+
+	// Fetch available roles
+	const { data: roles = [], isLoading: loadingRoles } = useQuery({
+		queryKey: ["roles"],
+		queryFn: async () => {
+			const { data, error } = await supabase.from("role").select("*");
+			if (error) throw error;
+			return data.map((role) => ({
+				label: role.name,
+				value: role.id,
+			}));
+		},
+		staleTime: 30 * 60 * 1000,
+	});
+
+	// Synchronize selectedRoleId with prop if it changes
+	useEffect(() => {
+		if (roleId && (selectedRoleId === "00000000-0000-0000-0000-000000000000" || selectedRoleId === "")) {
+			setSelectedRoleId(roleId);
+		}
+	}, [roleId]);
 
 	const { refetch } = useItemTimeEntriesStore();
 	const { showToast } = useToast();
+	const { rawContext } = useMondayStore();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
 	const handleSave = async () => {
@@ -44,6 +73,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 		setError(null);
 
 		try {
+			const context = rawContext || (await monday.get("context"));
 			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = combineDateAndTime(values.date, values.endTime);
 
@@ -51,16 +81,17 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					userId: userProfile.id,
+					"monday-context": JSON.stringify(context),
 				},
 				body: JSON.stringify({
-					task_name: itemName,
+					userId: userProfile.id,
+					taskName: itemName,
 					comment: values.comment,
-					board_id: boardId,
-					board_name: boardName,
-					item_id: itemId,
-					item_name: itemName,
-					role_id: roleId,
+					boardId: boardId,
+					boardName: boardName,
+					itemId: itemId,
+					itemName: itemName,
+					roleId: selectedRoleId,
 					duration: durationSeconds,
 					date: values.date.toISOString(),
 					startTime: startTimeIso,
@@ -105,6 +136,13 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 						onLockToggle={handlers.toggleLock}
 						onStartTimeNowClick={handlers.handleStartTimeNow}
 						onEndTimeNowClick={handlers.handleEndTimeNow}
+						roleSelector={{
+							show: true,
+							roles: roles,
+							selectedRoleId: selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
+						}}
 						quickAdjustments={{
 							add: [
 								{ label: "+15m", minutes: 15 },

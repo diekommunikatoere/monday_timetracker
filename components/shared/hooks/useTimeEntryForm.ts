@@ -15,9 +15,11 @@ export interface TimeEntryFormValues {
 export interface UseTimeEntryFormOptions {
 	initialValues?: Partial<TimeEntryFormValues>;
 	onValuesChange?: (values: TimeEntryFormValues) => void;
+	isEnabled?: boolean;
 }
 
 export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
+	const { isEnabled = true } = options;
 	const [date, setDate] = useState<Date>(options.initialValues?.date || new Date());
 	const [duration, setDuration] = useState(options.initialValues?.duration || "00:00");
 	const [startTime, setStartTime] = useState(options.initialValues?.startTime || getCurrentTimeString());
@@ -27,34 +29,65 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 
 	const updateSource = useRef<"duration" | "times" | "lock" | null>(null);
 
-	// Sync logic
+	// Live update for locked end time
 	useEffect(() => {
-		if (updateSource.current === "duration") {
-			const seconds = durationToSeconds(duration);
-			setEndTime(addSecondsToTimeString(startTime, seconds));
-		} else if (updateSource.current === "times") {
-			const seconds = calculateDurationBetweenTimes(startTime, endTime);
-			setDuration(secondsToDuration(Math.max(0, seconds)));
+		if (!isLocked || !isEnabled) return;
+
+		const interval = setInterval(() => {
+			const currentTime = getCurrentTimeString();
+			if (currentTime !== endTime) {
+				updateSource.current = "lock";
+				setEndTime(currentTime);
+				// When end time updates automatically, we need to update start time based on duration
+				const durationSeconds = durationToSeconds(duration);
+				setStartTime(subtractSecondsFromTimeString(currentTime, durationSeconds));
+			}
+		}, 10000); // Check every 10 seconds
+
+		return () => clearInterval(interval);
+	}, [isLocked, endTime, duration, isEnabled]);
+
+	// Sync: When duration changes (from input or buttons), update start_time (if locked) or end_time (if unlocked)
+	useEffect(() => {
+		if (updateSource.current === "times" || updateSource.current === "lock") {
+			updateSource.current = null;
+			return;
 		}
-		updateSource.current = null;
-	}, [duration, startTime, endTime]);
+
+		const durationSeconds = durationToSeconds(duration);
+		if (isLocked) {
+			const newStartTime = subtractSecondsFromTimeString(endTime, durationSeconds);
+			updateSource.current = "duration";
+			setStartTime(newStartTime);
+		} else {
+			const newEndTime = addSecondsToTimeString(startTime, durationSeconds);
+			updateSource.current = "duration";
+			setEndTime(newEndTime);
+		}
+	}, [duration, isLocked, endTime, startTime]);
 
 	const handleStartTimeChange = useCallback(
 		(val: string) => {
-			updateSource.current = "times";
 			setStartTime(val);
+			updateSource.current = "times";
+			const newDurationSeconds = calculateDurationBetweenTimes(val, endTime);
+			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
+			// Manual edit unlocks the end time
 			if (isLocked) setIsLocked(false);
 		},
-		[isLocked],
+		[endTime, isLocked],
 	);
 
 	const handleEndTimeChange = useCallback(
 		(val: string) => {
-			updateSource.current = "times";
 			setEndTime(val);
+			updateSource.current = "times";
+			const newDurationSeconds = calculateDurationBetweenTimes(startTime, val);
+			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
+			// Manual edit unlocks the end time
 			if (isLocked) setIsLocked(false);
 		},
-		[isLocked],
+		[startTime, isLocked],
 	);
 
 	const handleDurationChange = useCallback((val: string) => {

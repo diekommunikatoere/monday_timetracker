@@ -15,9 +15,10 @@ export interface TimeEntryRowProps {
 	onEdit?: (entry: TimeEntry) => void;
 	onDelete?: (entry: TimeEntry) => void;
 	showUserColumn?: boolean;
+	showCheckbox?: boolean;
 }
 
-export function TimeEntryRow({ entry, currentUserId, isSelected, onSelect, onEdit, onDelete, showUserColumn = false }: TimeEntryRowProps) {
+export function TimeEntryRow({ entry, currentUserId, isSelected, onSelect, onEdit, onDelete, showUserColumn = false, showCheckbox = false }: TimeEntryRowProps) {
 	const permissions = useTimeEntryPermissions({ entry, currentUserId });
 
 	const startDate = new Date(entry.start_time);
@@ -25,9 +26,11 @@ export function TimeEntryRow({ entry, currentUserId, isSelected, onSelect, onEdi
 
 	return (
 		<Table.Tr bg={isSelected ? "var(--mantine-color-blue-light)" : undefined}>
-			<Table.Td>
-				<Checkbox checked={isSelected} onChange={(e) => onSelect(entry.id, e.currentTarget.checked)} disabled={!permissions.canBulkSelect} aria-label={`Select time entry ${entry.id}`} />
-			</Table.Td>
+			{showCheckbox && (
+				<Table.Td>
+					<Checkbox checked={isSelected} onChange={(e) => onSelect(entry.id, e.currentTarget.checked)} disabled={!permissions.canBulkSelect} aria-label={`Select time entry ${entry.id}`} />
+				</Table.Td>
+			)}
 			{showUserColumn && <Table.Td>{entry.user_id}</Table.Td>}
 			<Table.Td>{entry.role_name || "-"}</Table.Td>
 			<Table.Td>{entry.comment || "-"}</Table.Td>

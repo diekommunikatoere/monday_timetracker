@@ -27,7 +27,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const { values, isLocked, handlers } = useTimeEntryForm();
+	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show });
 
 	const { refetch } = useTimeEntriesStore();
 	const { showToast } = useToast();

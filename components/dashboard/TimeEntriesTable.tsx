@@ -188,7 +188,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 
 	return (
 		<>
-			<TimeEntryTable timeEntries={timeEntries} loading={loading} error={error} selectedIds={selectedIds} onSelectRow={handleRowSelect} onSelectAll={handleSelectAll} onEdit={handleEdit} onDelete={handleDelete} currentUserId={userId} />
+			<TimeEntryTable timeEntries={timeEntries} loading={loading} error={error} selectedIds={selectedIds} onSelectRow={handleRowSelect} onSelectAll={handleSelectAll} onEdit={handleEdit} onDelete={handleDelete} currentUserId={userId} showCheckbox={true} />
 
 			<SaveTimerModal
 				show={showSaveModal}

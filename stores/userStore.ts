@@ -13,6 +13,13 @@ type MondayUser = {
 	accountId: string;
 	email: string | null;
 	name: string | null;
+	photoUrls: {
+		original: string | null;
+		small: string | null;
+		thumb: string | null;
+		thumb_small: string | null;
+		tiny: string | null;
+	} | null;
 	isAdmin: boolean;
 	isGuest: boolean;
 	isViewOnly: boolean;
@@ -62,6 +69,7 @@ export const useUserStore = create<UserState>()(
 						accountId: context?.data?.account?.id || null,
 						email: null,
 						name: null,
+						photoUrls: null,
 						isAdmin: context?.data?.user?.isAdmin || false,
 						isGuest: context?.data?.user?.isGuest || false,
 						isViewOnly: context?.data?.user?.isViewOnly || false,
@@ -114,6 +122,6 @@ export const useUserStore = create<UserState>()(
 				theme: state.theme,
 				// Don't persist user data - it's session-based
 			}),
-		}
-	)
+		},
+	),
 );
