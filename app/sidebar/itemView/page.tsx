@@ -1,17 +1,17 @@
 // app/sidebar/itemView/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Flex, Loader, Center, Text } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { Flex, Loader, Center, Text, Card, Group } from "@mantine/core";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { ItemSidebarHeader } from "@/components/sidebar/ItemSidebarHeader";
 import { ItemTimeEntriesView } from "@/components/sidebar/ItemTimeEntriesView";
 import { ItemManualEntryModal } from "@/components/sidebar/ItemManualEntryModal";
-import { Button, Icon } from "@/components";
 import { TimeEntry } from "@/types/time-entry";
 import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
 import { useUserStore } from "@/stores/userStore";
+import { formatDuration } from "@/lib/utils";
 
 export default function ItemViewPage() {
 	const userId = useUserStore((state) => state.supabaseUser?.id);
@@ -85,12 +85,20 @@ export default function ItemViewPage() {
 
 	return (
 		<Flex direction="column" style={{ height: "100vh", overflow: "hidden" }}>
-			<ItemSidebarHeader itemName={itemName} totalDuration={totalDuration} />
+			<ItemSidebarHeader onManualEntryClick={() => setShowManualModal(true)} />
 
-			<Flex justify="flex-end" p="md" pb={0}>
-				<Button leftSection={<Icon name="add" size={18} />} onClick={() => setShowManualModal(true)}>
-					Zeit eintragen
-				</Button>
+			<Flex justify="space-between" align="center" p="sm" style={{ borderBottom: "1px solid var(--color--border-ui)" }}>
+				<Text fw={700} size="lg">
+					{itemName}
+				</Text>
+				<Group gap="xs">
+					<Text size="sm" c="dimmed">
+						Gesamtzeit:
+					</Text>
+					<Text fw={700} size="md">
+						{formatDuration(totalDuration)}
+					</Text>
+				</Group>
 			</Flex>
 
 			<div style={{ flex: 1, overflow: "hidden" }}>
