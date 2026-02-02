@@ -9,7 +9,9 @@ export interface TimeEntryRowMenuProps<T> {
 	onDelete?: (entry: T) => void;
 }
 
-export function TimeEntryRowMenu<T>({ entry, onEdit, onDelete }: TimeEntryRowMenuProps<T>) {
+export function TimeEntryRowMenu<T extends { is_draft?: boolean }>({ entry, onEdit, onDelete }: TimeEntryRowMenuProps<T>) {
+	const isDraft = entry.is_draft;
+
 	return (
 		<Menu shadow="md" width={200} position="bottom-end">
 			<Menu.Target>
@@ -19,7 +21,11 @@ export function TimeEntryRowMenu<T>({ entry, onEdit, onDelete }: TimeEntryRowMen
 			</Menu.Target>
 
 			<Menu.Dropdown>
-				{onEdit ? (
+				{isDraft ? (
+					<Menu.Item leftSection={<Icon name="save" size={16} />} onClick={() => onEdit?.(entry)}>
+						Speichern
+					</Menu.Item>
+				) : onEdit ? (
 					<Menu.Item leftSection={<Icon name="edit" size={16} />} onClick={() => onEdit(entry)}>
 						Bearbeiten
 					</Menu.Item>

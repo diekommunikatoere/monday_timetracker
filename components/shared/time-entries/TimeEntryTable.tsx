@@ -65,7 +65,7 @@ export function TimeEntryTable({ timeEntries, columns, loading, error, selectedI
 			</Table.Thead>
 			<Table.Tbody>
 				{timeEntries.map((entry, rowIndex) => (
-					<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id) ? "var(--color--primary-selected)" : undefined}>
+					<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id) ? "var(--color--primary-selected)" : entry.is_draft ? "var(--color--secondary-extra-light)" : undefined}>
 						{visibleColumns.map((col) => (
 							<Table.Td key={col.id} ta={col.align || "left"}>
 								{col.cell({ row: entry, index: rowIndex })}

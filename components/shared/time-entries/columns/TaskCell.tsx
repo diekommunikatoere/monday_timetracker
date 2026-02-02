@@ -1,5 +1,5 @@
 // components/shared/time-entries/columns/TaskCell.tsx
-import { Flex, Text } from "@mantine/core";
+import { Flex, Text, Badge } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { TimeEntryRowMenu } from "../TimeEntryRowMenu";
 
@@ -13,6 +13,11 @@ export function TaskCell({ entry, onEdit, onDelete }: TaskCellProps) {
 	return (
 		<Flex align="center" justify="space-between" gap="xs">
 			<Flex justify={"center"} align={"center"} gap="xs">
+				{entry.is_draft && (
+					<Badge color="var(--color--primary)" variant="light" size="xs">
+						DRAFT
+					</Badge>
+				)}
 				<Text size="sm" fw={500} truncate>
 					{entry.item_name || entry.task_name || "-"}
 				</Text>
