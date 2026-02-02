@@ -26,7 +26,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show });
+	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
 
 	const { refetch } = useTimeEntriesStore();
 	const { rawContext } = useMondayStore();

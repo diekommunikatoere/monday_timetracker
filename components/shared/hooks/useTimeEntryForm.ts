@@ -16,18 +16,19 @@ export interface UseTimeEntryFormOptions {
 	initialValues?: Partial<TimeEntryFormValues>;
 	onValuesChange?: (values: TimeEntryFormValues) => void;
 	isEnabled?: boolean;
+	initialIsLocked?: boolean;
 }
 
 export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
-	const { isEnabled = true } = options;
+	const { isEnabled = true, initialIsLocked = true } = options;
 	const [date, setDate] = useState<Date>(options.initialValues?.date || new Date());
 	const [duration, setDuration] = useState(options.initialValues?.duration || "00:00");
 	const [startTime, setStartTime] = useState(options.initialValues?.startTime || getCurrentTimeString());
 	const [endTime, setEndTime] = useState(options.initialValues?.endTime || getCurrentTimeString());
 	const [comment, setComment] = useState(options.initialValues?.comment || "");
-	const [isLocked, setIsLocked] = useState(true);
+	const [isLocked, setIsLocked] = useState(initialIsLocked);
 
-	const updateSource = useRef<"duration" | "times" | "lock" | null>(null);
+	const updateSource = useRef<"duration" | "times" | "lock" | "reset" | null>(null);
 
 	// Live update for locked end time
 	useEffect(() => {
@@ -49,8 +50,8 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 
 	// Sync: When duration changes (from input or buttons), update start_time (if locked) or end_time (if unlocked)
 	useEffect(() => {
-		if (updateSource.current === "times" || updateSource.current === "lock") {
-			updateSource.current = null;
+		if (updateSource.current === "times" || updateSource.current === "lock" || updateSource.current === "reset") {
+			if (updateSource.current !== "reset") updateSource.current = null;
 			return;
 		}
 
@@ -117,6 +118,24 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 		setIsLocked(!isLocked);
 	}, [isLocked]);
 
+	const reset = useCallback((newValues: TimeEntryFormValues, newIsLocked?: boolean) => {
+		updateSource.current = "reset";
+		setDate(newValues.date);
+		setDuration(newValues.duration);
+		setStartTime(newValues.startTime);
+		setEndTime(newValues.endTime);
+		setComment(newValues.comment);
+		if (newIsLocked !== undefined) {
+			setIsLocked(newIsLocked);
+		}
+		// Clear the reset flag after a short delay to allow effects to skip
+		setTimeout(() => {
+			if (updateSource.current === "reset") {
+				updateSource.current = null;
+			}
+		}, 0);
+	}, []);
+
 	const values = useMemo(
 		() => ({
 			date,
@@ -139,8 +158,9 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 			handleStartTimeNow,
 			handleEndTimeNow,
 			toggleLock,
+			reset,
 		}),
-		[setDate, setComment, handleStartTimeChange, handleEndTimeChange, handleDurationChange, adjustDuration, handleStartTimeNow, handleEndTimeNow, toggleLock],
+		[setDate, setComment, handleStartTimeChange, handleEndTimeChange, handleDurationChange, adjustDuration, handleStartTimeNow, handleEndTimeNow, toggleLock, reset],
 	);
 
 	return {

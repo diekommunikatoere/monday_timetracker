@@ -42,7 +42,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 
 	const handleSelectAll = (checked: boolean) => {
 		if (checked) {
-			setSelectedIds(timeEntries.map((entry) => entry.id));
+			const ownEntryIds = timeEntries.filter((entry) => entry.user_id === userId).map((entry) => entry.id);
+			setSelectedIds(ownEntryIds);
 		} else {
 			setSelectedIds([]);
 		}
@@ -193,6 +194,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 		onSelectRow: handleRowSelect,
 		onSelectAll: handleSelectAll,
 		selectedIds,
+		currentUserId: userId,
 	});
 
 	return (

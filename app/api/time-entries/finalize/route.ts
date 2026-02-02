@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
 					start_time: finalStartTime,
 					end_time: finalEndTime,
 				})
-				.eq("id", draftId);
+				.eq("id", draftId)
+				.eq("user_id", userProfile.id);
 
 			if (updateError) {
 				console.error("Error updating draft:", updateError);

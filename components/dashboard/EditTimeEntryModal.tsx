@@ -27,7 +27,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show });
+	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
 
 	const { refetch } = useTimeEntriesStore();
 	const { showToast } = useToast();
@@ -39,11 +39,17 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 			const start = new Date(entry.start_time);
 			const end = new Date(entry.end_time);
 
-			handlers.setDate(start);
-			handlers.handleStartTimeChange(`${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`);
-			handlers.handleEndTimeChange(`${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`);
-			handlers.handleDurationChange(secondsToDuration(entry.duration));
-			handlers.setComment(entry.comment || "");
+			handlers.reset(
+				{
+					date: start,
+					startTime: `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`,
+					endTime: `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
+					duration: secondsToDuration(entry.duration),
+					comment: entry.comment || "",
+				},
+				false,
+			);
+
 			setSelectedTask({
 				boardId: entry.board_id || "",
 				boardName: entry.board_name || "",
@@ -55,7 +61,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				roleName: entry.role_name || "",
 			});
 		}
-	}, [show, entry, handlers, secondsToDuration]);
+	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
 
 	const handleSave = async () => {
 		if (!selectedTask || !userProfile?.id) {
@@ -159,7 +165,23 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 						}}
 						taskSelector={{
 							show: true,
-							node: <TaskItemSelector onSelectionChange={setSelectedTask} initialValues={selectedTask || undefined} />,
+							node: (
+								<TaskItemSelector
+									onSelectionChange={setSelectedTask}
+									initialValues={
+										selectedTask
+											? {
+													boardId: selectedTask.boardId,
+													boardName: selectedTask.boardName,
+													itemId: selectedTask.itemId,
+													itemName: selectedTask.itemName,
+													roleId: selectedTask.roleId,
+													roleName: selectedTask.roleName,
+												}
+											: undefined
+									}
+								/>
+							),
 						}}
 					/>
 

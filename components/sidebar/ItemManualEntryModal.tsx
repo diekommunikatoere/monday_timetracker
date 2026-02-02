@@ -29,7 +29,7 @@ export interface ItemManualEntryModalProps {
 }
 
 export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, roleId, roleName }: ItemManualEntryModalProps) {
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show });
+	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRoleId, setSelectedRoleId] = useState<string>(roleId);
@@ -120,6 +120,15 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 			<Modal.Body>
 				<Flex direction="column" gap="md">
 					{error && <Text c="red">{error}</Text>}
+
+					<Flex direction="column" gap="xs" p="xs" style={{ backgroundColor: "var(--color--background-secondary)", border: "1px solid var(--color--border-ui)", borderRadius: "4px" }}>
+						<Text size="xs" c="var(--color--text-secondary)" fw={700} tt="uppercase">
+							Aufgabe
+						</Text>
+						<Text size="sm" fw={600}>
+							{boardName} › {itemName}
+						</Text>
+					</Flex>
 
 					<TimeEntryFormFields
 						date={values.date}

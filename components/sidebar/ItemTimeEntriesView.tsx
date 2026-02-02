@@ -47,7 +47,8 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 
 	const handleSelectAll = (selected: boolean) => {
 		if (selected) {
-			setSelectedIds(timeEntries.map((e) => e.id));
+			const ownEntryIds = timeEntries.filter((e) => e.user_id === currentUserId).map((e) => e.id);
+			setSelectedIds(ownEntryIds);
 		} else {
 			setSelectedIds([]);
 		}
@@ -102,6 +103,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 	const columns = getSidebarColumns({
 		onEdit,
 		onDelete: handleDeleteRequest,
+		currentUserId,
 	});
 
 	return (
@@ -148,7 +150,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 											</Avatar>
 											<Text fw={600}>{group.userName}</Text>
 										</Flex>
-										<Badge variant="light" size="lg">
+										<Badge variant="light" size="lg" style={{ pointerEvents: "none" }}>
 											{formatDuration(group.totalDuration)}
 										</Badge>
 									</Group>

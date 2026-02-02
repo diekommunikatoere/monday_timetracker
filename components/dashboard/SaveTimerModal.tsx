@@ -434,7 +434,21 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 						</Flex>
 					</Flex>
 
-					<TaskItemSelector onSelectionChange={handleTaskSelection} />
+					<TaskItemSelector
+						onSelectionChange={handleTaskSelection}
+						initialValues={
+							selectedTask
+								? {
+										boardId: selectedTask.boardId,
+										boardName: selectedTask.boardName,
+										itemId: selectedTask.itemId,
+										itemName: selectedTask.itemName,
+										roleId: selectedTask.roleId,
+										roleName: selectedTask.roleName,
+									}
+								: undefined
+						}
+					/>
 
 					<TextInput aria-label="Kommentar hinzufügen..." value={comment} onChange={handleCommentChange} placeholder="Kommentar hinzufügen..." label="Kommentar" />
 

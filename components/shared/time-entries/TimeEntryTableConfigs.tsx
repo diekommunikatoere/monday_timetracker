@@ -14,18 +14,24 @@ interface ConfigOptions {
 	onSelectRow?: (id: string, selected: boolean) => void;
 	onSelectAll?: (selected: boolean) => void;
 	selectedIds?: string[];
+	currentUserId?: string;
 }
 
-export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll, selectedIds = [] }: ConfigOptions): ColumnDef<TimeEntry>[] => [
+export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll, selectedIds = [], currentUserId }: ConfigOptions): ColumnDef<TimeEntry>[] => [
 	{
 		id: "checkbox",
 		width: 40,
 		header: ({ data }) => {
-			const total = data.length;
+			const ownEntries = data.filter((entry) => entry.user_id === currentUserId);
+			const total = ownEntries.length;
 			const selected = selectedIds.length;
 			return <Checkbox checked={total > 0 && selected === total} indeterminate={selected > 0 && selected < total} onChange={(e) => onSelectAll?.(e.currentTarget.checked)} aria-label="Alle auswählen" />;
 		},
-		cell: ({ row }) => <Checkbox checked={selectedIds.includes(row.id)} onChange={(e) => onSelectRow?.(row.id, e.currentTarget.checked)} aria-label={`Auswählen ${row.id}`} />,
+		cell: ({ row }) => {
+			const isOwner = row.user_id === currentUserId;
+			if (!isOwner) return null;
+			return <Checkbox checked={selectedIds.includes(row.id)} onChange={(e) => onSelectRow?.(row.id, e.currentTarget.checked)} aria-label={`Auswählen ${row.id}`} />;
+		},
 	},
 	{
 		id: "task",
@@ -116,6 +122,7 @@ export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDe
 				{new Date(row.start_time).toLocaleDateString("de-DE", {
 					day: "2-digit",
 					month: "2-digit",
+					year: "2-digit",
 				})}
 			</Text>
 		),

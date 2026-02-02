@@ -1,7 +1,7 @@
 // components/TaskItemSelector.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Flex, Text, ComboboxItem, ComboboxItemGroup, Skeleton, Tooltip, Loader } from "@mantine/core";
 import { IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,8 +28,11 @@ interface TaskItemSelectorProps {
 	onResetRef?: (resetFn: () => void) => void;
 	initialValues?: {
 		boardId?: string;
+		boardName?: string;
 		itemId?: string;
-		role?: string;
+		itemName?: string;
+		roleId?: string;
+		roleName?: string;
 	};
 	subItemsOnly?: boolean;
 }
@@ -138,7 +141,27 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	}, [onResetRef, resetSelections]);
 
 	// Boards query using React Query with enhanced caching
-	const boardIds = rawContext?.data?.boardIds;
+	const contextBoardIds = rawContext?.data?.boardIds;
+	const contextBoardId = rawContext?.data?.boardId;
+	const boardIds = useMemo(() => {
+		const ids = new Set<string>();
+
+		// Add boards from context
+		if (contextBoardIds && contextBoardIds.length > 0) {
+			contextBoardIds.forEach((id) => ids.add(id.toString()));
+		}
+		if (contextBoardId) {
+			ids.add(contextBoardId.toString());
+		}
+
+		// Add initial board if provided
+		if (initialValues?.boardId) {
+			ids.add(initialValues.boardId.toString());
+		}
+
+		return Array.from(ids);
+	}, [contextBoardIds, contextBoardId, initialValues?.boardId]);
+
 	const {
 		data: boards = [],
 		isLoading: loadingBoards,
@@ -267,23 +290,35 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 	// Set initial board when boards load
 	useEffect(() => {
-		if (initialValues?.boardId && boards.length > 0 && !selectedBoard) {
+		if (initialValues?.boardId && selectedBoard?.value !== initialValues.boardId) {
+			// Try to find in loaded boards
 			const initialBoard = boards.find((board: DropdownOption) => board.value === initialValues.boardId);
 			if (initialBoard) {
 				setSelectedBoard(initialBoard);
+			} else if (initialValues.boardName) {
+				// If not found but we have a name, create a temporary option
+				setSelectedBoard({
+					value: initialValues.boardId,
+					label: initialValues.boardName,
+				});
 			}
 		}
-	}, [boards, initialValues?.boardId, selectedBoard]);
+	}, [boards, initialValues?.boardId, initialValues?.boardName, selectedBoard?.value]);
 
 	// Set initial role when roles load
 	useEffect(() => {
-		if (initialValues?.role && roles.length > 0 && !selectedRole) {
-			const initialRole = roles.find((role: DropdownOption) => role.value === initialValues.role);
+		if (initialValues?.roleId && selectedRole?.value !== initialValues.roleId) {
+			const initialRole = roles.find((role: DropdownOption) => role.value === initialValues.roleId);
 			if (initialRole) {
 				setSelectedRole(initialRole);
+			} else if (initialValues.roleName) {
+				setSelectedRole({
+					value: initialValues.roleId,
+					label: initialValues.roleName,
+				});
 			}
 		}
-	}, [roles, initialValues?.role, selectedRole]);
+	}, [roles, initialValues?.roleId, initialValues?.roleName, selectedRole?.value]);
 
 	// Update tasks state when query data changes
 	useEffect(() => {
@@ -307,15 +342,22 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 	// Set initial task if provided
 	useEffect(() => {
-		if (initialValues?.itemId && tasks.length > 0 && !selectedTask) {
+		if (initialValues?.itemId && selectedTask?.value !== initialValues.itemId) {
 			const allItems = tasks.flatMap((group) => group.items);
 			const initialTask = allItems.find((task) => (task as DropdownOption).value === initialValues.itemId);
 			if (initialTask) {
 				// Need to cast because ComboboxItem doesn't guarantee label is string, but we know it is
 				setSelectedTask(initialTask as DropdownOption);
+			} else if (initialValues.itemName) {
+				// If not found but we have a name, create a temporary option
+				setSelectedTask({
+					value: initialValues.itemId,
+					label: initialValues.itemName,
+					name: initialValues.itemName,
+				});
 			}
 		}
-	}, [initialValues?.itemId, tasks, selectedTask]);
+	}, [initialValues?.itemId, initialValues?.itemName, tasks, selectedTask?.value]);
 
 	// Handle tasks error
 	useEffect(() => {
