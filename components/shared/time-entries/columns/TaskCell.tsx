@@ -7,12 +7,13 @@ interface TaskCellProps {
 	entry: TimeEntry;
 	onEdit?: (entry: TimeEntry) => void;
 	onDelete?: (entry: TimeEntry) => void;
+	style?: React.CSSProperties;
 }
 
-export function TaskCell({ entry, onEdit, onDelete }: TaskCellProps) {
+export function TaskCell({ entry, onEdit, onDelete, style }: TaskCellProps) {
 	return (
-		<Flex align="center" justify="space-between" gap="xs">
-			<Flex justify={"center"} align={"center"} gap="xs">
+		<Flex align="center" justify="space-between" gap="xs" style={style}>
+			<Flex justify={"start"} align={"center"} columnGap="xs" rowGap="2px" wrap="wrap">
 				{entry.is_draft && (
 					<Badge size="xs" style={{ backgroundColor: "var(--color--surface-primary)", color: "var(--color--text-primary)" }}>
 						DRAFT

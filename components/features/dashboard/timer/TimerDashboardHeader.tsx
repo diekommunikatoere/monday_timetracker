@@ -34,16 +34,17 @@ export function TimerDashboardHeader(variant?) {
 	return (
 		<>
 			<header id="appHeader" className={`widget-header ${variant}`}>
-				<Flex align="center" gap={16}>
-					{/* Logo for light/dark mode */}
+				<Flex align="center" gap={16} className="header-left-section">
+					<Flex align="center" gap={16} className="logo-container">
+						{/* Logo for light/dark mode */}
+						<Logo size={{ width: 186, height: 32 }} style={logoStyle} />
 
-					<Logo size={{ width: 186, height: 32 }} style={logoStyle} />
-
-					<ManualTimeEntryButton
-						onClick={() => {
-							handleManualTimeModalOpen();
-						}}
-					/>
+						<ManualTimeEntryButton
+							onClick={() => {
+								handleManualTimeModalOpen();
+							}}
+						/>
+					</Flex>
 
 					<ThemeToggle />
 				</Flex>

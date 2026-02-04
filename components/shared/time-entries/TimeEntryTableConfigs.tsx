@@ -21,6 +21,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	{
 		id: "checkbox",
 		width: 40,
+		minWidth: 40,
 		header: ({ data }) => {
 			const ownEntries = data.filter((entry) => entry.user_id === currentUserId);
 			const total = ownEntries.length;
@@ -36,26 +37,39 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	{
 		id: "task",
 		header: "Aufgabe",
+		minWidth: 280,
 		cell: ({ row }) => <TaskCell entry={row} onEdit={onEdit} onDelete={onDelete} />,
 	},
 	{
 		id: "board",
 		header: "Board",
-		cell: ({ row }) => <Text size="sm">{row.board_name || "-"}</Text>,
+		minWidth: 150,
+		cell: ({ row }) => (
+			<Text truncate size="sm">
+				{row.board_name || "-"}
+			</Text>
+		),
 	},
 	{
 		id: "role",
 		header: "Rolle",
+		minWidth: 120,
 		cell: ({ row }) => <RoleCell entry={row} />,
 	},
 	{
 		id: "comment",
 		header: "Kommentar",
-		cell: ({ row }) => <Text size="sm">{row.comment || "-"}</Text>,
+		minWidth: 200,
+		cell: ({ row }) => (
+			<Text truncate size="sm">
+				{row.comment || "-"}
+			</Text>
+		),
 	},
 	{
 		id: "date",
 		header: "Datum",
+		minWidth: 100,
 		cell: ({ row }) => (
 			<Text size="sm">
 				{new Date(row.start_time).toLocaleDateString("de-DE", {
@@ -69,6 +83,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	{
 		id: "start",
 		header: "Start",
+		minWidth: 100,
 		cell: ({ row }) => (
 			<Text size="sm">
 				{new Date(row.start_time).toLocaleTimeString("de-DE", {
@@ -82,6 +97,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	{
 		id: "end",
 		header: "Ende",
+		minWidth: 100,
 		cell: ({ row }) => (
 			<Text size="sm">
 				{new Date(row.end_time).toLocaleTimeString("de-DE", {
@@ -95,6 +111,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	{
 		id: "total",
 		header: "Gesamtzeit",
+		minWidth: 100,
 		cell: ({ row }) => <Text size="sm">{formatDuration(row.duration)}</Text>,
 	},
 ];
@@ -103,6 +120,7 @@ export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDe
 	{
 		id: "total",
 		header: "Dauer",
+		minWidth: 80,
 		cell: ({ row }) => (
 			<Text size="sm" fw={600}>
 				{formatDuration(row.duration)}
@@ -112,11 +130,13 @@ export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDe
 	{
 		id: "role",
 		header: "Rolle",
+		minWidth: 120,
 		cell: ({ row }) => <RoleCell entry={row} showCommentIcon />,
 	},
 	{
 		id: "date",
 		header: "Datum",
+		minWidth: 100,
 		cell: ({ row }) => (
 			<Text size="sm">
 				{new Date(row.start_time).toLocaleDateString("de-DE", {
@@ -130,12 +150,13 @@ export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDe
 	{
 		id: "range",
 		header: "Zeitraum",
+		minWidth: 100,
 		cell: ({ row }) => <TimeRangeCell entry={row} />,
 	},
 	{
 		id: "actions",
-		width: 50,
 		header: "",
+		width: 40,
 		cell: ({ row }) => <TimeEntryRowMenu entry={row} onEdit={onEdit} onDelete={onDelete} />,
 	},
 ];

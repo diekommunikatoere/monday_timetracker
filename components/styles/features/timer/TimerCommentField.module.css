@@ -1,5 +1,5 @@
 .wrapper {
-	width: min(400px, 100%);
+	width: 100%;
 
 	.input {
 		font-size: 0.9rem;

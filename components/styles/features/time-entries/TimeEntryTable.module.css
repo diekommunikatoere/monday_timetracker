@@ -1,12 +1,10 @@
 .timeEntryTable {
-	width: 100%;
-
 	--table-border-color: var(--color--border-layout);
 	--table-highlight-on-hover-color: var(--color--background-primary-hover);
 }
 
 .headerRow {
-	background-color: var(--color--surface-primary);
+	border-bottom: 2px solid var(--color--border-layout);
 }
 
 .selectedPrimary {

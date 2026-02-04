@@ -6,11 +6,12 @@ import { Icon } from "@/components";
 interface RoleCellProps {
 	entry: TimeEntry;
 	showCommentIcon?: boolean;
+	style?: React.CSSProperties;
 }
 
-export function RoleCell({ entry, showCommentIcon = false }: RoleCellProps) {
+export function RoleCell({ entry, showCommentIcon = false, style }: RoleCellProps) {
 	return (
-		<Flex align="center" gap="xs">
+		<Flex align="center" gap="xs" style={style}>
 			<Text size="sm">{entry.role_name || "-"}</Text>
 			{showCommentIcon && entry.comment && (
 				<Tooltip label={entry.comment} withArrow position="top">

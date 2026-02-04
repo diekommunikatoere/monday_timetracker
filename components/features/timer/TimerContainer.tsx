@@ -38,8 +38,8 @@ export function TimerContainer() {
 
 	return (
 		<Box className={styles.timerContainer}>
-			<Flex direction="row" align="stretch" gap="xl">
-				<Flex direction="row" align="center" justify="center" gap="lg">
+			<Flex direction="row" align="stretch" justify="stretch" columnGap="xl" rowGap="sm" wrap={"wrap"}>
+				<Flex direction="row" align="stretch" justify="center" gap="lg">
 					{/* Timer Display - shows elapsed time and reset button */}
 					<TimerDisplay elapsedTime={state.elapsedTime} status={state.status} onReset={actions.reset} disabled={!hasSession || state.isSaving} />
 

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { Flex } from "@mantine/core";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -199,7 +200,9 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 
 	return (
 		<>
-			<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} />
+			<Flex direction="column" gap="md" style={{ flex: 1, minHeight: 0, width: "100%" }}>
+				<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
+			</Flex>
 
 			<SaveTimerModal
 				show={showSaveModal}

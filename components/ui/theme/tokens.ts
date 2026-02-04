@@ -90,9 +90,9 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--border-radius--xl": "16px",
 
 		"--box-shadow--xs": "0 4px 6px -4px rgba(0, 0, 0, 0.1)",
-		"--box-shadow--small": "0 4px 8px rgba(0, 0, 0, 0.2)",
-		"--box-shadow--medium": "0 6px 20px rgba(0, 0, 0, 0.2)",
-		"--box-shadow--large": "0 15px 50px rgba(0, 0, 0, 0.4)",
+		"--box-shadow--sm": "0 4px 8px rgba(0, 0, 0, 0.2)",
+		"--box-shadow--md": "0 6px 20px rgba(0, 0, 0, 0.2)",
+		"--box-shadow--lg": "0 15px 50px rgba(0, 0, 0, 0.4)",
 		"--box-shadow--primary": "0 4px 12px rgba(219, 0, 122, 0.3)",
 		"--box-shadow--secondary": "0 4px 12px rgba(255, 214, 64, 0.3)",
 		"--box-shadow--error": "0 4px 12px rgba(243, 27, 99, 0.3)",
@@ -154,16 +154,16 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 	},
 	dark: {
 		"--color--selected-primary": "var(--color--secondary-100)",
-		"--color--selected-primary-hover": "var(--color--secondary-500)",
+		"--color--selected-primary-hover": "var(--color--secondary-200)",
 		"--color--selected-secondary": "var(--color--primary-100)",
-		"--color--selected-secondary-hover": "var(--color--primary-500)",
+		"--color--selected-secondary-hover": "var(--color--primary-200)",
 
 		"--color--highlight": "var(--color--tertiary-100)",
 		"--color--highlight-hover": "var(--color--tertiary-200)",
 		"--color--highlight-primary": "var(--color--primary-100)",
-		"--color--highlight-primary-hover": "var(--color--primary-500)",
+		"--color--highlight-primary-hover": "var(--color--primary-200)",
 		"--color--highlight-secondary": "var(--color--secondary-100)",
-		"--color--highlight-secondary-hover": "var(--color--secondary-500)",
+		"--color--highlight-secondary-hover": "var(--color--secondary-200)",
 
 		"--color--surface-primary": "var(--color--primary-100)",
 		"--color--surface-secondary": "var(--color--secondary-50)",

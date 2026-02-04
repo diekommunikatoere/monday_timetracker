@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flex, Loader, Center, Text, Card, Group } from "@mantine/core";
+import { Flex, Loader, Center, Text, Card, Group, Divider } from "@mantine/core";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { ItemSidebarHeader } from "@/components/sidebar/ItemSidebarHeader";
@@ -94,7 +94,9 @@ export default function ItemViewPage() {
 		<Flex direction="column" style={{ height: "100vh", overflow: "hidden" }}>
 			<ItemSidebarHeader onManualEntryClick={() => setShowManualModal(true)} />
 
-			<Flex justify="space-between" align="center" p="16px 16px 0">
+			<Divider color="var(--color--border-layout)" mb={"sm"} mx={"sm"} />
+
+			<Flex justify="space-between" align="center" px="16px">
 				<Text fw={700} size="lg">
 					{itemName}
 				</Text>

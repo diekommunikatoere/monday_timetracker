@@ -4,9 +4,10 @@ import { TimeEntry } from "@/types/time-entry";
 
 interface TimeRangeCellProps {
 	entry: TimeEntry;
+	style?: React.CSSProperties;
 }
 
-export function TimeRangeCell({ entry }: TimeRangeCellProps) {
+export function TimeRangeCell({ entry, style }: TimeRangeCellProps) {
 	const start = new Date(entry.start_time);
 	const end = new Date(entry.end_time);
 
@@ -17,7 +18,7 @@ export function TimeRangeCell({ entry }: TimeRangeCellProps) {
 		});
 
 	return (
-		<Text size="sm">
+		<Text size="sm" style={style}>
 			{formatTime(start)} – {formatTime(end)}
 		</Text>
 	);

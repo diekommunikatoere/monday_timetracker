@@ -124,7 +124,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 				))}
 			</SimpleGrid>
 
-			<Divider color="var(--color--border-ui)" m={"sm"} />
+			<Divider color="var(--color--border-layout)" m={"sm"} />
 
 			{/* Grouped Tables */}
 			<ScrollArea style={{ flex: 1 }}>
@@ -158,7 +158,9 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 									</Group>
 								</Accordion.Control>
 								<Accordion.Panel>
-									<TimeEntryTable timeEntries={group.entries} columns={columns} />
+									<Flex style={{ flex: 1, width: "100%" }}>
+										<TimeEntryTable timeEntries={group.entries} columns={columns} scrollable />
+									</Flex>
 								</Accordion.Panel>
 							</Accordion.Item>
 						))}

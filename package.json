@@ -1,6 +1,6 @@
 {
 	"name": "timetracker",
-	"version": "0.7.0",
+	"version": "0.7.1",
 	"private": true,
 	"scripts": {
 		"dev": "npm run services:start && concurrently \"next dev\" \"npm run expose\"",

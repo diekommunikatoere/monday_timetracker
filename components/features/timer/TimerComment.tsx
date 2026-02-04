@@ -35,13 +35,13 @@ export function TimerComment({ value, onChange, disabled, hasSession, isSaving, 
 	const disabledColor = "var(--color--text-disabled)";
 
 	return (
-		<Flex direction="row" align="center" className="timer-comment-field-container" gap="0">
+		<Flex direction="row" align="center" className="timer-comment-field-container" gap="0" style={{ flex: 1 }}>
 			<Tooltip label="Als Entwurf speichern" position="top" withArrow>
 				<IconButton classNames={{ root: styles.timerIconButton }} variant="filled" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving} loading={isSaving}>
 					<Icon name="archive" color={hasSession ? activeColor : disabledColor} size={21} />
 				</IconButton>
 			</Tooltip>
-			<Input classNames={styles} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} style={{ flex: 1 }} />
+			<Input classNames={styles} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} style={{ flex: 1, minWidth: "clamp(min(200px, 100vw), 25vw, 450px)" }} />
 		</Flex>
 	);
 }

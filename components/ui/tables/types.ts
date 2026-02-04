@@ -6,6 +6,8 @@ export interface ColumnDef<T> {
 	header: ReactNode | ((props: HeaderProps<T>) => ReactNode);
 	cell: (props: CellProps<T>) => ReactNode;
 	width?: string | number;
+	minWidth?: string | number;
+	maxWidth?: string | number;
 	align?: "left" | "center" | "right";
 	hidden?: boolean;
 }
