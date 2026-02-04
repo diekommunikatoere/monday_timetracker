@@ -1,0 +1,31 @@
+.item {
+	border: 1px solid transparent;
+	box-shadow: none;
+	border-radius: var(--border-radius--md);
+	overflow: hidden;
+
+	&[data-active="true"] {
+		border: 1px solid var(--color--border-active);
+		margin-bottom: 4px;
+	}
+}
+
+.control {
+	padding-left: 8px;
+
+	&:hover {
+		background-color: var(--color--background-primary-hover);
+	}
+
+	&[data-active="true"] {
+		background-color: var(--color--background-secondary);
+
+		&:hover {
+			background-color: var(--color--background-secondary-hover);
+		}
+	}
+}
+
+.content {
+	padding: 0;
+}

@@ -1,27 +1,40 @@
 // stores/mondayStore.ts
 import { create } from "zustand";
 import mondaySdk from "monday-sdk-js";
-import { useUserStore } from "./userStore";
+import { useUserStore, MondayTheme, mapMondayThemeToAppTheme } from "./userStore";
 
 const monday = mondaySdk();
 
 interface MondayState {
 	rawContext: any;
 	isLoading: boolean;
+	isInitialized: boolean;
+	isListenerSetup: boolean;
 	error: string | null;
+	mondayTheme: MondayTheme | null;
 
 	initializeMondayContext: () => Promise<void>;
 	setRawContext: (context: any) => void;
 	setLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
+	setupContextListener: () => void;
 }
 
 export const useMondayStore = create<MondayState>()((set, get) => ({
 	rawContext: null,
 	isLoading: true,
+	isInitialized: false,
+	isListenerSetup: false,
 	error: null,
+	mondayTheme: null,
 
 	initializeMondayContext: async () => {
+		// Prevent multiple initialization calls if already in progress or completed
+		if (get().isInitialized && !get().error) {
+			console.log("[initializeMondayContext] Already initialized, skipping");
+			return;
+		}
+
 		const startTime = Date.now();
 		try {
 			set({ isLoading: true, error: null });
@@ -36,7 +49,16 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				throw new Error("No user found in Monday.com context");
 			}
 
-			set({ rawContext: contextResult });
+			// Update theme first to avoid flicker during rest of initialization
+			const mondayTheme = contextResult?.data?.theme as MondayTheme;
+			if (mondayTheme) {
+				console.log(`[mondayStore] initializeMondayContext setting theme: ${mondayTheme}`);
+				set({ mondayTheme });
+				// Also update user store theme for consistency
+				useUserStore.setState({ theme: mondayTheme, appTheme: mapMondayThemeToAppTheme(mondayTheme) });
+			}
+
+			set({ rawContext: contextResult, isInitialized: true });
 			console.log("Monday context data:", contextResult);
 
 			// Update user store with Monday user info
@@ -97,9 +119,22 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				authenticated: true,
 			});
 
-			console.log("Supabase user initialized:", userProfile);
-			console.log(`[initializeMondayContext] Total initialization time - ${Date.now() - startTime}ms`);
+			// If user has a persisted theme preference, apply it
+			if (userProfile.theme) {
+				const persistedTheme = userProfile.theme as MondayTheme;
+				console.log(`[mondayStore] Applying persisted theme: ${persistedTheme}`);
+				useUserStore.setState({
+					theme: persistedTheme,
+					appTheme: mapMondayThemeToAppTheme(persistedTheme),
+				});
+			}
 
+			console.log("Supabase user initialized:", userProfile);
+
+			// Automatically setup context listener after initialization
+			get().setupContextListener();
+
+			console.log(`[initializeMondayContext] Total initialization time - ${Date.now() - startTime}ms`);
 			set({ isLoading: false });
 		} catch (err) {
 			console.error("Error initializing Monday user:", err);
@@ -113,4 +148,36 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 	setRawContext: (context) => set({ rawContext: context }),
 	setLoading: (loading) => set({ isLoading: loading }),
 	setError: (error) => set({ error }),
+
+	/**
+	 * Sets up the monday.listen("context", ...) listener to reactively handle theme changes.
+	 * This should be called once during app initialization.
+	 */
+	setupContextListener: () => {
+		if (get().isListenerSetup) {
+			console.log("[setupContextListener] Listener already setup, skipping");
+			return;
+		}
+
+		console.log("[setupContextListener] Setting up monday.listen for context changes");
+		set({ isListenerSetup: true });
+
+		monday.listen("context", (res: any) => {
+			const contextData = res?.data;
+			if (!contextData) {
+				return;
+			}
+
+			// Update raw context
+			set({ rawContext: res });
+
+			// NOTE: We no longer automatically sync the platform theme to the userStore
+			// to prevent reversion loops when the user has manually selected a theme.
+			// The theme is now primarily managed by the userStore and persisted in the DB.
+			const newTheme = contextData.theme as MondayTheme;
+			if (newTheme) {
+				set({ mondayTheme: newTheme });
+			}
+		});
+	},
 }));

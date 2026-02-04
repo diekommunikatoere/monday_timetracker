@@ -2,10 +2,8 @@
 "use client";
 
 import { Flex, Tooltip } from "@mantine/core";
-import { IconButton } from "@/components";
-import { Icon } from "@/components";
+import { Icon, IconButton } from "@/components";
 import type { TimerControlsProps } from "@/types/timer.types";
-import styles from "@/components/styles/features/timer/TimerControls.module.css";
 
 /**
  * TimerControls - Presentational component for timer action buttons
@@ -26,8 +24,8 @@ import styles from "@/components/styles/features/timer/TimerControls.module.css"
 export function TimerControls({ status, hasSession, hasComment, isSaving, onPlayPause, onSave }: TimerControlsProps) {
 	const isRunning = status === "running";
 
-	const activeColor = "white";
-	const disabledColor = "var(--color--tertiary)";
+	const activeColor = "var(--color--icon-on-primary)";
+	const disabledColor = "var(--color--text-disabled)";
 
 	// Determine which icon to show for play/pause button
 	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} size={21} /> : <Icon name="play" color={activeColor} size={21} />;
@@ -35,12 +33,12 @@ export function TimerControls({ status, hasSession, hasComment, isSaving, onPlay
 	return (
 		<Flex direction="row" align="center" justify="center" gap="4px">
 			<Tooltip label={isRunning ? "Timer pausieren" : "Timer starten"} position="top" withArrow>
-				<IconButton className={`button button--timer play-pause ${styles.timerIconButton}`} variant="filled" size="lg" onClick={onPlayPause} disabled={isSaving} loading={isSaving}>
+				<IconButton variant="filled" colorVariant="primary" size="lg" onClick={onPlayPause} disabled={isSaving} loading={isSaving}>
 					{PlayPauseIcon}
 				</IconButton>
 			</Tooltip>
 			<Tooltip label="Speichern" position="top" withArrow>
-				<IconButton className={`button button--timer save ${styles.timerIconButton}`} variant="filled" size="lg" onClick={onSave} disabled={!hasSession || isSaving} loading={isSaving}>
+				<IconButton variant="filled" colorVariant="primary" size="lg" onClick={onSave} disabled={!hasSession || isSaving} loading={isSaving}>
 					<Icon name="save" color={hasSession ? activeColor : disabledColor} size={21} />
 				</IconButton>
 			</Tooltip>

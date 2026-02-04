@@ -223,7 +223,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 			<Modal.Header>Zeit eintragen</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
-					{error && <div style={{ color: "var(--mantine-color-red-6)" }}>{error}</div>}
+					{error && <div style={{ color: "var(--color--error-500)" }}>{error}</div>}
 
 					{/* Start and End Time Inputs */}
 					<Flex gap="md">

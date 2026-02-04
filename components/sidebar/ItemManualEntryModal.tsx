@@ -29,7 +29,7 @@ export interface ItemManualEntryModalProps {
 }
 
 export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, roleId, roleName }: ItemManualEntryModalProps) {
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
+	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: true });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRoleId, setSelectedRoleId] = useState<string>(roleId);

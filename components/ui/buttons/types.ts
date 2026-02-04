@@ -16,6 +16,7 @@ export type ButtonGroupProps = MantineButtonGroupProps & {
 
 export type IconButtonProps = MantineActionIconProps & {
 	children: React.ReactNode;
+	colorVariant?: "primary" | "secondary" | "tertiary" | "primary-muted" | "default";
 	onClick?: () => void;
 	href?: string;
 };

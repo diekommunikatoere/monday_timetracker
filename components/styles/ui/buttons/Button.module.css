@@ -12,12 +12,12 @@ button.button {
 	&.button--primary,
 	&[data-variant="filled"] {
 		background-color: var(--color-primary);
-		color: var(--color-white);
+		color: var(--color--text-on-primary);
 
 		&:disabled,
 		&[data-disabled] {
-			background-color: red;
-			color: var(--color-text-disabled);
+			background-color: var(--color--background-disabled);
+			color: var(--color--text-disabled);
 		}
 	}
 
@@ -39,7 +39,7 @@ button.button {
 
 	&:disabled,
 	&[data-disabled] {
-		background-color: var(--color-background-disabled);
+		background-color: var(--color--background-disabled);
 		cursor: not-allowed;
 	}
 }

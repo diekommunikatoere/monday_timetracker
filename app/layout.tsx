@@ -3,6 +3,8 @@
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
+import "@/public/css/light.css";
+import "@/public/css/dark.css";
 import "@/public/css/fonts.css";
 import "./globals.scss";
 import { themeTokens } from "@/components/ui/theme/tokens";
@@ -12,6 +14,8 @@ import { StoreProvider } from "@/components/StoreProvider";
 import { TimerProvider } from "@/components/features/timer/TimerProvider";
 import { createTheme, MantineProvider, ColorSchemeScript, colorsTuple } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
+import { useUserStore } from "@/stores/userStore";
+
 const theme = createTheme({
 	colors: {
 		"dki-black": colorsTuple("#282616"),
@@ -33,13 +37,15 @@ const theme = createTheme({
 const queryClient = new QueryClient();
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+	const appTheme = useUserStore((state) => state.appTheme);
+
 	return (
 		<html lang="de" suppressHydrationWarning>
 			<head>
 				<ColorSchemeScript />
 			</head>
 			<body>
-				<MantineProvider theme={theme} cssVariablesResolver={themeTokens}>
+				<MantineProvider theme={theme} cssVariablesResolver={themeTokens} forceColorScheme={appTheme}>
 					<Notifications />
 					<QueryClientProvider client={queryClient}>
 						<StoreProvider>

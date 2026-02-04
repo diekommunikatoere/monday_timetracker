@@ -18,7 +18,7 @@ export function TimeRangeCell({ entry }: TimeRangeCellProps) {
 
 	return (
 		<Text size="sm">
-			{formatTime(start)} - {formatTime(end)}
+			{formatTime(start)} – {formatTime(end)}
 		</Text>
 	);
 }

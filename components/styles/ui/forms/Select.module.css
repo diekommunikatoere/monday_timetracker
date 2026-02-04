@@ -3,13 +3,13 @@
 }
 
 .select--error {
-	border-color: var(--mantine-color-red-6);
+	border-color: var(--color--error-500);
 }
 
 .select--warning {
-	border-color: var(--mantine-color-yellow-6);
+	border-color: var(--color--secondary-500);
 }
 
 .select--success {
-	border-color: var(--mantine-color-green-6);
+	border-color: var(--color--success-500);
 }

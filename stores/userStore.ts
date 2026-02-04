@@ -8,6 +8,25 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
+// Monday.com theme values from context
+export type MondayTheme = "black" | "light" | "dark";
+
+// Mapped theme values for the application
+export type AppTheme = "light" | "dark";
+
+/**
+ * Maps Monday.com theme values to application theme values.
+ * - "light" -> "light"
+ * - "dark" | "black" -> "dark"
+ */
+export function mapMondayThemeToAppTheme(mondayTheme: MondayTheme): AppTheme {
+	if (mondayTheme === "light") {
+		return "light";
+	}
+	// Both "dark" and "black" map to "dark"
+	return "dark";
+}
+
 type MondayUser = {
 	id: string;
 	accountId: string;
@@ -41,8 +60,11 @@ interface UserState {
 	// Supabase user data
 	supabaseUser: SupabaseUser;
 
-	// Theme preferences
-	theme: "black" | "light" | "dark";
+	// Theme preferences - stores the raw Monday theme value
+	theme: MondayTheme;
+
+	// Computed app theme (light/dark)
+	appTheme: AppTheme;
 
 	// Authentication status
 	authenticated: boolean;
@@ -50,19 +72,25 @@ interface UserState {
 	// Actions
 	setMondayUser: (user: UserState["mondayUser"]) => void;
 	setSupabaseUser: (user: UserState["supabaseUser"]) => void;
-	setTheme: (theme: UserState["theme"]) => void;
+	toggleTheme: () => Promise<void>;
 }
 
 export const useUserStore = create<UserState>()(
 	persist(
-		(set) => ({
+		(set, get) => ({
 			mondayUser: null,
 			supabaseUser: null,
 			theme: "black",
+			appTheme: "dark",
 			authenticated: false,
 
 			setMondayUser: async () => {
 				const context = await monday.get("context");
+
+				// Extract theme from context
+				const mondayTheme = (context?.data?.theme as MondayTheme) || "black";
+				const appTheme = mapMondayThemeToAppTheme(mondayTheme);
+
 				set({
 					mondayUser: {
 						id: context?.data?.user?.id || null,
@@ -78,7 +106,11 @@ export const useUserStore = create<UserState>()(
 						timeFormat: context?.data?.user?.timeFormat || "24H",
 						timeZoneOffset: context?.data?.user?.timeZoneOffset || 0,
 					},
+					theme: mondayTheme,
+					appTheme,
 				});
+
+				console.log(`[setMondayUser] Theme initialized: ${mondayTheme} -> ${appTheme}`);
 			},
 			setSupabaseUser: () => {
 				console.log("Setting Supabase user...");
@@ -91,7 +123,34 @@ export const useUserStore = create<UserState>()(
 				set({ supabaseUser: user });
 				console.log("Supabase user set:", user);
 			},
-			setTheme: (theme) => set({ theme }),
+			toggleTheme: async () => {
+				const currentTheme = get().theme;
+				const newTheme: MondayTheme = currentTheme === "light" ? "dark" : "light";
+				const appTheme = mapMondayThemeToAppTheme(newTheme);
+
+				// Update local state synchronously
+				set({ theme: newTheme, appTheme });
+
+				// Persist to database asynchronously
+				try {
+					const mondayUserId = get().mondayUser?.id;
+					if (!mondayUserId) return;
+
+					// Get fresh context for authentication header
+					const context = await monday.get("context");
+
+					await fetch("/api/user/theme", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"monday-context": JSON.stringify(context),
+						},
+						body: JSON.stringify({ theme: newTheme }),
+					});
+				} catch (error) {
+					console.error("Failed to persist theme change:", error);
+				}
+			},
 			setAuthenticated: async () => {
 				// Find or create user in our database
 				const response = await fetch("/api/auth/monday-user", {

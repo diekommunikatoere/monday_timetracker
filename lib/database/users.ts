@@ -85,6 +85,18 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 /**
+ * Update user theme by Monday.com user ID
+ */
+export async function updateUserThemeByMondayId(mondayUserId: string, theme: string): Promise<void> {
+	const { error } = await supabaseAdmin.from("user_profiles").update({ theme, updated_at: new Date().toISOString() }).eq("monday_user_id", mondayUserId);
+
+	if (error) {
+		console.error("Error updating user theme:", error);
+		throw error;
+	}
+}
+
+/**
  * Update user profile (e.g., if Monday.com info changes)
  */
 export async function updateUserProfile(
@@ -92,6 +104,7 @@ export async function updateUserProfile(
 	updates: {
 		email?: string;
 		name?: string;
+		theme?: string;
 	},
 ): Promise<UserProfile> {
 	const { data, error } = await supabaseAdmin.from("user_profiles").update(updates).eq("id", userId).select().single();

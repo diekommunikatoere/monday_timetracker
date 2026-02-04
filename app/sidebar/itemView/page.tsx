@@ -23,8 +23,14 @@ export default function ItemViewPage() {
 	// Initialize Monday context on mount
 	useEffect(() => {
 		initializeMondayContext().catch((err) => console.error("Error initializing Monday context:", err));
-		setItemContext(rawContext?.data?.itemId?.toString() || "", rawContext?.data?.boardId?.toString() || "");
 	}, [initializeMondayContext]);
+
+	// Update item context when rawContext is available
+	useEffect(() => {
+		if (rawContext?.data?.itemId && rawContext?.data?.boardId) {
+			setItemContext(rawContext.data.itemId.toString(), rawContext.data.boardId.toString());
+		}
+	}, [rawContext, setItemContext]);
 
 	// Fetch time entries when userId is available
 	useEffect(() => {
@@ -88,7 +94,7 @@ export default function ItemViewPage() {
 		<Flex direction="column" style={{ height: "100vh", overflow: "hidden" }}>
 			<ItemSidebarHeader onManualEntryClick={() => setShowManualModal(true)} />
 
-			<Flex justify="space-between" align="center" p="sm" style={{ borderBottom: "1px solid var(--color--border-ui)" }}>
+			<Flex justify="space-between" align="center" p="16px 16px 0">
 				<Text fw={700} size="lg">
 					{itemName}
 				</Text>

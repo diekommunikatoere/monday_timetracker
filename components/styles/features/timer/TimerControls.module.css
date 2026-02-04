@@ -1,8 +1,0 @@
-.timerIconButton {
-	border-radius: var(--border-radius-small);
-
-	&:disabled {
-		cursor: not-allowed;
-		background-color: var(--color--tertiary-light);
-	}
-}

@@ -18,15 +18,6 @@
 	animation: blink 1.5s step-start infinite;
 }
 
-.timerResetButton {
-	border-radius: var(--border-radius-small);
-
-	&:disabled {
-		cursor: not-allowed;
-		background-color: var(--color--tertiary-light);
-	}
-}
-
 @keyframes blink {
 	50% {
 		opacity: 0.5; /* Cleaner than changing colors */

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Flex, Text, Card, Group, Badge, Divider, ScrollArea, Accordion, Avatar } from "@mantine/core";
+import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accordion, Avatar } from "@mantine/core";
 import { Icon } from "@/components";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
@@ -12,6 +12,8 @@ import { formatDuration } from "@/lib/utils";
 import { TimeEntry } from "@/types/time-entry";
 import { useToast } from "@/components/ToastProvider";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
+
+import styles from "@/components/styles/features/sidebar/ItemTimeEntriesView.module.css";
 
 export interface ItemTimeEntriesViewProps {
 	timeEntries: TimeEntry[];
@@ -109,20 +111,20 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 	return (
 		<Flex direction="column" style={{ height: "100%" }}>
 			{/* Aggregations by Role */}
-			<Group gap="sm" p="sm">
+			<SimpleGrid p="sm" type="container" cols={{ base: 1, "500px": 2, "620px": 3, "800px": 4 }} spacing="sm">
 				{Object.values(durationByRole).map((role) => (
-					<Card key={role.roleId} withBorder padding="xs" radius="md" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-						<Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+					<Card key={role.roleId} withBorder padding="sm" radius="md" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderColor: "var(--color--border-ui)" }}>
+						<Text size="xs" c="dimmed" tt="uppercase" fw={700} lh={1}>
 							{role.roleName}
 						</Text>
-						<Text fw={700} size="sm">
+						<Text fw={700} size="sm" lh={1}>
 							{formatDuration(role.duration)}
 						</Text>
 					</Card>
 				))}
-			</Group>
+			</SimpleGrid>
 
-			<Divider />
+			<Divider color="var(--color--border-ui)" m={"sm"} />
 
 			{/* Grouped Tables */}
 			<ScrollArea style={{ flex: 1 }}>
@@ -139,10 +141,10 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 						<Text>Keine Zeiteinträge gefunden.</Text>
 					</Flex>
 				) : (
-					<Accordion multiple value={open || []} onChange={(values) => setOpen(values.length > 0 ? values : null)} disableChevronRotation>
+					<Accordion multiple value={open || []} onChange={(values) => setOpen(values.length > 0 ? values : null)} disableChevronRotation classNames={styles} p="sm">
 						{groupedEntries.map((group) => (
 							<Accordion.Item key={group.userId} value={group.userId}>
-								<Accordion.Control chevron={open && open.includes(group.userId) ? <Icon name={"collapse"} size={16} /> : <Icon name={"expand"} size={16} />}>
+								<Accordion.Control chevron={open && open.includes(group.userId) ? <Icon name={"collapse"} size={16} color="var(--color--icon)" /> : <Icon name={"expand"} size={16} color="var(--color--icon)" />}>
 									<Group justify="space-between" pr="md">
 										<Flex direction="row" align="center" gap="sm">
 											<Avatar src={group.userPhotoUrl} alt={group.userName} radius="xl" size="sm">

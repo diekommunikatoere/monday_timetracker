@@ -3,13 +3,13 @@
 }
 
 .time-picker--error {
-	border-color: var(--mantine-color-red-6);
+	border-color: var(--color--error-500);
 }
 
 .time-picker--warning {
-	border-color: var(--mantine-color-yellow-6);
+	border-color: var(--color--secondary-500);
 }
 
 .time-picker--success {
-	border-color: var(--mantine-color-green-6);
+	border-color: var(--color--success-500);
 }

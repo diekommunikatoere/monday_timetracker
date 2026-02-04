@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Flex, Tooltip } from "@mantine/core";
 import { Icon, IconButton, Input } from "@/components";
 import type { TimerCommentFieldProps } from "@/types/timer.types";
-import "@/components/styles/features/timer/TimerCommentField.css";
+import styles from "@/components/styles/features/timer/TimerCommentField.module.css";
 
 /**
  * TimerComment - Presentational component for comment input
@@ -32,16 +32,16 @@ export function TimerComment({ value, onChange, disabled, hasSession, isSaving, 
 	};
 
 	const activeColor = "white";
-	const disabledColor = "var(--color--tertiary)";
+	const disabledColor = "var(--color--text-disabled)";
 
 	return (
 		<Flex direction="row" align="center" className="timer-comment-field-container" gap="0">
 			<Tooltip label="Als Entwurf speichern" position="top" withArrow>
-				<IconButton className={`button button--timer draft timer-icon-button`} variant="filled" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving} loading={isSaving}>
+				<IconButton classNames={{ root: styles.timerIconButton }} variant="filled" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving} loading={isSaving}>
 					<Icon name="archive" color={hasSession ? activeColor : disabledColor} size={21} />
 				</IconButton>
 			</Tooltip>
-			<Input className={`timer-comment-field ${isFocused ? " focus" : ""}`} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} style={{ flex: 1 }} />
+			<Input classNames={styles} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} style={{ flex: 1 }} />
 		</Flex>
 	);
 }

@@ -65,7 +65,7 @@ export function useTimer(): UseTimerReturn {
 	const { autoSaveDraft } = useDraftStore();
 
 	// Modal store for save modal
-	const { openTimerSave } = useModalStore();
+	const { openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation } = useModalStore();
 
 	// Time entries for refetch after save
 	const { refetch: refetchTimeEntries } = useTimeEntriesStore();
@@ -311,6 +311,55 @@ export function useTimer(): UseTimerReturn {
 	}, [comment, sessionId, userProfile?.id, autoSaveDraft]);
 
 	// ============================================
+	// Core Actions (Internal)
+	// ============================================
+
+	/**
+	 * Internal function to perform the actual save as draft logic
+	 */
+	const performSaveAsDraft = useCallback(async () => {
+		if (!userProfile?.id || !draftId || !sessionId) return;
+
+		try {
+			store.setError(null);
+
+			// Use draft store's saveDraft for the actual save
+			const { saveDraft } = useDraftStore.getState();
+			await saveDraft({
+				draftId,
+				userProfileId: userProfile.id,
+				comment,
+			});
+
+			// Soft reset
+			const context = await getMondayContext();
+			await fetch("/api/timer/soft-reset", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"monday-context": JSON.stringify(context),
+				},
+				body: JSON.stringify({
+					draftId,
+					sessionId,
+				}),
+			});
+
+			// Reset local state
+			store.reset();
+
+			// Refetch time entries
+			refetchTimeEntries(userProfile.id);
+
+			console.log("Timer saved as draft");
+		} catch (err: any) {
+			console.error("Failed to save as draft:", err);
+			store.setError(err.message || "Failed to save as draft");
+			setHookError(err.message);
+		}
+	}, [userProfile?.id, draftId, sessionId, comment, getMondayContext, refetchTimeEntries]);
+
+	// ============================================
 	// Timer Actions
 	// ============================================
 
@@ -451,45 +500,19 @@ export function useTimer(): UseTimerReturn {
 			 * Save as draft (soft reset - keeps entry but clears session)
 			 */
 			saveAsDraft: async () => {
-				if (!userProfile?.id || !draftId || !sessionId) return;
-
-				try {
-					store.setError(null);
-
-					// Use draft store's saveDraft for the actual save
-					const { saveDraft } = useDraftStore.getState();
-					await saveDraft({
-						draftId,
-						userProfileId: userProfile.id,
-						comment,
-					});
-
-					// Soft reset
-					const context = await getMondayContext();
-					await fetch("/api/timer/soft-reset", {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							"monday-context": JSON.stringify(context),
-						},
-						body: JSON.stringify({
-							draftId,
-							sessionId,
-						}),
-					});
-
-					// Reset local state
-					store.reset();
-
-					// Refetch time entries
-					refetchTimeEntries(userProfile.id);
-
-					console.log("Timer saved as draft");
-				} catch (err: any) {
-					console.error("Failed to save as draft:", err);
-					store.setError(err.message || "Failed to save as draft");
-					setHookError(err.message);
+				if (!comment || comment.trim() === "") {
+					openEmptyCommentConfirmation();
+					return;
 				}
+				await performSaveAsDraft();
+			},
+
+			/**
+			 * Confirm save as draft (bypasses empty comment check)
+			 */
+			confirmSaveAsDraft: async () => {
+				closeEmptyCommentConfirmation();
+				await performSaveAsDraft();
 			},
 
 			/**
@@ -510,7 +533,7 @@ export function useTimer(): UseTimerReturn {
 				store.setComment(newComment);
 			},
 		}),
-		[sessionId, draftId, elapsedTime, status, comment, userProfile?.id, apiCall, getMondayContext, openTimerSave, refetchTimeEntries],
+		[sessionId, draftId, elapsedTime, status, comment, userProfile?.id, apiCall, getMondayContext, openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation, refetchTimeEntries, performSaveAsDraft],
 	);
 
 	// ============================================

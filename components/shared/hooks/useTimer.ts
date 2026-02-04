@@ -53,6 +53,9 @@ export function useTimer(): UseTimerReturn {
 				}
 			},
 			saveAsDraft: async () => {},
+			confirmSaveAsDraft: async () => {
+				// TODO: Implement logic from feature hook
+			},
 			openSaveModal: () => {
 				// Trigger the save modal
 				useModalStore.getState().openTimerSave();

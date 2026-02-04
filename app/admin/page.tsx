@@ -491,7 +491,7 @@ export default function AdminPage() {
 														width: 10,
 														height: 10,
 														borderRadius: "50%",
-														backgroundColor: (board as any).config_status === "GREEN" ? "var(--mantine-color-green-6)" : (board as any).config_status === "YELLOW" ? "var(--mantine-color-yellow-6)" : "var(--mantine-color-red-6)",
+														backgroundColor: (board as any).config_status === "GREEN" ? "var(--color--success-500)" : (board as any).config_status === "YELLOW" ? "var(--color--secondary-500)" : "var(--color--error-500)",
 													}}
 												/>
 												<span className="board-card-name">{(board as any).monday_board?.name || board.board_id}</span>

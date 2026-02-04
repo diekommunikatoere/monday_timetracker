@@ -5,6 +5,7 @@ import { Table, Checkbox, Center, Loader, Text } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { useMemo } from "react";
 import { ColumnDef } from "@/components/ui/tables/types";
+import styles from "@/components/styles/features/time-entries/TimeEntryTable.module.css";
 
 export interface TimeEntryTableProps {
 	timeEntries: TimeEntry[];
@@ -53,9 +54,9 @@ export function TimeEntryTable({ timeEntries, columns, loading, error, selectedI
 	const visibleColumns = columns.filter((col) => !col.hidden);
 
 	return (
-		<Table highlightOnHover withColumnBorders withTableBorder withRowBorders>
+		<Table withTableBorder highlightOnHover withColumnBorders withRowBorders className={styles.timeEntryTable}>
 			<Table.Thead>
-				<Table.Tr bg="white">
+				<Table.Tr bg="var(--color--background-secondary)" className={styles.headerRow}>
 					{visibleColumns.map((col) => (
 						<Table.Th key={col.id} fw={600} style={{ width: col.width }} ta={col.align || "left"}>
 							{typeof col.header === "function" ? col.header({ data: timeEntries }) : col.header}
@@ -65,7 +66,7 @@ export function TimeEntryTable({ timeEntries, columns, loading, error, selectedI
 			</Table.Thead>
 			<Table.Tbody>
 				{timeEntries.map((entry, rowIndex) => (
-					<Table.Tr key={entry.id} bg={selectedIds.includes(entry.id) ? "var(--color--primary-selected)" : entry.is_draft ? "var(--color--secondary-extra-light)" : undefined}>
+					<Table.Tr key={entry.id} className={selectedIds.includes(entry.id) ? styles.selectedPrimary : entry.is_draft ? styles.highlightPrimary : undefined}>
 						{visibleColumns.map((col) => (
 							<Table.Td key={col.id} ta={col.align || "left"}>
 								{col.cell({ row: entry, index: rowIndex })}

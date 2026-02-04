@@ -1,48 +1,4 @@
-@use "../public/css/dark.css";
-@use "../public/css/light.css";
-
-// Variables
-// SCSS
-$color-primary: var(--color--primary);
-$color-secondary: var(--color--secondary);
-$color-tertiary: var(--color--tertiary);
-$color-primary-hover: var(--color--primary-hover);
-$color-primary-light: var(--color--primary-light);
-$color-primary-extra-light: var(--color--primary-extra-light);
-$color-primary-dark: var(--color--primary-dark);
-$color-secondary-hover: var(--color--secondary-hover);
-$color-secondary-light: var(--color--secondary-light);
-$color-secondary-extra-light: var(--color--secondary-extra-light);
-$color-secondary-dark: var(--color--secondary-dark);
-$color-tertiary-light: var(--color--tertiary-light);
-$color-tertiary-dark: var(--color--tertiary-dark);
-$color-background: var(--color--background-primary);
-$color-background-secondary: var(--color--background-secondary);
-$color-border: var(--color--border);
-$color-contrast: var(--color--contrast);
-$color-error: var(--color--error);
-$color-error-light: var(--color--error-light);
-$color-error-extra-light: var(--color--error-extra-light);
-$color-error-dark: var(--color--error-dark);
-$color-success: var(--color--success);
-$color-success-light: var(--color--success-light);
-$color-success-extra-light: var(--color--success-extra-light);
-$color-success-dark: var(--color--success-dark);
-
-// !Change to Gibson & Gill Sans later
-$font-family: "Gibson", "Gill Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
-$font-size-base: 16px;
-$line-height-base: 1.5;
-
-$box-shadow-xs: var(--box-shadow-xs);
-$box-shadow-small: var(--box-shadow-small);
-$box-shadow-medium: var(--box-shadow-medium);
-$box-shadow-large: var(--box-shadow-large);
-$box-shadow-primary: 0 4px 12px rgba(219, 0, 122, 0.3);
-$box-shadow-secondary: 0 4px 12px rgba(255, 214, 64, 0.3);
-$box-shadow-error: 0 4px 12px rgba(243, 27, 99, 0.3);
-$box-shadow-success: 0 4px 12px rgba(74, 222, 128, 0.3);
-$transition: all 0.1s ease-in-out;
+@use "../public/css/themeTokens.css";
 
 // Reset and base styles
 * {
@@ -55,11 +11,9 @@ html,
 body {
 	max-width: 100vw;
 	overflow-x: hidden;
-	font-family: $font-family;
-	font-size: $font-size-base;
-	line-height: $line-height-base;
-	color: $color-contrast;
-	background-color: $color-background;
+	font: var(--font--size-md) var(--font--primary);
+	color: var(--color--text-primary);
+	background-color: var(--color--background-primary);
 }
 
 main {
@@ -77,25 +31,24 @@ h5,
 h6 {
 	margin-bottom: 1rem;
 	font-weight: 600;
-	line-height: 1.2;
 }
 
 h1 {
-	font-size: 2.5rem;
+	font: var(--font--size-xxxl) var(--font--headlines);
 	text-align: center;
-	color: $color-primary;
+	color: var(--color--text-primary);
 	margin-bottom: 2rem;
 }
 
 h2 {
-	font-size: 1.75rem;
-	color: $color-secondary;
+	font: var(--font--size-xxl) var(--font--headlines);
+	color: var(--color--text-secondary);
 	margin-bottom: 1.5rem;
 }
 
 h3 {
-	font-size: 1.25rem;
-	color: $color-tertiary-dark;
+	font: var(--font--size-xl) var(--font--headlines);
+	color: var(--color--text-secondary);
 	margin-bottom: 1rem;
 }
 
@@ -103,100 +56,11 @@ p {
 	margin-bottom: 1rem;
 }
 
-// Button styles
-/* .btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 0.3em;
-	padding: 0.75rem 1.5rem;
-	font-size: 1rem;
-	font-weight: 700;
-	text-align: center;
-	text-decoration: none;
-	border: none;
-	border-radius: var(--border-radius--small);
-	cursor: pointer;
-	transition: $transition;
-
-	&:focus {
-		outline: 2px solid $color-primary;
-		outline-offset: 2px;
-	}
-
-	&:disabled {
-		cursor: not-allowed;
-	}
-
-	&.btn-primary {
-		background-color: $color-primary;
-		color: white;
-
-		&:hover:not(:disabled) {
-			background-color: $color-primary-hover;
-		}
-
-		&:disabled {
-			background-color: $color-tertiary-light;
-			color: $color-tertiary;
-		}
-	}
-
-	&.btn-secondary {
-		background-color: $color-secondary;
-		color: $color-contrast;
-
-		&:hover:not(:disabled) {
-			background-color: $color-secondary-hover;
-		}
-
-		&:disabled {
-			background-color: $color-tertiary-light;
-			color: $color-tertiary;
-		}
-	}
-
-	&.btn-tertiary {
-		background-color: $color-tertiary-light;
-		color: $color-contrast;
-
-		&:hover:not(:disabled) {
-			background-color: $color-tertiary-dark;
-			color: white;
-		}
-
-		&:disabled {
-			background-color: $color-tertiary-light;
-			color: $color-tertiary;
-		}
-	}
-
-	&.btn-danger {
-		background-color: $color-error;
-		color: white;
-
-		&:hover:not(:disabled) {
-			background-color: $color-error-dark;
-		}
-	}
-
-	&.btn-success {
-		background-color: $color-success;
-		color: $color-contrast;
-
-		&:hover:not(:disabled) {
-			background-color: $color-success-dark;
-			color: white;
-		}
-	}
-} */
-
 // Dashboard styles
 #dashboard-app {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	background-color: $color-background;
 	min-height: 100vh;
 	overflow: hidden;
 }
@@ -234,9 +98,9 @@ label {
 .task-input-container {
 	margin-top: 2rem;
 	padding: 1.5rem;
-	background-color: $color-background;
+	background-color: var(--color--background-primary);
 	border-radius: var(--border-radius--small);
-	border: 1px solid $color-tertiary;
+	border: 1px solid var(--color--border-ui);
 
 	.task-input-dropdowns {
 		display: flex;
@@ -252,21 +116,21 @@ label {
 		display: block;
 		margin-bottom: 0.5rem;
 		font-weight: 500;
-		color: $color-contrast;
+		color: var(--color--text-primary);
 	}
 
 	input {
 		width: 100%;
 		padding: 0.75rem;
 		font-size: 1rem;
-		border: 1px solid $color-tertiary;
+		border: 1px solid var(--color--border-ui);
 		border-radius: var(--border-radius--small);
-		transition: $transition;
+		transition: var(--transition);
 
 		&:focus {
 			outline: none;
-			border-color: $color-primary;
-			box-shadow: 0 0 0 2px rgba($color-primary, 0.25);
+			border-color: var(--color--primary);
+			box-shadow: 0 0 0 2px rgba(var(--color--primary), 0.25);
 		}
 	}
 }
@@ -279,15 +143,15 @@ label {
 
 // Time entries styles
 .time-entries-container {
-	background: $color-background;
+	background: var(--color--background-primary);
 	border-radius: var(--border-radius--small);
 	padding: 2rem;
-	box-shadow: $box-shadow-small;
+	box-shadow: var(--box-shadow--small);
 }
 
 .no-entries {
 	text-align: center;
-	color: $color-secondary;
+	color: var(--color--text-secondary);
 	font-style: italic;
 	padding: 2rem;
 }
@@ -305,22 +169,22 @@ label {
 	td {
 		padding: 1rem;
 		text-align: left;
-		border-bottom: 1px solid $color-tertiary;
+		border-bottom: 1px solid var(--color--border-ui);
 	}
 
 	th {
-		background-color: $color-background-secondary;
+		background-color: var(--color--background-secondary);
 		font-weight: 600;
-		color: $color-contrast;
+		color: var(--color--text-primary);
 		position: sticky;
 		top: 0;
 	}
 
 	.entry-row {
-		transition: $transition;
+		transition: var(--transition);
 
 		&:hover {
-			background-color: $color-secondary-extra-light;
+			background-color: var(--color--secondary-extra-light);
 		}
 	}
 
@@ -333,13 +197,13 @@ label {
 	}
 
 	.timestamp {
-		color: $color-tertiary;
+		color: var(--color--text-secondary);
 		white-space: nowrap;
 	}
 
 	.duration {
 		font-weight: 700;
-		color: $color-primary;
+		color: var(--color--primary);
 	}
 }
 
@@ -421,28 +285,6 @@ label {
 // Focus styles for keyboard navigation
 .btn:focus,
 input:focus {
-	outline: 2px solid $color-primary;
+	outline: 2px solid var(--color--primary);
 	outline-offset: 2px;
-}
-
-// High contrast mode support
-@media (prefers-contrast: high) {
-	$primary-color: $color-contrast;
-	$secondary-color: $color-tertiary;
-	$border-color: $color-contrast;
-
-	.btn-primary {
-		background-color: $color-contrast;
-		border: 2px solid $color-primary;
-	}
-
-	.btn-secondary {
-		background-color: $color-secondary;
-		border: 2px solid $color-secondary;
-	}
-
-	.btn-danger {
-		background-color: $color-error;
-		border: 2px solid $color-error;
-	}
 }

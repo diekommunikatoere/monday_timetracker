@@ -31,8 +31,8 @@ export function TimerDisplay({ elapsedTime, status, onReset, disabled }: TimerDi
 	return (
 		<Flex direction="row" align="center" justify="center" gap="lg">
 			<Tooltip label="Timer zurücksetzen" position="top" withArrow>
-				<IconButton className={`btn-reset ${styles.timerResetButton}`} onClick={onReset} variant="filled" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
-					<Icon name="reset" color={!disabled ? activeColor : disabledColor} size={21} />
+				<IconButton className={`btn-reset ${styles.timerResetButton}`} onClick={onReset} variant="filled" colorVariant="primary" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
+					<Icon name="reset" size={21} />
 				</IconButton>
 			</Tooltip>
 			<Text className={`${styles.time} ${isActive ? styles.isActive : ""} ${isPaused ? styles.isPaused : ""}`}>{formatTime(elapsedTime)}</Text>

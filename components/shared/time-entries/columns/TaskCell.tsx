@@ -14,14 +14,14 @@ export function TaskCell({ entry, onEdit, onDelete }: TaskCellProps) {
 		<Flex align="center" justify="space-between" gap="xs">
 			<Flex justify={"center"} align={"center"} gap="xs">
 				{entry.is_draft && (
-					<Badge color="var(--color--primary)" variant="light" size="xs">
+					<Badge size="xs" style={{ backgroundColor: "var(--color--surface-primary)", color: "var(--color--text-primary)" }}>
 						DRAFT
 					</Badge>
 				)}
 				<Text size="sm" fw={500} truncate>
 					{entry.item_name || entry.task_name || "-"}
 				</Text>
-				<Text size="xs" truncate style={{ fontStyle: "italic", color: "var(--color--text-secondary)" }}>
+				<Text size="xs" style={{ fontStyle: "italic", color: "var(--color--text-secondary)" }}>
 					{entry.parent_item_name || ""}
 				</Text>
 			</Flex>

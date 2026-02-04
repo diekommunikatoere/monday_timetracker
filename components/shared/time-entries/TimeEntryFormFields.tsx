@@ -65,7 +65,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={
 						onStartTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" color="var(--color--background-secondary)" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
 									<Icon name="today" size={16} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
@@ -82,7 +82,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={
 						onEndTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" color="var(--color--background-secondary)" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
 									<Icon name="today" size={16} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
@@ -90,7 +90,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					}
 					rightSection={
 						<Tooltip label={isLocked ? "Endzeit fixiert (Live)" : "Endzeit fixieren"} position="top" withArrow>
-							<IconButton variant="filled" color={isLocked ? "var(--color--primary)" : "var(--color--background-secondary)"} onClick={onLockToggle} aria-label="Endzeit fixieren">
+							<IconButton variant="filled" colorVariant={isLocked ? "primary" : "tertiary"} onClick={onLockToggle} aria-label="Endzeit fixieren">
 								<Icon name={isLocked ? "lock" : "unlock"} size={16} color={isLocked ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
 							</IconButton>
 						</Tooltip>
@@ -100,7 +100,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 							? {
 									color: "var(--color--text-primary)",
 									borderColor: "transparent",
-									backgroundColor: "var(--color--background-secondary)",
+									backgroundColor: "var(--color--background-disabled)",
 									transition: "all 0.2s ease",
 								}
 							: {},
