@@ -75,8 +75,6 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 
 			const data = await response.json();
 
-			console.log("Fetched item time entries data:", data);
-
 			// The API response structure should match ItemTimeEntriesResponse from plan
 			set({
 				timeEntries: data.entries,

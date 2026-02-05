@@ -167,8 +167,6 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 			const taskName = selectedTask.itemName || "Unbenannter Zeit-Eintrag";
 			const context = rawContext || (await monday.get("context"));
 
-			console.log("selectedTask", selectedTask);
-
 			// Build full ISO date-time strings from date + time inputs
 			const startTimeIso = combineDateAndTime(date, startTime);
 			const endTimeIso = combineDateAndTime(date, endTime);

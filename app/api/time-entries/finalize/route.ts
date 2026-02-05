@@ -92,8 +92,6 @@ export async function POST(request: NextRequest) {
 			}
 		}
 
-		console.log("Finalizing time entry with: ", { draftId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date });
-
 		// Call the RPC to finalize the time entry
 		const { data, error } = await supabaseAdmin.rpc("finalize_time_entry", {
 			p_user_id: userProfile.id,

@@ -146,7 +146,6 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ error: "Role ID is required" }, { status: 400 });
 		}
 
-		console.log(`[DEBUG] Checking if role ID ${id} is in use in time_entry table`);
 		// Check if role is in use
 		const { count } = await supabaseAdmin.from("time_entry").select("*", { count: "exact", head: true }).eq("role_id", id);
 

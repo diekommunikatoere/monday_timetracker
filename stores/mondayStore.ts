@@ -31,7 +31,6 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 	initializeMondayContext: async () => {
 		// Prevent multiple initialization calls if already in progress or completed
 		if (get().isInitialized && !get().error) {
-			console.log("[initializeMondayContext] Already initialized, skipping");
 			return;
 		}
 
@@ -43,8 +42,6 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 			// This reduces initialization time by ~30-50%
 			const [contextResult, userResult] = await Promise.all([monday.get("context"), monday.api(`query { me { id name email photo_original photo_small photo_thumb photo_thumb_small photo_tiny } }`)]);
 
-			console.log(`[initializeMondayContext] Parallel fetch complete - ${Date.now() - startTime}ms`);
-
 			if (!contextResult?.data?.user) {
 				throw new Error("No user found in Monday.com context");
 			}
@@ -52,14 +49,12 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 			// Update theme first to avoid flicker during rest of initialization
 			const mondayTheme = contextResult?.data?.theme as MondayTheme;
 			if (mondayTheme) {
-				console.log(`[mondayStore] initializeMondayContext setting theme: ${mondayTheme}`);
 				set({ mondayTheme });
 				// Also update user store theme for consistency
 				useUserStore.setState({ theme: mondayTheme, appTheme: mapMondayThemeToAppTheme(mondayTheme) });
 			}
 
 			set({ rawContext: contextResult, isInitialized: true });
-			console.log("Monday context data:", contextResult);
 
 			// Update user store with Monday user info
 			const mondayUser = {
@@ -86,7 +81,6 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 			};
 
 			useUserStore.setState({ mondayUser });
-			console.log("Monday user set in user store:", mondayUser);
 
 			// Authenticate user through API route (creates/finds Supabase user)
 			// Note: This still needs to be sequential as it depends on the mondayUser data
@@ -105,8 +99,6 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				}),
 			});
 
-			console.log(`[initializeMondayContext] Auth API call - ${Date.now() - authStartTime}ms`);
-
 			if (!response.ok) {
 				throw new Error("Failed to authenticate user");
 			}
@@ -122,19 +114,14 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 			// If user has a persisted theme preference, apply it
 			if (userProfile.theme) {
 				const persistedTheme = userProfile.theme as MondayTheme;
-				console.log(`[mondayStore] Applying persisted theme: ${persistedTheme}`);
 				useUserStore.setState({
 					theme: persistedTheme,
 					appTheme: mapMondayThemeToAppTheme(persistedTheme),
 				});
 			}
 
-			console.log("Supabase user initialized:", userProfile);
-
 			// Automatically setup context listener after initialization
 			get().setupContextListener();
-
-			console.log(`[initializeMondayContext] Total initialization time - ${Date.now() - startTime}ms`);
 			set({ isLoading: false });
 		} catch (err) {
 			console.error("Error initializing Monday user:", err);
@@ -155,11 +142,8 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 	 */
 	setupContextListener: () => {
 		if (get().isListenerSetup) {
-			console.log("[setupContextListener] Listener already setup, skipping");
 			return;
 		}
-
-		console.log("[setupContextListener] Setting up monday.listen for context changes");
 		set({ isListenerSetup: true });
 
 		monday.listen("context", (res: any) => {

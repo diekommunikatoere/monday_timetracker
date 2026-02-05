@@ -34,8 +34,6 @@ export function TimerContainer() {
 		}
 	};
 
-	console.log("Comment state: ", state.comment);
-
 	return (
 		<Box className={styles.timerContainer}>
 			<Flex direction="row" align="stretch" justify="stretch" columnGap="xl" rowGap="sm" wrap={"wrap"}>

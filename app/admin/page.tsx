@@ -308,15 +308,11 @@ export default function AdminPage() {
 	};
 
 	const handleSyncBoard = async (boardId: string) => {
-		console.log(`[handleSyncBoard] Syncing board ${boardId}`);
-		console.log(`[handleSyncBoard] rawContext available:`, !!rawContext);
-
 		setSyncingBoards((prev) => ({ ...prev, [boardId]: true }));
 		try {
 			const headers: Record<string, string> = {};
 			if (rawContext) {
 				headers["monday-context"] = JSON.stringify(rawContext);
-				console.log("[handleSyncBoard] Added monday-context header");
 			}
 
 			const response = await fetch(`/api/sync/board/${boardId}`, {

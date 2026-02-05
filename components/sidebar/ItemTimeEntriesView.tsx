@@ -100,8 +100,6 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 		return Object.values(groups).sort((a, b) => b.totalDuration - a.totalDuration);
 	}, [timeEntries, durationByUser]);
 
-	console.log("Grouped Entries:", groupedEntries);
-
 	const columns = getSidebarColumns({
 		onEdit,
 		onDelete: handleDeleteRequest,
@@ -113,11 +111,11 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 			{/* Aggregations by Role */}
 			<SimpleGrid p="sm" type="container" cols={{ base: 1, "500px": 2, "620px": 3, "800px": 4 }} spacing="sm">
 				{Object.values(durationByRole).map((role) => (
-					<Card key={role.roleId} withBorder padding="sm" radius="md" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderColor: "var(--color--border-ui)" }}>
-						<Text size="xs" c="dimmed" tt="uppercase" fw={700} lh={1}>
+					<Card key={role.roleId} withBorder padding="md" radius="md" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderColor: "var(--color--border-ui)" }}>
+						<Text size="xs" c={"var(--color--text-secondary)"} tt="uppercase" fw={700} lh={1}>
 							{role.roleName}
 						</Text>
-						<Text fw={700} size="sm" lh={1}>
+						<Text c={"var(--color--text-primary)"} fw={700} size="sm" lh={1}>
 							{formatDuration(role.duration)}
 						</Text>
 					</Card>

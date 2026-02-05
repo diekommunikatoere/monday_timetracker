@@ -120,7 +120,6 @@ export function useTimer(): UseTimerReturn {
 		}
 
 		const loadSession = async () => {
-			console.log("Loading timer session for user:", userProfile.id);
 			try {
 				store.setLoading(true);
 				store.setError(null);
@@ -350,8 +349,6 @@ export function useTimer(): UseTimerReturn {
 
 			// Refetch time entries
 			refetchTimeEntries(userProfile.id);
-
-			console.log("Timer saved as draft");
 		} catch (err: any) {
 			console.error("Failed to save as draft:", err);
 			store.setError(err.message || "Failed to save as draft");
@@ -376,8 +373,6 @@ export function useTimer(): UseTimerReturn {
 						method: "POST",
 						body: JSON.stringify({}),
 					});
-
-					console.log("Timer started:", data);
 
 					if (data.resumed) {
 						store.setSession({
@@ -423,8 +418,6 @@ export function useTimer(): UseTimerReturn {
 						}),
 					});
 
-					console.log("Timer paused:", data);
-
 					store.setStatus("paused");
 					store.setElapsedTime(data.elapsedTime);
 					store.updateServerSync(data.elapsedTime);
@@ -452,8 +445,6 @@ export function useTimer(): UseTimerReturn {
 							isPausing: false,
 						}),
 					});
-
-					console.log("Timer resumed:", data);
 
 					store.setStatus("running");
 					store.setElapsedTime(data.elapsedTime);
@@ -487,8 +478,6 @@ export function useTimer(): UseTimerReturn {
 							"draft-id": draftId,
 						},
 					});
-
-					console.log("Timer reset");
 				} catch (err: any) {
 					console.error("Failed to reset timer:", err);
 					store.setError(err.message || "Failed to reset timer");

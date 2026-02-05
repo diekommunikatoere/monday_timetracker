@@ -5,11 +5,7 @@ export async function POST(req: NextRequest) {
 	try {
 		const { boardIds } = await req.json();
 
-		console.log("[api/connectedBoards] Received board IDs:", boardIds);
-
 		const boards = await getConnectedBoards(boardIds || []);
-
-		console.log("[api/connectedBoards] Returning boards:", boards);
 
 		return NextResponse.json({ boards });
 	} catch (error) {

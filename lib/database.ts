@@ -197,8 +197,6 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 
 // Get time entries for a specific user
 export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithRole[]> {
-	console.log(`Fetching time entries for userId: ${userId}`);
-
 	// Fetch from database using RPC to get joined names
 	const { data, error } = await supabaseAdmin.rpc("get_user_time_entries", {
 		p_user_id: userId,

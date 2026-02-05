@@ -876,23 +876,21 @@ export default function BoardConfigPage() {
 			{/* Column Modal */}
 			<Modal opened={columnModalOpen} onClose={() => setColumnModalOpen(false)} title={editingColumn ? "Edit Column Mapping" : "Add Column Mapping"} size="lg">
 				<Stack gap="md">
-					{!editingColumn &&
-						(console.log("Monday Columns:", mondayColumns),
-						(
-							<Select
-								label="Select Column"
-								placeholder="Choose a monday.com column"
-								data={mondayColumns
-									.filter((c) => c.isCompatible)
-									.map((c) => ({
-										value: c.id,
-										label: `${c.title} (${c.type})`,
-									}))}
-								value={columnForm.column_id}
-								onChange={handleColumnSelect}
-								searchable
-							/>
-						))}
+					{!editingColumn && (
+						<Select
+							label="Select Column"
+							placeholder="Choose a monday.com column"
+							data={mondayColumns
+								.filter((c) => c.isCompatible)
+								.map((c) => ({
+									value: c.id,
+									label: `${c.title} (${c.type})`,
+								}))}
+							value={columnForm.column_id}
+							onChange={handleColumnSelect}
+							searchable
+						/>
+					)}
 
 					{editingColumn && <TextInput label="Column" value={`${columnForm.column_name} (${columnForm.column_type})`} disabled />}
 

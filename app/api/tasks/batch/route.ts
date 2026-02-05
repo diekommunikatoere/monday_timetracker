@@ -42,8 +42,6 @@ export async function POST(request: NextRequest) {
 			tasksObject[boardId] = tasks;
 		}
 
-		console.log(`[api/tasks/batch] Fetched ${boardIds.length} boards in ${Date.now() - startTime}ms`);
-
 		return NextResponse.json(tasksObject);
 	} catch (error) {
 		if (error instanceof ClientError) {
