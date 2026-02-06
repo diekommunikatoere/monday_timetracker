@@ -1,8 +1,3 @@
----
-description: Backend code examples for the official monday.com API client library. Use these rules when making GraphQL queries in a server-side environment. 
-globs: 
-alwaysApply: false
----
 ## Backend Usage (Node.js Environment)
 
 The following examples show correct usage of the monday API client in a backend environment, such as NodeJS or in server-side code for NextJS or React. 

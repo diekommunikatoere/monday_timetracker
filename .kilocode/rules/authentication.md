@@ -1,9 +1,3 @@
----
-description: Authentication is handled by monday.com, since the app is embedded within their platform. Users log in to monday.com, and the app leverages monday.com's authentication system to identify users.
-globs: 
-alwaysApply: true
----
-
 ## Guidelines
 
 - Do not implement a separate authentication mechanism within the app.

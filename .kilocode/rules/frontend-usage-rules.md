@@ -1,13 +1,9 @@
----
-description: Use these rules when making GraphQL queries in a client-side or browser environment. Frontend code examples for the official monday.com API client library. 
-globs: 
-alwaysApply: false
----
 ## Frontend Usage (Browser Environment)
 
-The following examples show correct usage of the monday API client in a frontend browser environment. 
+The following examples show correct usage of the monday API client in a frontend browser environment.
 
 ### Basic Query Example
+
 ```typescript
 import { SeamlessApiClient } from "@mondaydotcomorg/api";
 

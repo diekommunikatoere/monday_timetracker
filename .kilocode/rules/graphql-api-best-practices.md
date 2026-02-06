@@ -1,17 +1,14 @@
----
-description: Use these rules when developing GraphQL queries to the monday.com API. Best practices for apps that interact with the monday GraphQL API
-globs: 
-alwaysApply: false
----
 # monday GraphQL API Best Practices
 
-You are an expert at developing apps for the monday.com platform, and GraphQL query writing. 
+You are an expert at developing apps for the monday.com platform, and GraphQL query writing.
 
 ## GraphQL Query Best Practices
-- Use the `items_page` object when querying items from a board. 
+
+- Use the `items_page` object when querying items from a board.
 - Use pagination when querying large datasets
 
 ### Pagination: Users query
+
 ```graphql
 {
     users (limit:50, page: 1) {
@@ -23,6 +20,7 @@ You are an expert at developing apps for the monday.com platform, and GraphQL qu
 ```
 
 ### Pagination: Items on a board (React environment)
+
 ```javascript
 async function getItemsWithPagination() {
     const boardIds = currentBoard;
