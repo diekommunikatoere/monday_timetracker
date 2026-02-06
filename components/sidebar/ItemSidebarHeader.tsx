@@ -18,7 +18,7 @@ export function ItemSidebarHeader({ onManualEntryClick }: ItemSidebarHeaderProps
 		<header>
 			<Flex justify="space-between" align="center" p="sm">
 				<Logo size={{ width: 120, height: 24 }} style={logoStyle} />
-				<Button leftSection={<Icon name="add" size={18} color="var(--color--text-on-primary)" weight="bold" />} onClick={onManualEntryClick}>
+				<Button leftSection={<Icon name="add" size={18} color="var(--color--icon-on-primary)" weight="bold" />} onClick={onManualEntryClick}>
 					Zeit eintragen
 				</Button>
 			</Flex>

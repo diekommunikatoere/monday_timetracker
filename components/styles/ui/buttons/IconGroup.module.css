@@ -57,7 +57,7 @@
 	}
 
 	svg path {
-		fill: var(--color--text-on-primary);
+		fill: var(--color--icon-on-primary);
 	}
 
 	&:disabled,
@@ -80,7 +80,7 @@
 	}
 
 	svg path {
-		fill: var(--color--text-on-secondary);
+		fill: var(--color--icon-on-secondary);
 	}
 
 	&:disabled,
@@ -103,7 +103,7 @@
 	}
 
 	svg path {
-		fill: var(--color--text-on-tertiary);
+		fill: var(--color--icon-on-tertiary);
 	}
 
 	&:disabled,

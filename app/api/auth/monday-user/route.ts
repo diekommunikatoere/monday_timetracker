@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 		const teamIds = teams.map((team) => team.id);
 
 		// This uses supabaseAdmin from server.ts - safe on server
-		const userProfile = await findOrCreateUserByMondayId(session.userId, session.accountId, email, name, teamIds, photo_urls);
+		const userProfile = await findOrCreateUserByMondayId(session.userId, session.accountId, email, name, teamIds, photo_urls, session.isAdmin);
 
 		return NextResponse.json({ userProfile });
 	} catch (error) {

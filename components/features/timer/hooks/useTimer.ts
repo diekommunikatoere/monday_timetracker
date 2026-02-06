@@ -311,7 +311,6 @@ export function useTimer(): UseTimerReturn {
 		const timer = setTimeout(async () => {
 			await autoSaveDraft({
 				comment,
-				userId: userProfile.id,
 				sessionId,
 			});
 		}, 500);
@@ -336,7 +335,6 @@ export function useTimer(): UseTimerReturn {
 			const { saveDraft } = useDraftStore.getState();
 			await saveDraft({
 				draftId,
-				userProfileId: userProfile.id,
 				comment,
 			});
 

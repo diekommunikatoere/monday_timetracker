@@ -151,6 +151,7 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--icon": "var(--color--tertiary-300)",
 		"--color--icon-on-primary": "var(--color--primary-950)",
 		"--color--icon-on-secondary": "var(--color--tertiary-100)",
+		"--color--icon-on-tertiary": "var(--color--tertiary-50)",
 	},
 	dark: {
 		"--color--selected-primary": "var(--color--secondary-100)",
@@ -203,5 +204,6 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--icon": "var(--color--tertiary-800)",
 		"--color--icon-on-primary": "var(--color--tertiary-950)",
 		"--color--icon-on-secondary": "var(--color--tertiary-100)",
+		"--color--icon-on-tertiary": "var(--color--tertiary-950)",
 	},
 });

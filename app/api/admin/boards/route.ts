@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 		}
 
+		if (!session.isAdmin) {
+			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+		}
+
 		const { searchParams } = new URL(request.url);
 		const boardId = searchParams.get("boardId");
 

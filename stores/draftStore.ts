@@ -1,7 +1,15 @@
 // stores/draftStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { supabase } from "@/lib/supabase/client";
+import { useMondayStore } from "./mondayStore";
+
+declare global {
+	interface Window {
+		monday?: {
+			token?: string;
+		};
+	}
+}
 
 interface DraftState {
 	// Comment state
@@ -23,10 +31,10 @@ interface DraftState {
 	setTaskName: (taskName: string) => void;
 
 	// Auto-save (debounced)
-	autoSaveDraft: (params: { comment: string; userId: string; sessionId?: string }) => void;
+	autoSaveDraft: (params: { comment: string; sessionId?: string }) => void;
 
 	// Manual save
-	saveDraft: (params: { draftId: string; userProfileId: string; taskName?: string; comment: string; onSaved?: () => void; showToast?: (message: string, type: string, duration: number) => void }) => Promise<void>;
+	saveDraft: (params: { draftId: string; taskName?: string; comment: string; onSaved?: () => void; showToast?: (message: string, type: string, duration: number) => void }) => Promise<void>;
 
 	// Internal state management
 	setSaving: (isSaving: boolean) => void;
@@ -58,7 +66,7 @@ export const useDraftStore = create<DraftState>()(
 
 			setTaskName: (taskName) => set({ taskName }),
 
-			autoSaveDraft: async ({ comment, userId, sessionId }) => {
+			autoSaveDraft: async ({ comment, sessionId }) => {
 				// Clear existing debounce timer
 				const currentTimer = get().debounceTimerId;
 				if (currentTimer) clearTimeout(currentTimer);
@@ -66,36 +74,29 @@ export const useDraftStore = create<DraftState>()(
 				// Set new debounce timer
 				const timerId = setTimeout(async () => {
 					try {
-						// Get draft_id from session
-						const { data: session } = await supabase.from("timer_session").select("draft_id").eq("id", sessionId).single();
+						const sessionToken = useMondayStore.getState().sessionToken;
+						if (!sessionToken) return;
 
-						const draftId = session?.draft_id;
+						console.log("Auto-saving draft via API:", { comment, sessionId });
 
-						if (draftId) {
-							const { data: existingDraft, error } = await supabase.from("time_entry").select("*").eq("id", draftId).single();
+						const response = await fetch("/api/timer/draft", {
+							method: "PATCH",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${sessionToken}`,
+							},
+							body: JSON.stringify({ comment, sessionId }),
+						});
 
-							if (error) throw error;
-
-							console.log("Auto-saving draft:", { comment, existingDraft });
-
-							if (existingDraft) {
-								// Update existing draft
-								await supabase.from("time_entry").update({ comment }).eq("id", existingDraft.id);
-								set({ isSaving: true });
-							} else if (comment.trim()) {
-								// Only create new draft if there's actual content
-								await supabase.from("time_entry").insert({
-									user_id: userId,
-									comment,
-									start_time: new Date().toISOString(),
-									is_draft: true,
-								});
-								set({ isSaving: true });
-							}
-
-							// Reset saving state
-							setTimeout(() => set({ isSaving: false }), 500);
+						if (!response.ok) {
+							const errorData = await response.json();
+							throw new Error(errorData.error || "Failed to auto-save draft");
 						}
+
+						set({ isSaving: true });
+
+						// Reset saving state
+						setTimeout(() => set({ isSaving: false }), 500);
 					} catch (error) {
 						console.error("Error auto-saving draft:", error);
 						set({ error: error instanceof Error ? error.message : "Unknown error" });
@@ -105,30 +106,36 @@ export const useDraftStore = create<DraftState>()(
 				set({ debounceTimerId: timerId });
 			},
 
-			saveDraft: async ({ draftId, userProfileId, taskName, comment, onSaved, showToast }) => {
-				if (!userProfileId || !draftId) {
-					set({ error: "Missing user profile or draft ID" });
+			saveDraft: async ({ draftId, taskName, comment, onSaved, showToast }) => {
+				if (!draftId) {
+					set({ error: "Missing draft ID" });
 					return;
 				}
+
+				const sessionToken = useMondayStore.getState().sessionToken;
+				if (!sessionToken) return;
 
 				set({ isSaving: true, error: null });
 
 				try {
 					const finalTaskName = taskName && taskName.trim() ? taskName : "Unzugeordneter Zeiteintrag";
-					console.log("finalizing draft with: ", userProfileId, draftId, finalTaskName, comment);
+					console.log("finalizing draft via API:", { draftId, finalTaskName, comment });
 
-					// Call RPC with supabase user_id (from user_profiles.id mapped from monday_user_id)
-					const { data, error } = await supabase.rpc("finalize_draft", {
-						p_user_id: userProfileId, // Supabase user_profiles.id
-						p_draft_id: draftId,
-						p_task_name: finalTaskName,
-						p_comment: comment,
+					const response = await fetch("/api/timer/finalize", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${sessionToken}`,
+						},
+						body: JSON.stringify({ draftId, taskName: finalTaskName, comment }),
 					});
 
-					if (error) {
-						throw error;
+					if (!response.ok) {
+						const errorData = await response.json();
+						throw new Error(errorData.error || "Failed to save draft");
 					}
 
+					const data = await response.json();
 					console.log("Draft finalized:", data);
 
 					if (onSaved) {

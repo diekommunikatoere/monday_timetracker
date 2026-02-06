@@ -534,6 +534,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_admin: boolean | null
           monday_account_id: string
           monday_user_id: string
           name: string | null
@@ -546,6 +547,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_admin?: boolean | null
           monday_account_id: string
           monday_user_id: string
           name?: string | null
@@ -558,6 +560,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_admin?: boolean | null
           monday_account_id?: string
           monday_user_id?: string
           name?: string | null
