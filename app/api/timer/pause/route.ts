@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { pauseTimer, resumeTimer } from "@/lib/database";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { getUserProfileByMondayId } from "@/lib/database/users";
 import type { GetCurrentElapsedTimeResult } from "@/types/database";
 
 export async function POST(request: NextRequest) {
 	try {
 		console.log("Received pause/resume timer request");
-		// Authenticate user
-		const context = await getMondayContext(request);
-		if (!context?.user?.id) {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
-		const { data: userId } = await supabaseAdmin.from("user_profiles").select("id").eq("monday_user_id", context.user.id).single();
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		// Get user profile
+		const userProfile = await getUserProfileByMondayId(session.userId);
+		if (!userProfile) {
+			return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+		}
+
+		const userId = userProfile.id;
 
 		const { sessionId, elapsedTime, isPausing } = await request.json();
 
@@ -21,7 +34,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		if (isPausing) {
-			await pauseTimer(sessionId, userId.id);
+			await pauseTimer(sessionId, userId);
 
 			// Get the final elapsed time from the server after pausing
 			const { data: elapsedTimeResult, error: rpcError } = await supabaseAdmin.rpc("get_current_elapsed_time", { p_session_id: sessionId });
@@ -38,7 +51,7 @@ export async function POST(request: NextRequest) {
 				elapsedTime: calculatedElapsedTime,
 			});
 		} else {
-			await resumeTimer(sessionId, userId.id);
+			await resumeTimer(sessionId, userId);
 
 			// Get the current elapsed time after resuming
 			const { data: elapsedTimeResult, error: rpcError } = await supabaseAdmin.rpc("get_current_elapsed_time", { p_session_id: sessionId });

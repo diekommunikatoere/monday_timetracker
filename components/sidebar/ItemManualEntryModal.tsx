@@ -57,7 +57,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 
 	const { refetch } = useItemTimeEntriesStore();
 	const { showToast } = useToast();
-	const { rawContext } = useMondayStore();
+	const { rawContext, sessionToken } = useMondayStore();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
 	const handleSave = async () => {
@@ -82,6 +82,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 				headers: {
 					"Content-Type": "application/json",
 					"monday-context": JSON.stringify(context),
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
 					userId: userProfile.id,

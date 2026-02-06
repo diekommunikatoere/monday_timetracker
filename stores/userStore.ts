@@ -1,6 +1,7 @@
 // stores/userStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useMondayStore } from "./mondayStore";
 
 // function specific imports
 import { useState, useEffect, useCallback } from "react";
@@ -136,6 +137,9 @@ export const useUserStore = create<UserState>()(
 					const mondayUserId = get().mondayUser?.id;
 					if (!mondayUserId) return;
 
+					const sessionToken = useMondayStore.getState().sessionToken;
+					if (!sessionToken) return;
+
 					// Get fresh context for authentication header
 					const context = await monday.get("context");
 
@@ -144,6 +148,7 @@ export const useUserStore = create<UserState>()(
 						headers: {
 							"Content-Type": "application/json",
 							"monday-context": JSON.stringify(context),
+							Authorization: `Bearer ${sessionToken}`,
 						},
 						body: JSON.stringify({ theme: newTheme }),
 					});
@@ -152,15 +157,17 @@ export const useUserStore = create<UserState>()(
 				}
 			},
 			setAuthenticated: async () => {
+				const sessionToken = useMondayStore.getState().sessionToken;
+				if (!sessionToken) return;
+
 				// Find or create user in our database
 				const response = await fetch("/api/auth/monday-user", {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
+						Authorization: `Bearer ${sessionToken}`,
 					},
 					body: JSON.stringify({
-						mondayUserId: useUserStore.getState().mondayUser?.id,
-						mondayAccountId: useUserStore.getState().mondayUser?.accountId,
 						email: useUserStore.getState().mondayUser?.email,
 						name: useUserStore.getState().mondayUser?.name,
 					}),

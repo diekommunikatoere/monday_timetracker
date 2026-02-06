@@ -69,7 +69,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 
 	// Store selectors
 	const { refetch } = useTimeEntriesStore();
-	const { rawContext } = useMondayStore();
+	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
@@ -177,6 +177,7 @@ export default function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryM
 				headers: {
 					"Content-Type": "application/json",
 					"monday-context": JSON.stringify(context),
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
 					userId: userProfile.id,

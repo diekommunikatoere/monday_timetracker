@@ -63,7 +63,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 	// Store selectors
 	const { refetch } = useTimeEntriesStore();
-	const { rawContext } = useMondayStore();
+	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
@@ -259,6 +259,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 				headers: {
 					"Content-Type": "application/json",
 					"monday-context": JSON.stringify(context),
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
 					draftId: activeDraftId,
@@ -292,6 +293,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 					headers: {
 						"Content-Type": "application/json",
 						"monday-context": JSON.stringify(context),
+						Authorization: `Bearer ${sessionToken}`,
 					},
 					body: JSON.stringify({
 						draftId: activeDraftId,

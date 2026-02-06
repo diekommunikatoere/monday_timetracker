@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserTimeEntries } from "@/lib/database";
-import { findOrCreateUserByMondayId, getUserProfile } from "@/lib/database/users";
+import { findOrCreateUserByMondayId, getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 export async function GET(request: NextRequest) {
-	const { searchParams } = new URL(request.url);
-	const mondayUserId = searchParams.get("mondayUserId");
-
-	if (!mondayUserId) {
-		return NextResponse.json({ error: "mondayUserId is required" }, { status: 400 });
-	}
-
 	try {
-		// Get or create the user profile to ensure we have the Supabase user ID
-		const userProfile = await getUserProfile(mondayUserId); // mondayAccountId can be empty for now
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-		// Fetch time entries for this user
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		// Get the user profile using the Monday ID from the JWT
+		const userProfile = await getUserProfileByMondayId(session.userId);
+
+		if (!userProfile) {
+			return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+		}
+
+		// Fetch time entries for this user using the internal Supabase ID
 		const timeEntries = await getUserTimeEntries(userProfile.id);
 
 		return NextResponse.json(timeEntries);

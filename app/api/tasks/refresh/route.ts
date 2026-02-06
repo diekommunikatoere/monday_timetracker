@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { invalidateBoardCache, invalidateAllBoardCaches } from "@/lib/monday";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
  * POST /api/tasks/refresh
- *
- * Invalidates the Redis cache for a specific board's tasks,
- * forcing the next request to fetch fresh data from monday.com.
- *
- * Query params:
- * - boardId (optional): Specific board to refresh. If not provided, refreshes all boards.
- *
- * Response: { success: true, message: string }
  */
 export async function POST(request: NextRequest) {
 	try {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
 		const { searchParams } = new URL(request.url);
 		const boardId = searchParams.get("boardId");
 

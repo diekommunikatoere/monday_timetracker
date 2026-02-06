@@ -67,6 +67,24 @@ export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAcc
 }
 
 /**
+ * Get user profile by Monday.com user ID
+ */
+export async function getUserProfileByMondayId(mondayUserId: string): Promise<UserProfile | null> {
+	const { data, error } = await supabaseAdmin.from("user_profiles").select("*").eq("monday_user_id", mondayUserId).single();
+
+	if (error) {
+		if (error.code === "PGRST116") {
+			// User not found
+			return null;
+		}
+		console.error("Error fetching user profile by Monday ID:", error);
+		throw error;
+	}
+
+	return data;
+}
+
+/**
  * Get user profile by Supabase user ID
  */
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {

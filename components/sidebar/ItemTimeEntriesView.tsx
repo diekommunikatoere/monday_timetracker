@@ -6,6 +6,7 @@ import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accord
 import { Icon } from "@/components";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
+import { useMondayStore } from "@/stores/mondayStore";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getSidebarColumns } from "../shared/time-entries/TimeEntryTableConfigs";
 import { formatDuration } from "@/lib/utils";
@@ -26,6 +27,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 	const { loading, error, totalDuration, durationByRole, durationByUser, setItemContext, fetchItemTimeEntries, refetch } = useItemTimeEntriesStore();
 
 	const currentUserId = useUserStore((s) => s.supabaseUser?.id);
+	const { sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -68,7 +70,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 			const response = await fetch(`/api/time-entries/${pendingDelete.id}`, {
 				method: "DELETE",
 				headers: {
-					userId: currentUserId || "",
+					Authorization: `Bearer ${sessionToken}`,
 				},
 			});
 

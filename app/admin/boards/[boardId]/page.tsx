@@ -119,7 +119,7 @@ export default function BoardConfigPage() {
 	const [savingOverride, setSavingOverride] = useState(false);
 
 	// Monday context
-	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError, rawContext: mondayContext } = useMondayStore();
+	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError, rawContext: mondayContext, sessionToken } = useMondayStore();
 	const isAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
 
 	// Initialize Monday context on mount
@@ -129,8 +129,13 @@ export default function BoardConfigPage() {
 
 	// Fetch board config
 	const fetchBoardConfig = useCallback(async () => {
+		if (!sessionToken) return;
 		try {
-			const response = await fetch(`/api/admin/boards?boardId=${boardId}`);
+			const response = await fetch(`/api/admin/boards?boardId=${boardId}`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -146,12 +151,17 @@ export default function BoardConfigPage() {
 			console.error("Error fetching board config:", err);
 			setError(err instanceof Error ? err.message : "Failed to fetch board configuration");
 		}
-	}, [boardId]);
+	}, [boardId, sessionToken]);
 
 	// Fetch column sync configs
 	const fetchColumns = useCallback(async () => {
+		if (!sessionToken) return;
 		try {
-			const response = await fetch(`/api/admin/boards/${boardId}/columns`);
+			const response = await fetch(`/api/admin/boards/${boardId}/columns`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -163,12 +173,17 @@ export default function BoardConfigPage() {
 			console.error("Error fetching columns:", err);
 			setError(err instanceof Error ? err.message : "Failed to fetch column configurations");
 		}
-	}, [boardId]);
+	}, [boardId, sessionToken]);
 
 	// Fetch role overrides
 	const fetchRoleOverrides = useCallback(async () => {
+		if (!sessionToken) return;
 		try {
-			const response = await fetch(`/api/admin/boards/${boardId}/role-overrides`);
+			const response = await fetch(`/api/admin/boards/${boardId}/role-overrides`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -180,12 +195,17 @@ export default function BoardConfigPage() {
 			console.error("Error fetching role overrides:", err);
 			setError(err instanceof Error ? err.message : "Failed to fetch role overrides");
 		}
-	}, [boardId]);
+	}, [boardId, sessionToken]);
 
 	// Fetch available roles
 	const fetchRoles = useCallback(async () => {
+		if (!sessionToken) return;
 		try {
-			const response = await fetch("/api/admin/roles?active=true");
+			const response = await fetch("/api/admin/roles?active=true", {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -196,12 +216,17 @@ export default function BoardConfigPage() {
 		} catch (err) {
 			console.error("Error fetching roles:", err);
 		}
-	}, []);
+	}, [sessionToken]);
 
 	// Fetch monday.com columns
 	const fetchMondayColumns = useCallback(async () => {
+		if (!sessionToken) return;
 		try {
-			const response = await fetch(`/api/boards/${boardId}/columns`);
+			const response = await fetch(`/api/boards/${boardId}/columns`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -212,13 +237,17 @@ export default function BoardConfigPage() {
 		} catch (err) {
 			console.error("Error fetching monday columns:", err);
 		}
-	}, [boardId]);
+	}, [boardId, sessionToken]);
 
 	// Fetch sync stats
 	const fetchSyncStats = useCallback(async () => {
+		if (!sessionToken) return;
 		try {
 			const response = await fetch(`/api/sync/board/${boardId}`, {
-				headers: mondayContext ? { "monday-context": JSON.stringify(mondayContext) } : {},
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+					"monday-context": mondayContext ? JSON.stringify(mondayContext) : "",
+				},
 			});
 			const data = await response.json();
 
@@ -228,17 +257,18 @@ export default function BoardConfigPage() {
 		} catch (err) {
 			console.error("Error fetching sync stats:", err);
 		}
-	}, [boardId, mondayContext]);
+	}, [boardId, mondayContext, sessionToken]);
 
 	// Load all data on mount
 	useEffect(() => {
+		if (!sessionToken) return;
 		const loadData = async () => {
 			setLoading(true);
 			await Promise.all([fetchBoardConfig(), fetchColumns(), fetchRoleOverrides(), fetchRoles(), fetchMondayColumns()]);
 			setLoading(false);
 		};
 		loadData();
-	}, [fetchBoardConfig, fetchColumns, fetchRoleOverrides, fetchRoles, fetchMondayColumns]);
+	}, [fetchBoardConfig, fetchColumns, fetchRoleOverrides, fetchRoles, fetchMondayColumns, sessionToken]);
 
 	// Load sync stats when tab changes to sync
 	useEffect(() => {
@@ -249,10 +279,10 @@ export default function BoardConfigPage() {
 
 	// Bulk sync handler
 	const handleBulkSync = async () => {
-		if (!mondayContext) {
+		if (!mondayContext || !sessionToken) {
 			notifications.show({
 				title: "Error",
-				message: "Monday context not available",
+				message: "Authentication not ready",
 				color: "red",
 			});
 			return;
@@ -268,6 +298,7 @@ export default function BoardConfigPage() {
 				headers: {
 					"Content-Type": "application/json",
 					"monday-context": JSON.stringify(mondayContext),
+					Authorization: `Bearer ${sessionToken}`,
 				},
 			});
 
@@ -359,7 +390,10 @@ export default function BoardConfigPage() {
 
 			const response = await fetch(`/api/admin/boards/${boardId}/columns`, {
 				method,
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
 				body: JSON.stringify(columnForm),
 			});
 
@@ -396,6 +430,9 @@ export default function BoardConfigPage() {
 		try {
 			const response = await fetch(`/api/admin/boards/${boardId}/columns?columnId=${column.column_id}`, {
 				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
 			});
 
 			const data = await response.json();
@@ -456,7 +493,10 @@ export default function BoardConfigPage() {
 
 			const response = await fetch(`/api/admin/boards/${boardId}/role-overrides`, {
 				method,
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
 				body: JSON.stringify(overrideForm),
 			});
 
@@ -493,6 +533,9 @@ export default function BoardConfigPage() {
 		try {
 			const response = await fetch(`/api/admin/boards/${boardId}/role-overrides?roleId=${override.role_id}`, {
 				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
 			});
 
 			const data = await response.json();

@@ -1,5 +1,6 @@
 // stores/appStore.ts
 import { create } from "zustand";
+import { useMondayStore } from "./mondayStore";
 
 interface AppState {
 	// Connected boards from Monday context
@@ -36,11 +37,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
 		const { connectedBoardIds } = get();
 		if (connectedBoardIds.length === 0) return;
 
+		const sessionToken = useMondayStore.getState().sessionToken;
+		if (!sessionToken) return;
+
 		set({ isLoading: true, error: null });
 		try {
 			const response = await fetch("/api/connectedBoards", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
 				body: JSON.stringify({ boardIds: connectedBoardIds }),
 			});
 

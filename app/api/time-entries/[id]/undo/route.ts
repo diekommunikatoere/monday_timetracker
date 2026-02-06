@@ -1,7 +1,8 @@
-// app/api/time-entries/[id]/undo/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { restoreTimeEntry } from "@/lib/database";
 import { queueItemSync } from "@/lib/columnSync";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { getUserProfileByMondayId } from "@/lib/database/users";
 
 /**
  * POST /api/time-entries/[id]/undo
@@ -9,12 +10,24 @@ import { queueItemSync } from "@/lib/columnSync";
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	try {
-		// Get user ID for user authentication
-		const userId = request.headers.get("userId");
-
-		if (!userId) {
-			return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		// Get user profile
+		const userProfile = await getUserProfileByMondayId(session.userId);
+		if (!userProfile) {
+			return NextResponse.json({ error: "User not found" }, { status: 404 });
+		}
+
+		const userId = userProfile.id;
 
 		const { id } = await params;
 		const body = await request.json();

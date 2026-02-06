@@ -6,6 +6,7 @@ import { Flex, Text, Group } from "@mantine/core";
 import { Button, Modal } from "@/components";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useUserStore } from "@/stores/userStore";
+import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntry } from "@/types/time-entry";
@@ -32,6 +33,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	const { refetch } = useTimeEntriesStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
+	const { sessionToken } = useMondayStore();
 
 	// Initialize form with entry data
 	useEffect(() => {
@@ -86,7 +88,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				method: "PATCH",
 				headers: {
 					"Content-Type": "application/json",
-					userId: userProfile.id,
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
 					id: entry.id,

@@ -1,22 +1,27 @@
-// app/api/user/theme/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { updateUserThemeByMondayId } from "@/lib/database/users";
-import { getMondayContext } from "@/lib/monday";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 export async function POST(request: NextRequest) {
 	try {
-		const context = await getMondayContext(request);
-		const { theme } = await request.json();
-
-		if (!context?.user?.id) {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		const { theme } = await request.json();
 
 		if (!theme) {
 			return NextResponse.json({ error: "Missing theme" }, { status: 400 });
 		}
 
-		await updateUserThemeByMondayId(context.user.id.toString(), theme);
+		await updateUserThemeByMondayId(session.userId, theme);
 
 		return NextResponse.json({ success: true });
 	} catch (error) {

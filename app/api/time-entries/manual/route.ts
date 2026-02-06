@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { syncAfterFinalize } from "@/lib/columnSync";
 import { insertTimeEntry } from "@/lib/database";
 import { roundDuration } from "@/lib/utils";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { getUserProfileByMondayId } from "@/lib/database/users";
 
 interface ManualTimeEntryRequest {
 	userId: string;
@@ -24,17 +25,20 @@ interface ManualTimeEntryRequest {
 
 export async function POST(request: NextRequest) {
 	try {
-		// Authenticate user from Monday context
-		const context = await getMondayContext(request);
-		if (!context?.user?.id) {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		// Get the Supabase user ID from the Monday user ID
-		const { data: userProfile, error: userError } = await supabaseAdmin.from("user_profiles").select("id").eq("monday_user_id", context.user.id).single();
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
 
-		if (userError || !userProfile) {
-			console.error("Error fetching user profile:", userError);
+		// Get user profile
+		const userProfile = await getUserProfileByMondayId(session.userId);
+		if (!userProfile) {
 			return NextResponse.json({ error: "User not found" }, { status: 404 });
 		}
 

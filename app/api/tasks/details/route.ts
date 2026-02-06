@@ -1,9 +1,20 @@
-// app/api/tasks/details/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getItemDetails } from "@/lib/monday";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 export async function GET(request: NextRequest) {
 	try {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
 		const { searchParams } = new URL(request.url);
 		const itemId = searchParams.get("itemId");
 

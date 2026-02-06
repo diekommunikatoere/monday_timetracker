@@ -7,6 +7,7 @@ const monday = mondaySdk();
 
 interface MondayState {
 	rawContext: any;
+	sessionToken: string | null;
 	isLoading: boolean;
 	isInitialized: boolean;
 	isListenerSetup: boolean;
@@ -22,6 +23,7 @@ interface MondayState {
 
 export const useMondayStore = create<MondayState>()((set, get) => ({
 	rawContext: null,
+	sessionToken: null,
 	isLoading: true,
 	isInitialized: false,
 	isListenerSetup: false,
@@ -38,13 +40,14 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 		try {
 			set({ isLoading: true, error: null });
 
-			// OPTIMIZATION: Fetch context and user data in PARALLEL
-			// This reduces initialization time by ~30-50%
-			const [contextResult, userResult] = await Promise.all([monday.get("context"), monday.api(`query { me { id name email photo_original photo_small photo_thumb photo_thumb_small photo_tiny } }`)]);
+			// OPTIMIZATION: Fetch context, user data, and session token in PARALLEL
+			const [contextResult, userResult, sessionTokenResult] = await Promise.all([monday.get("context"), monday.api(`query { me { id name email photo_original photo_small photo_thumb photo_thumb_small photo_tiny } }`), monday.get("sessionToken")]);
 
 			if (!contextResult?.data?.user) {
 				throw new Error("No user found in Monday.com context");
 			}
+
+			const sessionToken = sessionTokenResult?.data || null;
 
 			// Update theme first to avoid flicker during rest of initialization
 			const mondayTheme = contextResult?.data?.theme as MondayTheme;
@@ -54,7 +57,7 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				useUserStore.setState({ theme: mondayTheme, appTheme: mapMondayThemeToAppTheme(mondayTheme) });
 			}
 
-			set({ rawContext: contextResult, isInitialized: true });
+			set({ rawContext: contextResult, sessionToken, isInitialized: true });
 
 			// Update user store with Monday user info
 			const mondayUser = {
@@ -89,11 +92,9 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"monday-context": JSON.stringify(contextResult),
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
-					mondayUserId: mondayUser.id,
-					mondayAccountId: mondayUser.accountId,
 					email: mondayUser.email,
 					name: mondayUser.name,
 				}),

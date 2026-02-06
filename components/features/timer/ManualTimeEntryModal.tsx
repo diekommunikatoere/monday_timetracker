@@ -29,7 +29,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
 
 	const { refetch } = useTimeEntriesStore();
-	const { rawContext } = useMondayStore();
+	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
@@ -69,6 +69,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 				headers: {
 					"Content-Type": "application/json",
 					"monday-context": JSON.stringify(context),
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
 					userId: userProfile.id,

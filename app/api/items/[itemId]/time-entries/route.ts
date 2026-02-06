@@ -1,10 +1,21 @@
-// app/api/items/[itemId]/time-entries/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getItemTimeEntries } from "@/lib/database";
 import { getItemDetails } from "@/lib/monday";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ itemId: string }> }) {
 	try {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
 		const { itemId } = await params;
 		const { searchParams } = new URL(request.url);
 		let boardId = searchParams.get("boardId");

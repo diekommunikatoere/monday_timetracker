@@ -38,7 +38,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
 
 	const userId = useUserStore((state) => state.supabaseUser?.id);
-	const { rawContext } = useMondayStore();
+	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 
 	const handleSelectAll = (checked: boolean) => {
@@ -95,7 +95,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 				const response = await fetch(`/api/time-entries/${entry.id}`, {
 					method: "DELETE",
 					headers: {
-						userId: userId || "",
+						Authorization: `Bearer ${sessionToken}`,
 					},
 				});
 
@@ -127,7 +127,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
-						userId: userId || "",
+						Authorization: `Bearer ${sessionToken}`,
 					},
 					body: JSON.stringify({
 						entryIds: selectedIds,
@@ -171,7 +171,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					userId: userId || "",
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({ undoToken }),
 			});

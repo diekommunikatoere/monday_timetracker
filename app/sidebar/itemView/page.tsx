@@ -48,13 +48,18 @@ export default function ItemViewPage() {
 
 	const itemId = rawContext?.data?.itemId?.toString();
 	const boardId = rawContext?.data?.boardId?.toString();
+	const sessionToken = useMondayStore((state) => state.sessionToken);
 
 	useEffect(() => {
 		async function fetchDetails() {
-			if (!itemId) return;
+			if (!itemId || !sessionToken) return;
 			setLoadingDetails(true);
 			try {
-				const response = await fetch(`/api/tasks/details?itemId=${itemId}`);
+				const response = await fetch(`/api/tasks/details?itemId=${itemId}`, {
+					headers: {
+						Authorization: `Bearer ${sessionToken}`,
+					},
+				});
 				if (response.ok) {
 					const data = await response.json();
 					setItemDetails(data);
@@ -66,7 +71,7 @@ export default function ItemViewPage() {
 			}
 		}
 		fetchDetails();
-	}, [itemId]);
+	}, [itemId, sessionToken]);
 
 	const itemName = itemDetails?.name || "Aktuelle Aufgabe";
 	const boardName = itemDetails?.boardName || "Projekt-Board";

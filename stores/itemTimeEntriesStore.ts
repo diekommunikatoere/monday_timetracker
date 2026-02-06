@@ -3,6 +3,7 @@
 
 import { create } from "zustand";
 import { TimeEntry } from "@/types/time-entry";
+import { useMondayStore } from "./mondayStore";
 
 export interface ItemTimeEntriesState {
 	// Current item context
@@ -58,6 +59,9 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 		const { itemId, boardId, filters } = get();
 		if (!itemId || !boardId) return;
 
+		const sessionToken = useMondayStore.getState().sessionToken;
+		if (!sessionToken) return;
+
 		try {
 			set({ loading: true, error: null });
 
@@ -67,7 +71,11 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 			if (filters.dateRange.start) params.append("startDate", filters.dateRange.start.toISOString());
 			if (filters.dateRange.end) params.append("endDate", filters.dateRange.end.toISOString());
 
-			const response = await fetch(`/api/items/${itemId}/time-entries?${params.toString()}`);
+			const response = await fetch(`/api/items/${itemId}/time-entries?${params.toString()}`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 
 			if (!response.ok) {
 				throw new Error("Fehler beim Laden der Zeiteinträge für dieses Item");

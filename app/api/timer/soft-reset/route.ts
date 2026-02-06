@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { getUserProfileByMondayId } from "@/lib/database/users";
 
 export async function POST(request: NextRequest) {
 	try {
-		// Authenticate user
-		const context = await getMondayContext(request);
-		if (!context?.user?.id) {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
-		const { data: userId } = await supabaseAdmin.from("user_profiles").select("id").eq("monday_user_id", context.user.id).single();
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		// Get user profile
+		const userProfile = await getUserProfileByMondayId(session.userId);
+		if (!userProfile) {
+			return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+		}
+
+		const userId = userProfile.id;
 
 		const body = await request.json();
 		const { draftId, sessionId } = body;
@@ -19,7 +32,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Delete timer_session (cascades to timer_segments)
-		const { error: sessionError } = await supabaseAdmin.from("timer_session").delete().eq("id", sessionId).eq("user_id", userId.id);
+		const { error: sessionError } = await supabaseAdmin.from("timer_session").delete().eq("id", sessionId).eq("user_id", userId);
 
 		if (sessionError) throw sessionError;
 

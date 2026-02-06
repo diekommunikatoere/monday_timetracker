@@ -8,6 +8,7 @@ import type { UseTimerReturn, TimerActions, TimerState, TimerStatus } from "@/ty
 import { supabase } from "@/lib/supabase/client";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
+import { useMondayStore } from "@/stores/mondayStore";
 import { useDraftStore } from "@/stores/draftStore";
 import { useModalStore } from "@/stores/modalStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
@@ -73,6 +74,9 @@ export function useTimer(): UseTimerReturn {
 	// Local error state for hook-level errors
 	const [hookError, setHookError] = useState<string | null>(null);
 
+	// Monday context
+	const { rawContext, sessionToken } = useMondayStore();
+
 	// ============================================
 	// Helper Functions
 	// ============================================
@@ -81,20 +85,26 @@ export function useTimer(): UseTimerReturn {
 	 * Get Monday context for API calls
 	 */
 	const getMondayContext = useCallback(async () => {
-		return monday.get("context");
-	}, []);
+		return rawContext;
+	}, [rawContext]);
 
 	/**
-	 * Make API call with Monday context header
+	 * Make API call with Monday context and Authorization header
 	 */
 	const apiCall = useCallback(
 		async <T>(url: string, options: RequestInit = {}): Promise<T> => {
+			if (!sessionToken) {
+				console.warn(`[TimerHook] Skipping API call to ${url} because sessionToken is missing`);
+				throw new Error("Session token not available. Please wait for initialization.");
+			}
+
 			const context = await getMondayContext();
 			const response = await fetch(url, {
 				...options,
 				headers: {
 					"Content-Type": "application/json",
 					"monday-context": JSON.stringify(context),
+					Authorization: `Bearer ${sessionToken}`,
 					...options.headers,
 				},
 			});
@@ -331,13 +341,8 @@ export function useTimer(): UseTimerReturn {
 			});
 
 			// Soft reset
-			const context = await getMondayContext();
-			await fetch("/api/timer/soft-reset", {
+			await apiCall("/api/timer/soft-reset", {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"monday-context": JSON.stringify(context),
-				},
 				body: JSON.stringify({
 					draftId,
 					sessionId,
@@ -462,18 +467,17 @@ export function useTimer(): UseTimerReturn {
 			reset: async () => {
 				if (!userProfile?.id || !draftId || !sessionId) return;
 
+				console.log("Resetting timer with sessionId:", sessionId, "and draftId:", draftId);
+
 				try {
 					store.setError(null);
 
 					// Reset local state first for immediate feedback
 					store.reset();
 
-					const context = await getMondayContext();
-					await fetch("/api/timer/reset", {
+					await apiCall("/api/timer/reset", {
 						method: "POST",
 						headers: {
-							"Content-Type": "application/json",
-							"user-id": userProfile.id,
 							"session-id": sessionId,
 							"draft-id": draftId,
 						},

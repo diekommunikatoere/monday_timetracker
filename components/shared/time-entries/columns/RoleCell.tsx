@@ -16,7 +16,7 @@ export function RoleCell({ entry, showCommentIcon = false, style }: RoleCellProp
 			{showCommentIcon && entry.comment && (
 				<Tooltip label={entry.comment} withArrow position="top">
 					<UnstyledButton aria-label="Kommentar anzeigen" disabled style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "help" }}>
-						<Icon name="comment" size={14} />
+						<Icon name="comment" size={14} color="var(--color--icon)" />
 					</UnstyledButton>
 				</Tooltip>
 			)}

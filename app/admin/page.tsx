@@ -47,7 +47,7 @@ export default function AdminPage() {
 	const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({});
 
 	// Monday context
-	const { rawContext, initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
+	const { rawContext, sessionToken, initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
 	const isAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
 
 	// Initialize Monday context on mount
@@ -57,8 +57,14 @@ export default function AdminPage() {
 
 	// Fetch roles
 	const fetchRoles = useCallback(async () => {
+		if (!sessionToken) return;
+
 		try {
-			const response = await fetch("/api/admin/roles");
+			const response = await fetch("/api/admin/roles", {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -70,12 +76,18 @@ export default function AdminPage() {
 			console.error("Error fetching roles:", err);
 			setError(err instanceof Error ? err.message : "Failed to fetch roles");
 		}
-	}, []);
+	}, [sessionToken]);
 
 	// Fetch board configs
 	const fetchBoards = useCallback(async () => {
+		if (!sessionToken) return;
+
 		try {
-			const response = await fetch("/api/admin/boards");
+			const response = await fetch("/api/admin/boards", {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 			const data = await response.json();
 
 			if (!response.ok) {
@@ -87,17 +99,19 @@ export default function AdminPage() {
 			console.error("Error fetching boards:", err);
 			setError(err instanceof Error ? err.message : "Failed to fetch board configurations");
 		}
-	}, []);
+	}, [sessionToken]);
 
-	// Load data on mount
+	// Load data on mount or when sessionToken becomes available
 	useEffect(() => {
+		if (!sessionToken) return;
+
 		const loadData = async () => {
 			setLoading(true);
 			await Promise.all([fetchRoles(), fetchBoards()]);
 			setLoading(false);
 		};
 		loadData();
-	}, [fetchRoles, fetchBoards]);
+	}, [fetchRoles, fetchBoards, sessionToken]);
 
 	// Role handlers
 	const handleOpenRoleModal = (role?: Role) => {
@@ -140,7 +154,10 @@ export default function AdminPage() {
 
 			const response = await fetch("/api/admin/roles", {
 				method,
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
 				body: JSON.stringify(body),
 			});
 
@@ -177,6 +194,9 @@ export default function AdminPage() {
 		try {
 			const response = await fetch(`/api/admin/roles?id=${role.id}`, {
 				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
 			});
 
 			const data = await response.json();
@@ -245,7 +265,10 @@ export default function AdminPage() {
 
 			const response = await fetch("/api/admin/boards", {
 				method,
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
 				body: JSON.stringify(boardForm),
 			});
 
@@ -283,6 +306,9 @@ export default function AdminPage() {
 		try {
 			const response = await fetch(`/api/admin/boards?boardId=${board.board_id}`, {
 				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
 			});
 
 			const data = await response.json();
@@ -310,7 +336,9 @@ export default function AdminPage() {
 	const handleSyncBoard = async (boardId: string) => {
 		setSyncingBoards((prev) => ({ ...prev, [boardId]: true }));
 		try {
-			const headers: Record<string, string> = {};
+			const headers: Record<string, string> = {
+				Authorization: `Bearer ${sessionToken}`,
+			};
 			if (rawContext) {
 				headers["monday-context"] = JSON.stringify(rawContext);
 			}

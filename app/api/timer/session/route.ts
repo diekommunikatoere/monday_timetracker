@@ -1,25 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { getUserProfileByMondayId } from "@/lib/database/users";
 import type { GetTimerSessionWithElapsedResult } from "@/types/database";
 
 export async function GET(request: NextRequest) {
 	try {
-		// Authenticate user
-		const context = await getMondayContext(request);
-		if (!context?.user?.id) {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
-		const { data: userId } = await supabaseAdmin.from("user_profiles").select("id").eq("monday_user_id", context.user.id).single();
 
-		if (!userId) {
-			return NextResponse.json({ error: "User not found" }, { status: 404 });
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 		}
+
+		// Get user profile
+		const userProfile = await getUserProfileByMondayId(session.userId);
+		if (!userProfile) {
+			return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+		}
+
+		const userId = userProfile.id;
 
 		// Use the RPC function to get session with elapsed time calculated server-side
 		// This avoids clock drift issues between app server and database
 		const { data: result, error: rpcError } = await supabaseAdmin.rpc("get_timer_session_with_elapsed", {
-			p_user_id: userId.id,
+			p_user_id: userId,
 		});
 
 		if (rpcError) {

@@ -1,6 +1,7 @@
 // stores/timeEntriesStore.ts
 import { create } from "zustand";
 import { TimeEntry } from "@/types/time-entry";
+import { useMondayStore } from "./mondayStore";
 
 interface TimeEntriesState {
 	// Time entries data
@@ -26,9 +27,16 @@ export const useTimeEntriesStore = create<TimeEntriesState>()((set, get) => ({
 	fetchTimeEntries: async (userId: string) => {
 		if (!userId) return;
 
+		const sessionToken = useMondayStore.getState().sessionToken;
+		if (!sessionToken) return;
+
 		try {
 			set({ loading: true, error: null });
-			const response = await fetch(`/api/time-entries?mondayUserId=${userId}`);
+			const response = await fetch("/api/time-entries", {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
 
 			if (!response.ok) {
 				throw new Error("Fehler beim Laden der Zeiteinträge");

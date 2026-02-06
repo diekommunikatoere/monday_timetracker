@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 import type { RoleInsert, RoleUpdate } from "@/types/database";
 
 /**
  * GET /api/admin/roles
  * Fetch all roles (optionally filter by active status)
- * Note: Admin access is validated client-side via monday SDK
  */
 export async function GET(request: NextRequest) {
 	try {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
 		const { searchParams } = new URL(request.url);
 		const activeOnly = searchParams.get("active") === "true";
 
@@ -42,6 +53,21 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
 	try {
+		// Validate session and admin status
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		if (!session.isAdmin) {
+			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+		}
+
 		const body = await request.json();
 		const { name, description, hourly_rate, color_hex, is_active } = body;
 
@@ -88,6 +114,21 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
 	try {
+		// Validate session and admin status
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		if (!session.isAdmin) {
+			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+		}
+
 		const body = await request.json();
 		const { id, name, description, hourly_rate, color_hex, is_active } = body;
 
@@ -138,6 +179,21 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
 	try {
+		// Validate session and admin status
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		if (!session.isAdmin) {
+			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+		}
+
 		const { searchParams } = new URL(request.url);
 		const id = searchParams.get("id");
 		const hardDelete = searchParams.get("hard") === "true";

@@ -1,23 +1,30 @@
 // app/api/auth/monday-user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { findOrCreateUserByMondayId } from "@/lib/database/users";
-import { getMondayContext, getUserDetails } from "@/lib/monday";
+import { getUserDetails } from "@/lib/monday";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 export async function POST(request: NextRequest) {
 	try {
-		const context = await getMondayContext(request);
-		const { mondayUserId, mondayAccountId, email, name } = await request.json();
-
-		if (!mondayUserId || !mondayAccountId) {
-			return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
+		const { email, name } = await request.json();
+
 		// Fetch user's details (teams and photos) from Monday
-		const { teams, photo_urls } = await getUserDetails(mondayUserId);
+		const { teams, photo_urls } = await getUserDetails(session.userId);
 		const teamIds = teams.map((team) => team.id);
 
 		// This uses supabaseAdmin from server.ts - safe on server
-		const userProfile = await findOrCreateUserByMondayId(mondayUserId, mondayAccountId, email, name, teamIds, photo_urls);
+		const userProfile = await findOrCreateUserByMondayId(session.userId, session.accountId, email, name, teamIds, photo_urls);
 
 		return NextResponse.json({ userProfile });
 	} catch (error) {

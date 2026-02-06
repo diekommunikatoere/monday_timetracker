@@ -60,33 +60,6 @@ type TaskGroupsResponse = {
 	}[];
 };
 
-// Fetch tasks function - extracted for prefetching
-const fetchTasks = async (boardId: string): Promise<TaskGroupsResponse> => {
-	const params = new URLSearchParams({ boardId });
-	const response = await fetch(`/api/tasks?${params}`);
-	if (!response.ok) {
-		throw new Error("Failed to fetch tasks");
-	}
-	return response.json();
-};
-
-// Invalidate cache and refetch - returns true on success
-const invalidateAndRefetchTasks = async (boardId: string): Promise<boolean> => {
-	try {
-		// First, invalidate the Redis cache on the server
-		const response = await fetch(`/api/tasks/refresh?boardId=${boardId}`, {
-			method: "POST",
-		});
-		if (!response.ok) {
-			throw new Error("Failed to invalidate cache");
-		}
-		return true;
-	} catch (error) {
-		console.error("Error refreshing tasks:", error);
-		return false;
-	}
-};
-
 export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues, subItemsOnly }: TaskItemSelectorProps) {
 	// State management for selections
 	const [tasks, setTasks] = useState<ComboboxItemGroup[]>([]);
@@ -96,8 +69,50 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	const [error, setError] = useState<string | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
+	const { sessionToken } = useMondayStore();
+
 	// Query client for prefetching
 	const queryClient = useQueryClient();
+
+	// Fetch tasks function
+	const fetchTasks = useCallback(
+		async (boardId: string): Promise<TaskGroupsResponse> => {
+			const params = new URLSearchParams({ boardId });
+			const response = await fetch(`/api/tasks?${params}`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
+			if (!response.ok) {
+				throw new Error("Failed to fetch tasks");
+			}
+			return response.json();
+		},
+		[sessionToken],
+	);
+
+	// Invalidate cache and refetch - returns true on success
+	const invalidateAndRefetchTasks = useCallback(
+		async (boardId: string): Promise<boolean> => {
+			try {
+				// First, invalidate the Redis cache on the server
+				const response = await fetch(`/api/tasks/refresh?boardId=${boardId}`, {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${sessionToken}`,
+					},
+				});
+				if (!response.ok) {
+					throw new Error("Failed to invalidate cache");
+				}
+				return true;
+			} catch (error) {
+				console.error("Error refreshing tasks:", error);
+				return false;
+			}
+		},
+		[sessionToken],
+	);
 
 	// Use mondayStore for context
 	const { rawContext } = useMondayStore();
@@ -175,6 +190,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({ boardIds }),
 			});

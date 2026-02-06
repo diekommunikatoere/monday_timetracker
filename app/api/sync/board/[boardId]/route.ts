@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMondayContext } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { syncItemColumns, getBoardConfig } from "@/lib/columnSync";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 interface Props {
 	params: Promise<{
@@ -15,14 +16,19 @@ interface Props {
  */
 export async function POST(request: NextRequest, { params }: Props) {
 	try {
-		// Authenticate user from Monday context
-		const context = await getMondayContext(request);
-		if (!context?.user?.id) {
+		// Validate session
+		const authHeader = request.headers.get("authorization");
+		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
+		const session = verifyMondayJwt(authHeader);
+		if (!session.isValid) {
+			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+		}
+
 		// Get the Supabase user ID from the Monday user ID
-		const { data: userProfile, error: userError } = await supabaseAdmin.from("user_profiles").select("id").eq("monday_user_id", context.user.id).single();
+		const { data: userProfile, error: userError } = await supabaseAdmin.from("user_profiles").select("id").eq("monday_user_id", session.userId).single();
 
 		if (userError || !userProfile) {
 			console.error("Error fetching user profile:", userError);
