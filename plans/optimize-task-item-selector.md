@@ -59,6 +59,23 @@ CREATE INDEX idx_monday_group_board ON monday_group(board_id);
 CREATE INDEX idx_monday_group_sync ON monday_group(board_id, sync_enabled);
 ```
 
+### Alter `monday_board`
+
+```sql
+ALTER TABLE monday_board ADD COLUMN workspace_id TEXT;
+ALTER TABLE monday_board ADD COLUMN board_kind TEXT;  -- 'public', 'private', 'share'
+ALTER TABLE monday_board ADD COLUMN state TEXT;       -- 'active', 'archived', 'deleted'
+```
+
+`workspace_id` is important because:
+
+- Archive boards live in a different workspace than project boards
+- Enables scoping queries by workspace
+- Webhook payloads include `boardId` but not workspace — having it in DB provides context
+- Future multi-workspace support is pre-wired
+
+`board_kind` and `state` are cheap to store and useful for filtering (e.g., skip archived boards in cron).
+
 ### Alter `monday_item`
 
 ```sql
@@ -85,7 +102,7 @@ Extend [`app/admin/boards/[boardId]/page.tsx`](app/admin/boards/[boardId]/page.t
 
 ### Files to create/modify
 
-- `supabase/migrations/xxx_monday_group.sql` — new table + monday_item alterations
+- `supabase/migrations/xxx_monday_group.sql` — new table + monday_board and monday_item alterations
 - `app/api/admin/boards/[boardId]/groups/route.ts` — group management API
 - [`app/admin/boards/[boardId]/page.tsx`](app/admin/boards/[boardId]/page.tsx) — admin UI
 - [`types/database/database.ts`](types/database/database.ts) — regenerate types
