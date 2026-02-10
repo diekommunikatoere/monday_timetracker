@@ -55,8 +55,64 @@ export async function upsertMondayItem(id: string, name: string, boardId: string
 	);
 
 	if (error) {
-		console.error(`Error upserting monday_item ${id}:`, error);
+		console.error(`[${new Date().toISOString()}] Error upserting monday_item ${id} (Board: ${boardId}):`, {
+			message: error.message,
+			details: error.details,
+			hint: error.hint,
+			code: error.code,
+		});
 	}
+}
+
+interface MondayItemData {
+	id: string;
+	name: string;
+	boardId: string;
+	parentItemId?: string | null;
+}
+
+/**
+ * Batch upsert multiple Monday items into the dimension table
+ * This is more efficient than individual upserts and prevents connection pool exhaustion
+ */
+export async function upsertMondayItemsBatch(items: MondayItemData[]) {
+	if (items.length === 0) return;
+
+	const BATCH_SIZE = 100; // Supabase recommended batch size
+	const batches: MondayItemData[][] = [];
+
+	// Split items into batches
+	for (let i = 0; i < items.length; i += BATCH_SIZE) {
+		batches.push(items.slice(i, i + BATCH_SIZE));
+	}
+
+	console.log(`[upsertMondayItemsBatch] Processing ${items.length} items in ${batches.length} batches`);
+
+	// Process batches sequentially to avoid overwhelming the connection pool
+	for (let i = 0; i < batches.length; i++) {
+		const batch = batches[i];
+		const upsertData = batch.map((item) => ({
+			id: item.id,
+			name: item.name,
+			board_id: item.boardId,
+			parent_item_id: item.parentItemId || null,
+			updated_at: new Date().toISOString(),
+		}));
+
+		const { error } = await supabaseAdmin.from("monday_item").upsert(upsertData, { onConflict: "id" });
+
+		if (error) {
+			console.error(`[upsertMondayItemsBatch] Error in batch ${i + 1}/${batches.length}:`, {
+				message: error.message,
+				details: error.details,
+				hint: error.hint,
+				code: error.code,
+			});
+			// Continue with other batches even if one fails
+		}
+	}
+
+	console.log(`[upsertMondayItemsBatch] Completed ${items.length} items`);
 }
 
 const CACHE_TTL = 300; // 5 minutes

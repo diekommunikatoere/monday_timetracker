@@ -218,21 +218,36 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		refetchOnMount: false, // Use cached data on remount
 	});
 
-	// OPTIMIZATION: Prefetch tasks for all boards when boards are loaded
+	// OPTIMIZATION: Sequential prefetch to avoid API overload
+	// This allows the UI to remain responsive while data loads in background
 	useEffect(() => {
 		if (boards.length > 0) {
-			// Prefetch with a slight stagger to avoid overwhelming the API
-			boards.forEach((board: DropdownOption, index: number) => {
-				setTimeout(() => {
-					queryClient.prefetchQuery({
-						queryKey: ["tasks", board.value],
-						queryFn: () => fetchTasks(board.value),
-						staleTime: 5 * 60 * 1000, // 5 minutes
-					});
-				}, index * 100); // Stagger by 100ms per board
-			});
+			// Use sequential prefetching instead of parallel to avoid overwhelming the API
+			// Each board is fetched one at a time, allowing the cache to populate incrementally
+			const prefetchSequentially = async () => {
+				for (const board of boards) {
+					// Check if already cached before fetching
+					const cached = queryClient.getQueryData(["tasks", board.value]);
+					if (!cached) {
+						try {
+							await queryClient.prefetchQuery({
+								queryKey: ["tasks", board.value],
+								queryFn: () => fetchTasks(board.value),
+								staleTime: 5 * 60 * 1000, // 5 minutes
+							});
+							console.log(`[TaskItemSelector] Prefetched tasks for board ${board.value}`);
+						} catch (err) {
+							console.warn(`[TaskItemSelector] Failed to prefetch board ${board.value}:`, err);
+							// Continue with next board even if one fails
+						}
+					}
+				}
+			};
+
+			// Start sequential prefetch in background
+			prefetchSequentially();
 		}
-	}, [boards, queryClient]);
+	}, [boards, queryClient, fetchTasks]);
 
 	// Roles query with enhanced caching
 	const { data: roles = [], isLoading: loadingRoles } = useQuery({
@@ -457,9 +472,23 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		[selectedBoard, selectedTask, onSelectionChange],
 	);
 
-	// Show loading indicator only for initial load, not background refetch
-	const showTasksLoading = isLoadingTasks && !tasksData;
-	const taskPlaceholder = showTasksLoading ? "Lade Aufgaben..." : selectedBoard ? "Aufgabe auswählen..." : "Zuerst ein Board auswählen";
+	// OPTIMIZATION: Determine loading states
+	// isLoadingTasks: true only on initial load (no cached data)
+	// isFetchingTasks: true during background refetch
+	const hasTaskData = tasks.length > 0 || (tasksData?.groups && tasksData.groups.length > 0);
+	const isTaskDropdownLoading = isLoadingTasks && !hasTaskData;
+
+	// Placeholder text based on state
+	const taskPlaceholder = useMemo(() => {
+		if (!selectedBoard) return "Zuerst ein Board auswählen";
+		if (isTaskDropdownLoading) return "Lade Aufgaben...";
+		return "Aufgabe auswählen...";
+	}, [selectedBoard, isTaskDropdownLoading]);
+
+	// OPTIMIZATION: Determine if dropdown should be disabled
+	// The dropdown is now always interactive once a board is selected
+	// It shows loading state via the placeholder and rightSection
+	const isTaskDropdownDisabled = !selectedBoard;
 
 	return (
 		<Flex
@@ -491,52 +520,40 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				</div>
 			)}
 
-			{/* Task Selector - with groups, skeleton loading, and refresh button */}
-			{showTasksLoading ? (
-				<div>
-					<Text size="sm" fw={500} mb={4}>
-						Aufgabe auswählen
-					</Text>
-					<Skeleton height={36} radius="sm" />
-				</div>
-			) : (
-				<div>
-					<Flex justify="space-between" align="center" mb={4}>
-						<label htmlFor="task-selector" style={{ marginBottom: 0 }}>
-							<Text size="sm" fw={500}>
-								Aufgabe auswählen
-							</Text>
-						</label>
-						{selectedBoard && (
-							<Tooltip label="Aufgabenliste aktualisieren" position="left">
-								<IconButton variant="subtle" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
-									{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
-								</IconButton>
-							</Tooltip>
-						)}
-					</Flex>
-					<Select
-						id="task-selector"
-						placeholder={taskPlaceholder}
-						data={tasks}
-						value={selectedTask?.value || null}
-						onChange={handleTaskChange}
-						clearable
-						searchable={!showTasksLoading}
-						disabled={!selectedBoard || showTasksLoading}
-						nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : "Keine Aufgaben gefunden"}
-						// Show subtle loading indicator for background refetch
-						rightSection={
-							isFetchingTasks && tasksData ? (
-								<Text size="xs" c="dimmed">
-									...
-								</Text>
-							) : undefined
-						}
-						classNames={{ option: styles.selectOption }}
-					/>
-				</div>
-			)}
+			{/* OPTIMIZATION: Task Selector - Always render dropdown immediately */}
+			{/* Removed skeleton blocking - dropdown is interactive from the start */}
+			<div>
+				<Flex justify="space-between" align="center" mb={4}>
+					<label htmlFor="task-selector" style={{ marginBottom: 0 }}>
+						<Text size="sm" fw={500}>
+							Aufgabe auswählen
+						</Text>
+					</label>
+					{selectedBoard && (
+						<Tooltip label="Aufgabenliste aktualisieren" position="left">
+							<IconButton variant="filled" colorVariant="tertiary" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
+								{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
+							</IconButton>
+						</Tooltip>
+					)}
+				</Flex>
+				<Select
+					id="task-selector"
+					placeholder={taskPlaceholder}
+					data={tasks}
+					value={selectedTask?.value || null}
+					onChange={handleTaskChange}
+					clearable
+					// OPTIMIZATION: Always searchable once board is selected
+					// The dropdown is interactive even while loading
+					searchable={!!selectedBoard}
+					disabled={isTaskDropdownDisabled}
+					nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : isTaskDropdownLoading ? "Lade Aufgaben..." : "Keine Aufgaben gefunden"}
+					// Show loading indicator for initial load or background refetch
+					rightSection={isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? <Loader size={14} /> : undefined}
+					classNames={{ option: styles.selectOption }}
+				/>
+			</div>
 
 			{/* Role Selector with skeleton loading */}
 			{loadingRoles ? (
