@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { getItemDetails } from "@/lib/monday";
 
 /**
  * POST /api/webhooks/monday
@@ -31,11 +32,17 @@ export async function POST(request: NextRequest) {
 			case "create_item":
 			case "create_pulse": {
 				const { groupId, pulseName } = event;
+
+				// Check if this item is a subitem by querying monday API
+				const itemDetails = await getItemDetails(itemId);
+				const parentItemId = itemDetails?.parentItemId || null;
+
 				await supabaseAdmin.from("monday_item").upsert({
 					id: itemId,
 					board_id: boardId,
 					group_id: groupId?.toString(),
-					name: pulseName || "Unnamed Item",
+					parent_item_id: parentItemId,
+					name: pulseName || itemDetails?.name || "Unnamed Item",
 					is_active: true,
 					updated_at: new Date().toISOString(),
 				});
