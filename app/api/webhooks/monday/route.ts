@@ -33,14 +33,17 @@ export async function POST(request: NextRequest) {
 			case "create_pulse": {
 				const { groupId, pulseName } = event;
 
-				// Check if this item is a subitem by querying monday API
+				// Query API to detect if subitem (monday sends create_pulse for both)
 				const itemDetails = await getItemDetails(itemId);
 				const parentItemId = itemDetails?.parentItemId || null;
+
+				// Subitems use parent's group_id; regular items use event's groupId
+				const effectiveGroupId = parentItemId ? itemDetails?.parentGroupId : groupId?.toString();
 
 				await supabaseAdmin.from("monday_item").upsert({
 					id: itemId,
 					board_id: boardId,
-					group_id: groupId?.toString(),
+					group_id: effectiveGroupId,
 					parent_item_id: parentItemId,
 					name: pulseName || itemDetails?.name || "Unnamed Item",
 					is_active: true,

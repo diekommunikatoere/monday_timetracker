@@ -905,6 +905,9 @@ export async function getItemDetails(itemId: string) {
 			items(ids: $itemId) {
 				id
 				name
+				group { 
+					id 
+				}
 				board {
 					id
 					name
@@ -912,6 +915,9 @@ export async function getItemDetails(itemId: string) {
 				parent_item {
 					id
 					name
+					group { 
+						id
+					}
 					board {
 						id
 						name
@@ -929,10 +935,12 @@ export async function getItemDetails(itemId: string) {
 		return {
 			id: item.id,
 			name: item.name,
+			groupId: item.group?.id,
 			boardId: item.board?.id,
 			boardName: item.board?.name,
 			parentItemId: item.parent_item?.id,
 			parentItemName: item.parent_item?.name,
+			parentGroupId: item.parent_item?.group?.id,
 			parentBoardId: item.parent_item?.board?.id,
 			parentBoardName: item.parent_item?.board?.name,
 		};
