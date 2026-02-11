@@ -38,21 +38,93 @@ export async function upsertMondayBoard(id: string, name: string) {
 }
 
 /**
+ * Fetch tasks (items and subitems) for a board from the database.
+ * Filters by active items and synced groups.
+ * Uses a two-step query to avoid FK join issues.
+ */
+export async function getTasksFromDB(boardId: string) {
+	console.log(`[getTasksFromDB] Fetching tasks for board ${boardId}`);
+	// Step 1: Get all synced groups for this board, ordered by their board position
+	const { data: syncedGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position").eq("board_id", boardId).eq("sync_enabled", true).order("position", { ascending: true });
+
+	if (groupsError) {
+		console.error(`Error fetching synced groups for board ${boardId}:`, groupsError);
+		throw groupsError;
+	}
+
+	if (!syncedGroups || syncedGroups.length === 0) {
+		// No synced groups means no tasks
+		return [];
+	}
+
+	const syncedGroupIds = syncedGroups.map((g) => g.id);
+	const groupInfoMap = new Map(syncedGroups.map((g) => [g.id, { title: g.title, position: g.position }]));
+
+	// Step 2: Get active items from synced groups
+	const { data: items, error: itemsError } = await supabaseAdmin.from("monday_item").select("id, name, parent_item_id, group_id").eq("board_id", boardId).eq("is_active", true).in("group_id", syncedGroupIds).order("name", { ascending: true });
+
+	if (itemsError) {
+		console.error(`Error fetching items from DB for board ${boardId}:`, itemsError);
+		throw itemsError;
+	}
+
+	if (!items || items.length === 0) {
+		return [];
+	}
+
+	// Step 3: Fetch parent names for subitems
+	const parentIds = Array.from(new Set(items.map((i) => i.parent_item_id).filter(Boolean))) as string[];
+
+	let parentMap = new Map<string, string>();
+	if (parentIds.length > 0) {
+		const { data: parents, error: parentError } = await supabaseAdmin.from("monday_item").select("id, name").in("id", parentIds);
+
+		if (!parentError && parents) {
+			console.log(`[getTasksFromDB] Fetched ${parents.length} parent items for board ${boardId}`);
+			parents.forEach((p) => parentMap.set(p.id, p.name));
+		}
+	}
+
+	// Format for the frontend
+	return items.map((item) => ({
+		id: item.id,
+		name: item.name,
+		group: {
+			id: item.group_id,
+			title: groupInfoMap.get(item.group_id)?.title || "Unknown Group",
+			position: groupInfoMap.get(item.group_id)?.position || null,
+		},
+		parent_item: item.parent_item_id
+			? {
+					id: item.parent_item_id,
+					name: parentMap.get(item.parent_item_id) || "Parent Item",
+				}
+			: null,
+	}));
+}
+
+/**
  * Upsert a Monday item into the dimension table
  */
-export async function upsertMondayItem(id: string, name: string, boardId: string, parentItemId?: string | null) {
+export async function upsertMondayItem(id: string, name: string, boardId: string, parentItemId?: string | null, groupId?: string | null) {
 	if (!id || !name || !boardId) return;
 
-	const { error } = await supabaseAdmin.from("monday_item").upsert(
-		{
-			id,
-			name,
-			board_id: boardId,
-			parent_item_id: parentItemId || null,
-			updated_at: new Date().toISOString(),
-		},
-		{ onConflict: "id" },
-	);
+	// Optimization: Don't overwrite group_id with null if it's already set
+	// This prevents manual time entries (which don't have group info) from clearing sync groups
+	const upsertPayload: any = {
+		id,
+		name,
+		board_id: boardId,
+		parent_item_id: parentItemId || null,
+		is_active: true,
+		updated_at: new Date().toISOString(),
+	};
+
+	if (groupId) {
+		upsertPayload.group_id = groupId;
+	}
+
+	const { error } = await supabaseAdmin.from("monday_item").upsert(upsertPayload, { onConflict: "id" });
 
 	if (error) {
 		console.error(`[${new Date().toISOString()}] Error upserting monday_item ${id} (Board: ${boardId}):`, {
@@ -69,6 +141,7 @@ interface MondayItemData {
 	name: string;
 	boardId: string;
 	parentItemId?: string | null;
+	groupId?: string | null;
 }
 
 /**
@@ -96,6 +169,7 @@ export async function upsertMondayItemsBatch(items: MondayItemData[]) {
 			name: item.name,
 			board_id: item.boardId,
 			parent_item_id: item.parentItemId || null,
+			group_id: item.groupId || null,
 			updated_at: new Date().toISOString(),
 		}));
 

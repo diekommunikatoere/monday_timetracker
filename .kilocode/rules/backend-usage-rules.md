@@ -1,8 +1,9 @@
 ## Backend Usage (Node.js Environment)
 
-The following examples show correct usage of the monday API client in a backend environment, such as NodeJS or in server-side code for NextJS or React. 
+The following examples show correct usage of the monday API client in a backend environment, such as NodeJS or in server-side code for NextJS or React.
 
 ### Basic Mutation Example
+
 ```typescript
 import { ApiClient } from "@mondaydotcomorg/api";
 
@@ -35,7 +36,7 @@ async function createNewItem(boardId: string, itemName: string) {
         throw new Error('API token not found in environment variables');
     }
 
-    const client = new ApiClient({ token: API_TOKEN, apiVersion: "2025-04"});
+    const client = new ApiClient({ token: API_TOKEN, apiVersion: "2025-10"});
     
     try {
         const response = await client.request<APIResponse<CreateItemResponse>>(

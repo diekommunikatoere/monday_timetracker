@@ -131,6 +131,7 @@ CREATE TABLE monday_webhook (
 Single endpoint for all events. monday.com sends a `challenge` on registration that must be echoed back.
 
 ### Events and DB Actions
+<!-- !TODO WEBHOOKS IN MONDAY EINRICHTEN -->
 
 | Event | DB Action |
 |---|---|

@@ -47,6 +47,7 @@ type ItemsPageResponse = {
 		groups: Array<{
 			id: string;
 			title: string;
+			position: string;
 			items_page: {
 				cursor: string | null;
 				items: SimpleItem[];
@@ -122,6 +123,7 @@ type TaskGroup = {
 type GroupItems = {
 	groupId: string;
 	groupTitle: string;
+	groupPosition: string;
 	items: SimpleItem[];
 };
 
@@ -215,19 +217,7 @@ export async function getBoardTasks(
 
 	const startTime = Date.now();
 
-	// Generate cache key - include searchTerm if present
-	const cacheKey = searchTerm ? `monday:tasks:${boardId}:search:${searchTerm}` : `monday:tasks:${boardId}`;
-
-	// Try cache first (skip cache for search queries to ensure fresh results)
-	if (!searchTerm) {
-		const cached = await cacheHelper.get<{ groups: TaskGroup[] }>(cacheKey);
-		if (cached) {
-			console.log(`[getBoardTasks] Cache HIT for board ${boardId} - ${Date.now() - startTime}ms`);
-			return cached;
-		}
-	}
-
-	console.log(`[getBoardTasks] Cache MISS for board ${boardId} - fetching from API`);
+	console.log(`[getBoardTasks] Fetching tasks for board ${boardId} from API`);
 
 	// Phase 1: Fetch all items with pagination (low complexity - no subitems)
 	const allGroupItems: GroupItems[] = [];
@@ -243,6 +233,7 @@ export async function getBoardTasks(
 				groups {
 					id
 					title
+					position
 					items_page(limit: 200) {
 						cursor
 						items {
@@ -307,6 +298,7 @@ export async function getBoardTasks(
 			allGroupItems.push({
 				groupId: group.id,
 				groupTitle: group.title,
+				groupPosition: group.position,
 				items: [...group.items_page.items],
 			});
 
@@ -568,7 +560,7 @@ export async function getBoardTasks(
 
 	// Fire-and-forget: batch upsert items to database (don't block response)
 	// Collect all items into a single array for batch processing
-	const itemsToUpsert: { id: string; name: string; boardId: string; parentItemId?: string | null }[] = [];
+	const itemsToUpsert: { id: string; name: string; boardId: string; parentItemId?: string | null; groupId?: string | null }[] = [];
 
 	for (const group of allGroupItems) {
 		for (const item of group.items) {
@@ -578,6 +570,7 @@ export async function getBoardTasks(
 				name: item.name,
 				boardId,
 				parentItemId: null,
+				groupId: group.groupId,
 			});
 
 			// Add subitems if they exist
@@ -589,6 +582,7 @@ export async function getBoardTasks(
 						name: subitem.name,
 						boardId,
 						parentItemId: item.id.toString(),
+						groupId: group.groupId,
 					});
 				}
 			}
@@ -599,7 +593,7 @@ export async function getBoardTasks(
 	// Use batch upsert instead of individual requests to prevent connection pool exhaustion
 	upsertMondayItemsBatch(itemsToUpsert).catch((err) => console.error("[getBoardTasks] Background batch upsert error:", err));
 
-	// Transform to grouped options
+	// Transform to grouped options and sort
 	const groupedOptions: TaskGroup[] = allGroupItems
 		.map((group) => {
 			const options = group.items.flatMap((item) => {
@@ -624,19 +618,23 @@ export async function getBoardTasks(
 				];
 			});
 
+			// Sort items within group alphabetically by label
+			const sortedOptions = options.sort((a, b) => a.label.localeCompare(b.label));
+
 			return {
 				label: group.groupTitle || "Default Group",
-				options,
+				position: group.groupPosition,
+				options: sortedOptions,
 			};
 		})
-		.filter((group: TaskGroup) => group.options.length > 0);
+		.filter((group: TaskGroup & { position: string }) => group.options.length > 0)
+		.sort((a, b) => {
+			// Sort groups by board position (numeric string comparison)
+			return a.position.localeCompare(b.position, undefined, { numeric: true });
+		})
+		.map(({ label, options }) => ({ label, options })); // Remove position from final output to match TaskGroup type
 
 	const result = { groups: groupedOptions };
-
-	// Cache the result (only for non-search queries)
-	if (!searchTerm) {
-		await cacheHelper.set(cacheKey, result, CACHE_TTL.TASKS);
-	}
 
 	console.log(`[getBoardTasks] API fetch complete for board ${boardId} - ${Date.now() - startTime}ms, total complexity: ${totalComplexity}`);
 	return result;
@@ -648,28 +646,10 @@ export async function getBatchBoardTasks(boardIds: string[]): Promise<Map<string
 	const startTime = Date.now();
 	const results = new Map<string, { groups: TaskGroup[] }>();
 
-	// Check cache for each board first
-	const uncachedBoardIds: string[] = [];
-	for (const boardId of boardIds) {
-		const cacheKey = `monday:tasks:${boardId}`;
-		const cached = await cacheHelper.get<{ groups: TaskGroup[] }>(cacheKey);
-		if (cached) {
-			results.set(boardId, cached);
-		} else {
-			uncachedBoardIds.push(boardId);
-		}
-	}
-
-	console.log(`[getBatchBoardTasks] Cache: ${boardIds.length - uncachedBoardIds.length} hits, ${uncachedBoardIds.length} misses`);
-
-	if (uncachedBoardIds.length === 0) {
-		console.log(`[getBatchBoardTasks] All cached - ${Date.now() - startTime}ms`);
-		return results;
-	}
+	console.log(`[getBatchBoardTasks] Fetching ${boardIds.length} boards from API`);
 
 	// OPTIMIZATION: Sequential fetching instead of parallel to avoid API overload
-	// This also allows the UI to show results incrementally as each board resolves
-	for (const boardId of uncachedBoardIds) {
+	for (const boardId of boardIds) {
 		try {
 			const tasks = await getBoardTasks(boardId);
 			results.set(boardId, tasks);
@@ -684,15 +664,8 @@ export async function getBatchBoardTasks(boardIds: string[]): Promise<Map<string
 	return results;
 }
 
-// Invalidate cache for a specific board (call after write operations)
-export async function invalidateBoardCache(boardId: string): Promise<void> {
-	await cacheHelper.del(`monday:tasks:${boardId}`);
-	console.log(`[invalidateBoardCache] Cleared cache for board ${boardId}`);
-}
-
 // Invalidate all board caches (for forced refresh)
 export async function invalidateAllBoardCaches(): Promise<void> {
-	await cacheHelper.clearPattern("monday:tasks:*");
 	await cacheHelper.clearPattern("monday:boards:*");
 	console.log("[invalidateAllBoardCaches] Cleared all monday caches");
 }

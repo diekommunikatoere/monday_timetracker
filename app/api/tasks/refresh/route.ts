@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidateBoardCache, invalidateAllBoardCaches } from "@/lib/monday";
+import { invalidateAllBoardCaches } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
@@ -26,9 +26,6 @@ export async function POST(request: NextRequest) {
 			if (isNaN(Number(boardId)) || Number(boardId) <= 0) {
 				return NextResponse.json({ error: "boardId must be a valid positive integer" }, { status: 400 });
 			}
-
-			await invalidateBoardCache(boardId);
-			console.log(`[api/tasks/refresh] Invalidated cache for board ${boardId}`);
 
 			return NextResponse.json({
 				success: true,

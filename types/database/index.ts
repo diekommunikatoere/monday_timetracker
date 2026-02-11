@@ -36,6 +36,12 @@ export type {
 	TimerSession,
 	TimerSessionInsert,
 	TimerSessionUpdate,
+	MondayGroup,
+	MondayGroupInsert,
+	MondayGroupUpdate,
+	MondayWebhook,
+	MondayWebhookInsert,
+	MondayWebhookUpdate,
 	// RPC result types
 	GetItemTimeByRoleResult,
 	CalculateRemainingBudgetResult,
