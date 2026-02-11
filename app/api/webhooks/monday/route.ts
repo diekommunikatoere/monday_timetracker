@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
 		// 1. Handle monday.com verification challenge
 		if (body.challenge) {
-			return NextResponse.json({ challenge: body.challenge });
+			return NextResponse.json(body);
 		}
 
 		// 2. Parse event data
