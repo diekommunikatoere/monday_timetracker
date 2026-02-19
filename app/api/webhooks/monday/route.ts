@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 		const itemId = event.itemId?.toString() || event.pulseId?.toString();
 
 		console.log(`Received monday webhook: ${eventType} for board ${boardId}, item ${itemId}`);
+		console.log("Full event data:", JSON.stringify(event));
 
 		// 3. Handle different event types
 		switch (eventType) {
