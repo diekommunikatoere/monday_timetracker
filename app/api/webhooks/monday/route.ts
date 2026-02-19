@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 				break;
 			}
 
-			case "item_moved_to_any_group": {
+			case "move_pulse_into_group": {
 				const { destGroupId } = event;
 				await supabaseAdmin
 					.from("monday_item")
@@ -76,8 +76,12 @@ export async function POST(request: NextRequest) {
 				break;
 			}
 
-			case "item_archived":
-			case "item_deleted": {
+			case "delete_pulse": {
+				await supabaseAdmin.from("monday_item").delete().eq("id", itemId);
+				break;
+			}
+
+			case "item_archived": {
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
@@ -110,6 +114,24 @@ export async function POST(request: NextRequest) {
 					is_active: true,
 					updated_at: new Date().toISOString(),
 				});
+				break;
+			}
+
+			case "move_subitem": {
+				// Call API to get updated parent/group info after the move
+				const itemDetails = await getItemDetails(itemId);
+				const newParentItemId = itemDetails?.parentItemId || null;
+				// Subitems inherit group_id from their parent
+				const newGroupId = itemDetails?.parentGroupId || null;
+
+				await supabaseAdmin
+					.from("monday_item")
+					.update({
+						parent_item_id: newParentItemId,
+						group_id: newGroupId,
+						updated_at: new Date().toISOString(),
+					})
+					.eq("id", itemId);
 				break;
 			}
 

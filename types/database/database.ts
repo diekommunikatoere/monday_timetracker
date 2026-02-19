@@ -208,41 +208,6 @@ export type Database = {
 				};
 				Relationships: [];
 			};
-			monday_webhook: {
-				Row: {
-					board_id: string;
-					created_at: string;
-					event: string;
-					id: string;
-					is_active: boolean;
-					url: string;
-				};
-				Insert: {
-					board_id: string;
-					created_at?: string;
-					event: string;
-					id: string;
-					is_active?: boolean;
-					url: string;
-				};
-				Update: {
-					board_id?: string;
-					created_at?: string;
-					event?: string;
-					id?: string;
-					is_active?: boolean;
-					url?: string;
-				};
-				Relationships: [
-					{
-						foreignKeyName: "monday_webhook_board_id_fkey";
-						columns: ["board_id"];
-						isOneToOne: false;
-						referencedRelation: "monday_board";
-						referencedColumns: ["id"];
-					},
-				];
-			};
 			monday_column: {
 				Row: {
 					board_id: string;
@@ -345,6 +310,41 @@ export type Database = {
 					updated_at?: string;
 				};
 				Relationships: [];
+			};
+			monday_webhook: {
+				Row: {
+					board_id: string;
+					created_at: string;
+					event: string;
+					id: string;
+					is_active: boolean;
+					url: string;
+				};
+				Insert: {
+					board_id: string;
+					created_at?: string;
+					event: string;
+					id: string;
+					is_active?: boolean;
+					url: string;
+				};
+				Update: {
+					board_id?: string;
+					created_at?: string;
+					event?: string;
+					id?: string;
+					is_active?: boolean;
+					url?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: "monday_webhook_board_id_fkey";
+						columns: ["board_id"];
+						isOneToOne: false;
+						referencedRelation: "monday_board";
+						referencedColumns: ["id"];
+					},
+				];
 			};
 			role: {
 				Row: {
@@ -510,6 +510,13 @@ export type Database = {
 						referencedColumns: ["id"];
 					},
 					{
+						foreignKeyName: "time_entry_item_id_fkey";
+						columns: ["item_id"];
+						isOneToOne: false;
+						referencedRelation: "view_monday_tasks";
+						referencedColumns: ["id"];
+					},
+					{
 						foreignKeyName: "time_entry_role_id_fkey";
 						columns: ["role_id"];
 						isOneToOne: false;
@@ -655,7 +662,19 @@ export type Database = {
 			};
 		};
 		Views: {
-			[_ in never]: never;
+			view_monday_tasks: {
+				Row: {
+					board_id: string | null;
+					group_id: string | null;
+					id: string | null;
+					is_active: boolean | null;
+					name: string | null;
+					parent_item_id: string | null;
+					parent_item_name: string | null;
+					updated_at: string | null;
+				};
+				Relationships: [];
+			};
 		};
 		Functions: {
 			add_default_roles: { Args: never; Returns: undefined };

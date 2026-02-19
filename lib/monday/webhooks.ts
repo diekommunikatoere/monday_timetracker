@@ -1,7 +1,7 @@
 import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-const WEBHOOK_EVENTS = ["create_item", "change_name", "item_moved_to_any_group", "item_archived", "item_deleted", "item_restored", "create_subitem"];
+const WEBHOOK_EVENTS = ["create_item", "create_pulse", "change_name", "item_moved_to_any_group", "item_archived", "item_deleted", "item_restored", "create_subitem", "move_subitem"];
 
 /**
  * Registers missing webhooks for a board.

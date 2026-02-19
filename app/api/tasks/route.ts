@@ -4,6 +4,9 @@ import { getBoardTasks } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 import { getTasksFromDB } from "@/lib/database";
 
+// Disable Next.js caching to ensure fresh data on each request
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
 	try {
 		// Validate session
@@ -30,11 +33,14 @@ export async function GET(request: NextRequest) {
 
 		try {
 			// Try to get tasks from DB first (fast path)
+			console.log(`[API /api/tasks] Attempting to fetch tasks for board ${boardId} from DB`);
 			const tasks = await getTasksFromDB(boardId);
+			console.log(`[API /api/tasks] DB returned ${tasks.length} tasks for board ${boardId}`);
 
 			if (tasks.length > 0) {
 				// Apply simple search filtering if provided
 				const filteredTasks = searchTerm ? tasks.filter((t: any) => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.group.title.toLowerCase().includes(searchTerm.toLowerCase()) || t.parent_item?.name.toLowerCase().includes(searchTerm.toLowerCase())) : tasks;
+				console.log(`[API /api/tasks] After search filtering ("${searchTerm || ""}"), ${filteredTasks.length} tasks remaining`);
 
 				// Transform into grouped format for frontend
 				const groupsMap = new Map<string, any>();
