@@ -44,6 +44,14 @@ export type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
 export type TimerSessionInsert = Database["public"]["Tables"]["timer_session"]["Insert"];
 export type TimerSessionUpdate = Database["public"]["Tables"]["timer_session"]["Update"];
 
+export type MondayGroup = Database["public"]["Tables"]["monday_group"]["Row"];
+export type MondayGroupInsert = Database["public"]["Tables"]["monday_group"]["Insert"];
+export type MondayGroupUpdate = Database["public"]["Tables"]["monday_group"]["Update"];
+
+export type MondayWebhook = Database["public"]["Tables"]["monday_webhook"]["Row"];
+export type MondayWebhookInsert = Database["public"]["Tables"]["monday_webhook"]["Insert"];
+export type MondayWebhookUpdate = Database["public"]["Tables"]["monday_webhook"]["Update"];
+
 // ============================================
 // RPC Function Result Types
 // ============================================

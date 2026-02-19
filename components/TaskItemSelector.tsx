@@ -289,6 +289,59 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		placeholderData: (previousData) => previousData,
 	});
 
+	// Real-time subscription to task changes
+	useEffect(() => {
+		if (!selectedBoard?.value) return;
+
+		console.log(`[TaskItemSelector] Subscribing to realtime changes for board ${selectedBoard.value}`);
+
+		const itemChannel = supabase
+			.channel(`tasks-${selectedBoard.value}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "monday_item",
+					filter: `board_id=eq.${selectedBoard.value}`,
+				},
+				(payload) => {
+					console.log("[TaskItemSelector] Task change detected via Realtime:", payload.eventType);
+					// Invalidate React Query cache to trigger refetch from fast DB-backed API
+					queryClient.invalidateQueries({
+						queryKey: ["tasks", selectedBoard.value],
+					});
+				},
+			)
+			.subscribe();
+
+		const groupChannel = supabase
+			.channel(`groups-${selectedBoard.value}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "monday_group",
+					filter: `board_id=eq.${selectedBoard.value}`,
+				},
+				(payload) => {
+					console.log("[TaskItemSelector] Group change detected via Realtime:", payload.eventType);
+					// Invalidate React Query cache to trigger refetch
+					queryClient.invalidateQueries({
+						queryKey: ["tasks", selectedBoard.value],
+					});
+				},
+			)
+			.subscribe();
+
+		return () => {
+			console.log(`[TaskItemSelector] Unsubscribing from realtime changes for board ${selectedBoard.value}`);
+			supabase.removeChannel(itemChannel);
+			supabase.removeChannel(groupChannel);
+		};
+	}, [selectedBoard?.value, queryClient]);
+
 	// Handle refresh button click
 	const handleRefreshTasks = useCallback(async () => {
 		if (!selectedBoard || isRefreshing) return;

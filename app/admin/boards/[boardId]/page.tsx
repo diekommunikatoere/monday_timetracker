@@ -9,7 +9,7 @@ import { Button, IconButton } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
-import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType } from "@/types/database";
+import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType, MondayGroup } from "@/types/database";
 import { isTimePurpose } from "@/lib/monday/utils";
 
 import "@/public/css/components/AdminPage.css";
@@ -85,6 +85,8 @@ export default function BoardConfigPage() {
 	const [roleOverrides, setRoleOverrides] = useState<RoleOverrideWithRole[]>([]);
 	const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
 	const [mondayColumns, setMondayColumns] = useState<MondayColumn[]>([]);
+	const [groups, setGroups] = useState<MondayGroup[]>([]);
+	const [groupsLoading, setGroupsLoading] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -239,6 +241,35 @@ export default function BoardConfigPage() {
 		}
 	}, [boardId, sessionToken]);
 
+	// Fetch groups
+	const fetchGroups = useCallback(async () => {
+		if (!sessionToken) return;
+		try {
+			setGroupsLoading(true);
+			const response = await fetch(`/api/admin/boards/${boardId}/groups`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to fetch groups");
+			}
+
+			setGroups(data.groups || []);
+		} catch (err) {
+			console.error("Error fetching groups:", err);
+			notifications.show({
+				title: "Error",
+				message: err instanceof Error ? err.message : "Failed to fetch groups",
+				color: "red",
+			});
+		} finally {
+			setGroupsLoading(false);
+		}
+	}, [boardId, sessionToken]);
+
 	// Fetch sync stats
 	const fetchSyncStats = useCallback(async () => {
 		if (!sessionToken) return;
@@ -276,6 +307,53 @@ export default function BoardConfigPage() {
 			fetchSyncStats();
 		}
 	}, [activeTab, fetchSyncStats, mondayContext]);
+
+	// Load groups when tab changes to groups
+	useEffect(() => {
+		if (activeTab === "groups") {
+			fetchGroups();
+		}
+	}, [activeTab, fetchGroups]);
+
+	// Toggle group sync handler
+	const handleToggleGroupSync = async (groupId: string, currentSyncEnabled: boolean) => {
+		if (!sessionToken) return;
+		try {
+			const response = await fetch(`/api/admin/boards/${boardId}/groups`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify({
+					groupId,
+					sync_enabled: !currentSyncEnabled,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to update group sync status");
+			}
+
+			// Update local state
+			setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, sync_enabled: !currentSyncEnabled } : g)));
+
+			notifications.show({
+				title: "Success",
+				message: `Group ${!currentSyncEnabled ? "enabled" : "disabled"} for sync`,
+				color: "green",
+			});
+		} catch (err) {
+			console.error("Error toggling group sync:", err);
+			notifications.show({
+				title: "Error",
+				message: err instanceof Error ? err.message : "Failed to update group sync status",
+				color: "red",
+			});
+		}
+	};
 
 	// Bulk sync handler
 	const handleBulkSync = async () => {
@@ -654,6 +732,7 @@ export default function BoardConfigPage() {
 			<Tabs value={activeTab} onChange={setActiveTab} className="admin-tabs">
 				<Tabs.List>
 					<Tabs.Tab value="columns">Column Mappings</Tabs.Tab>
+					<Tabs.Tab value="groups">Groups</Tabs.Tab>
 					<Tabs.Tab value="roles">Role Rate Overrides</Tabs.Tab>
 					<Tabs.Tab value="sync">Sync Operations</Tabs.Tab>
 				</Tabs.List>
@@ -715,6 +794,76 @@ export default function BoardConfigPage() {
 														<IconTrash />
 													</IconButton>
 												</Group>
+											</Table.Td>
+										</Table.Tr>
+									))}
+								</Table.Tbody>
+							</Table>
+						)}
+					</div>
+				</Tabs.Panel>
+
+				{/* Groups Tab */}
+				<Tabs.Panel value="groups" pt="md">
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Groups</h2>
+								<p className="admin-section-description">Control which groups are synced for the task selector. Disabled groups will not appear in the task dropdown.</p>
+							</div>
+						</div>
+
+						{groupsLoading ? (
+							<div className="admin-loading">
+								<Loader size="sm" />
+								<Text size="sm" c="dimmed" ml="xs">
+									Loading groups...
+								</Text>
+							</div>
+						) : groups.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">No groups found</div>
+								<p className="empty-state-description">This board has no groups, or they haven't been loaded yet. Groups will be fetched from monday.com when you open this tab.</p>
+							</div>
+						) : (
+							<Table>
+								<Table.Thead>
+									<Table.Tr>
+										<Table.Th>Group</Table.Th>
+										<Table.Th>Position</Table.Th>
+										<Table.Th>Sync Status</Table.Th>
+										<Table.Th>Actions</Table.Th>
+									</Table.Tr>
+								</Table.Thead>
+								<Table.Tbody>
+									{groups.map((group) => (
+										<Table.Tr key={group.id}>
+											<Table.Td>
+												<Flex align="center" gap="xs">
+													{group.color && (
+														<div
+															style={{
+																width: 12,
+																height: 12,
+																borderRadius: 2,
+																backgroundColor: group.color,
+															}}
+														/>
+													)}
+													<Text fw={500}>{group.title}</Text>
+												</Flex>
+												<Text size="xs" c="dimmed">
+													{group.id}
+												</Text>
+											</Table.Td>
+											<Table.Td>
+												<Text size="sm">{group.position || "-"}</Text>
+											</Table.Td>
+											<Table.Td>
+												<Badge color={group.sync_enabled ? "green" : "gray"}>{group.sync_enabled ? "Synced" : "Not Synced"}</Badge>
+											</Table.Td>
+											<Table.Td>
+												<Switch label={group.sync_enabled ? "Enabled" : "Disabled"} checked={group.sync_enabled} onChange={() => handleToggleGroupSync(group.id, group.sync_enabled)} />
 											</Table.Td>
 										</Table.Tr>
 									))}

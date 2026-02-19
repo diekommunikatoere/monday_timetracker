@@ -3,6 +3,7 @@ import { cacheHelper } from "@/lib/redis";
 import type { Database, FinalizeSegmentResult } from "@/types/database";
 import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
 import { roundDuration } from "./utils";
+import { fetchAllWithRange, fetchAllWithKeyset } from "./supabase/pagination";
 
 type TimeEntry = Database["public"]["Tables"]["time_entry"]["Row"];
 type TimeEntryWithRole = FrontendTimeEntry;
@@ -38,21 +39,113 @@ export async function upsertMondayBoard(id: string, name: string) {
 }
 
 /**
+ * Fetch tasks (items and subitems) for a board from the database.
+ * Filters by active items and synced groups.
+ * Uses a two-step query to avoid FK join issues.
+ */
+export async function getTasksFromDB(boardId: string) {
+	console.log(`[getTasksFromDB] Fetching tasks for board ${boardId}`);
+	// Step 1: Get all synced groups for this board, ordered by their board position
+	const { data: allGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position, sync_enabled").eq("board_id", boardId).order("position", { ascending: true });
+
+	if (groupsError) {
+		console.error(`Error fetching groups for board ${boardId}:`, groupsError);
+		throw groupsError;
+	}
+
+	const syncedGroups = allGroups?.filter((g) => g.sync_enabled) || [];
+	console.log(`[getTasksFromDB] Found ${allGroups?.length || 0} groups total, ${syncedGroups.length} are sync_enabled`);
+
+	if (syncedGroups.length === 0 && (allGroups?.length || 0) > 0) {
+		console.warn(`[getTasksFromDB] All groups are currently disabled for sync on board ${boardId}`);
+	}
+
+	if (syncedGroups.length === 0) {
+		// No synced groups means no tasks
+		return [];
+	}
+
+	const syncedGroupIds = syncedGroups.map((g) => g.id);
+	const groupInfoMap = new Map(syncedGroups.map((g) => [g.id, { title: g.title, position: g.position }]));
+
+	// Step 2: Get all active items (parents and subitems) from synced groups using the view
+	// First, let's see how many items are in the board total vs synced
+	const { count: totalBoardItems } = await supabaseAdmin.from("view_monday_tasks").select("*", { count: "exact", head: true }).eq("board_id", boardId);
+	const { count: activeBoardItems } = await supabaseAdmin.from("view_monday_tasks").select("*", { count: "exact", head: true }).eq("board_id", boardId).eq("is_active", true);
+
+	console.log(`[getTasksFromDB] Board ${boardId} total items (from view): ${totalBoardItems}, active items: ${activeBoardItems}`);
+
+	// Step 3: Fetch the items with group filtering using pagination for large boards
+	// Use keyset pagination on 'name' column for efficient fetching
+	// Note: We select board_id and is_active to enable in-memory filtering
+	const result = await fetchAllWithKeyset(supabaseAdmin, "view_monday_tasks", "name", "id, name, parent_item_id, parent_item_name, group_id, board_id, is_active", { batchSize: 1000 });
+
+	if (!result.success) {
+		console.error(`Error fetching items from DB for board ${boardId}:`, result.error);
+		throw new Error(result.error || "Failed to fetch tasks");
+	}
+
+	// Apply filters in memory (board_id, is_active, group_id)
+	type ViewMondayTask = {
+		board_id: string | null;
+		group_id: string | null;
+		id: string | null;
+		is_active: boolean | null;
+		name: string | null;
+		parent_item_id: string | null;
+		parent_item_name: string | null;
+		updated_at: string | null;
+	};
+
+	const items = result.data.filter((item: ViewMondayTask) => item.board_id === boardId && item.is_active === true && syncedGroupIds.includes(item.group_id!)) as ViewMondayTask[];
+
+	if (items.length === 0) {
+		console.log(`[getTasksFromDB] No items found matching sync criteria for board ${boardId}`);
+		return [];
+	}
+
+	console.log(`[getTasksFromDB] Fetched ${items.length} items for board ${boardId} from synced groups (${result.batches} batches)`);
+
+	// Format for the frontend
+	return items.map((item) => ({
+		id: item.id,
+		name: item.name,
+		group: {
+			id: item.group_id,
+			title: groupInfoMap.get(item.group_id)?.title || "Unknown Group",
+			position: groupInfoMap.get(item.group_id)?.position || null,
+		},
+		parent_item: item.parent_item_id
+			? {
+					id: item.parent_item_id,
+					name: item.parent_item_name || "Parent Item",
+				}
+			: null,
+	}));
+}
+
+/**
  * Upsert a Monday item into the dimension table
  */
-export async function upsertMondayItem(id: string, name: string, boardId: string, parentItemId?: string | null) {
+export async function upsertMondayItem(id: string, name: string, boardId: string, parentItemId?: string | null, groupId?: string | null) {
 	if (!id || !name || !boardId) return;
 
-	const { error } = await supabaseAdmin.from("monday_item").upsert(
-		{
-			id,
-			name,
-			board_id: boardId,
-			parent_item_id: parentItemId || null,
-			updated_at: new Date().toISOString(),
-		},
-		{ onConflict: "id" },
-	);
+	// Optimization: Don't overwrite group_id with null if it's already set
+	// This prevents manual time entries (which don't have group info) from clearing sync groups
+	const upsertPayload: any = {
+		id,
+		name,
+		board_id: boardId,
+		parent_item_id: parentItemId || null,
+		is_active: true,
+		updated_at: new Date().toISOString(),
+	};
+
+	if (groupId) {
+		upsertPayload.group_id = groupId;
+	}
+
+	const { error } = await supabaseAdmin.from("monday_item").upsert(upsertPayload, { onConflict: "id" });
 
 	if (error) {
 		console.error(`[${new Date().toISOString()}] Error upserting monday_item ${id} (Board: ${boardId}):`, {
@@ -69,6 +162,7 @@ interface MondayItemData {
 	name: string;
 	boardId: string;
 	parentItemId?: string | null;
+	groupId?: string | null;
 }
 
 /**
@@ -96,6 +190,7 @@ export async function upsertMondayItemsBatch(items: MondayItemData[]) {
 			name: item.name,
 			board_id: item.boardId,
 			parent_item_id: item.parentItemId || null,
+			group_id: item.groupId || null,
 			updated_at: new Date().toISOString(),
 		}));
 
@@ -118,7 +213,7 @@ export async function upsertMondayItemsBatch(items: MondayItemData[]) {
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_PREFIX = "time_entry:";
 
-// Get all time entries
+// Get all time entries with pagination support
 export async function getAllTimeEntries(): Promise<TimeEntry[]> {
 	const cacheKey = `${CACHE_PREFIX}all`;
 
@@ -129,19 +224,19 @@ export async function getAllTimeEntries(): Promise<TimeEntry[]> {
 		return cached;
 	}
 
-	// Fetch from database
-	const { data, error } = await supabaseAdmin.from("time_entry").select("*").is("deleted_at", null).order("created_at", { ascending: true });
+	// Fetch from database using keyset pagination for better performance with large datasets
+	const result = await fetchAllWithKeyset(supabaseAdmin, "time_entry", "created_at", "*", { batchSize: 1000 });
 
-	if (error) {
-		console.error("Error fetching time entries:", error);
-		throw error;
+	if (!result.success) {
+		console.error("Error fetching time entries:", result.error);
+		throw new Error(result.error || "Failed to fetch time entries");
 	}
 
 	// Cache the result
-	await cacheHelper.set(cacheKey, data, CACHE_TTL);
-	console.log("💾 Cached: getAllTimeEntries");
+	await cacheHelper.set(cacheKey, result.data, CACHE_TTL);
+	console.log(`💾 Cached: getAllTimeEntries (${result.count} entries in ${result.batches} batches)`);
 
-	return data;
+	return result.data;
 }
 
 // Get time entry by ID
