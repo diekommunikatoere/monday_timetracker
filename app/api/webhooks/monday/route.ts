@@ -22,28 +22,25 @@ export async function POST(request: NextRequest) {
 		}
 
 		const eventType = event.type;
-		const boardId = event.boardId?.toString();
-		const itemId = event.itemId?.toString() || event.pulseId?.toString();
 
-		console.log(`Received monday webhook: ${eventType} for board ${boardId}, item ${itemId}`);
+		console.log(`Received monday webhook: ${eventType} for board ${event.boardId}, item ${event.itemId}`);
 		console.log("Full event data:", JSON.stringify(event));
 
 		// 3. Handle different event types
 		switch (eventType) {
-			case "create_item":
 			case "create_pulse": {
 				const { groupId, pulseName } = event;
 
 				// Query API to detect if subitem (monday sends create_pulse for both)
-				const itemDetails = await getItemDetails(itemId);
+				const itemDetails = await getItemDetails(event.itemId);
 				const parentItemId = itemDetails?.parentItemId || null;
 
 				// Subitems use parent's group_id; regular items use event's groupId
 				const effectiveGroupId = parentItemId ? itemDetails?.parentGroupId : groupId?.toString();
 
 				await supabaseAdmin.from("monday_item").upsert({
-					id: itemId,
-					board_id: boardId,
+					id: event.itemId,
+					board_id: event.boardId,
 					group_id: effectiveGroupId,
 					parent_item_id: parentItemId,
 					name: pulseName || itemDetails?.name || "Unnamed Item",
@@ -53,7 +50,7 @@ export async function POST(request: NextRequest) {
 				break;
 			}
 
-			case "change_name": {
+			case "update_name": {
 				const { value } = event;
 				await supabaseAdmin
 					.from("monday_item")
@@ -61,7 +58,7 @@ export async function POST(request: NextRequest) {
 						name: value?.name || "Unnamed Item",
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", itemId);
+					.eq("id", event.pulseId?.toString());
 				break;
 			}
 
@@ -73,23 +70,23 @@ export async function POST(request: NextRequest) {
 						group_id: destGroupId?.toString(),
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", itemId);
+					.eq("id", event.itemId?.toString());
 				break;
 			}
 
 			case "delete_pulse": {
-				await supabaseAdmin.from("monday_item").delete().eq("id", itemId);
+				await supabaseAdmin.from("monday_item").delete().eq("id", event.itemId?.toString());
 				break;
 			}
 
-			case "item_archived": {
+			case "archive_pulse": {
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
 						is_active: false,
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", itemId);
+					.eq("id", event.itemId?.toString());
 				break;
 			}
 
@@ -100,7 +97,7 @@ export async function POST(request: NextRequest) {
 						is_active: true,
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", itemId);
+					.eq("id", event.itemId?.toString());
 				break;
 			}
 
@@ -108,8 +105,8 @@ export async function POST(request: NextRequest) {
 			case "create_subpulse": {
 				const { parentItemId, pulseName } = event;
 				await supabaseAdmin.from("monday_item").upsert({
-					id: itemId,
-					board_id: boardId,
+					id: event.itemId,
+					board_id: event.boardId,
 					parent_item_id: parentItemId?.toString(),
 					name: pulseName || "Unnamed Subitem",
 					is_active: true,
@@ -119,11 +116,10 @@ export async function POST(request: NextRequest) {
 			}
 
 			case "move_subitem": {
-				// Call API to get updated parent/group info after the move
-				const itemDetails = await getItemDetails(itemId);
-				const newParentItemId = itemDetails?.parentItemId || null;
 				// Subitems inherit group_id from their parent
-				const newGroupId = itemDetails?.parentGroupId || null;
+				const newParentItemId = event.destPulseId?.toString() || null;
+				const newParentDetails = await getItemDetails(newParentItemId);
+				const newGroupId = newParentDetails?.groupId || null;
 
 				await supabaseAdmin
 					.from("monday_item")
@@ -132,7 +128,7 @@ export async function POST(request: NextRequest) {
 						group_id: newGroupId,
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", itemId);
+					.eq("id", event.subitem?.toString());
 				break;
 			}
 
@@ -144,7 +140,7 @@ export async function POST(request: NextRequest) {
 						name: value?.name || "Unnamed Subitem",
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", itemId);
+					.eq("id", event.itemId?.toString());
 				break;
 			}
 
