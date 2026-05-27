@@ -73,8 +73,8 @@ export default function ItemViewPage() {
 		fetchDetails();
 	}, [itemId, sessionToken]);
 
-	const itemName = itemDetails?.name || "Aktuelle Aufgabe";
-	const boardName = itemDetails?.boardName || "Projekt-Board";
+	const itemName = itemDetails?.name;
+	const boardName = itemDetails?.parentBoardName;
 	const effectiveBoardId = itemDetails?.parentBoardId || boardId;
 	const roleId = "00000000-0000-0000-0000-000000000000"; // Placeholder
 	const roleName = "Standard-Rolle";
