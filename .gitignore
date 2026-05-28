@@ -46,3 +46,6 @@ next-env.d.ts
 
 # local copilot settings
 .github/chatmodes/*
+
+# kilocode
+.kilocode/package-lock.json
