@@ -205,10 +205,12 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				throw new Error(data.error);
 			}
 
-			return (data.boards || []).map((board: any) => ({
-				label: board.label,
-				value: board.value.toString(),
-			}));
+			return (data.boards || [])
+				.map((board: any) => ({
+					label: board.label,
+					value: board.value.toString(),
+				}))
+				.sort((a, b) => a.label.localeCompare(b.label));
 		},
 		enabled: !!boardIds?.length,
 		// OPTIMIZATION: Extended cache times for board data
@@ -255,10 +257,16 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		queryFn: async () => {
 			const { data, error } = await supabase.from("role").select("*");
 			if (error) throw error;
-			return data.map((role) => ({
-				label: role.name,
-				value: role.id,
-			}));
+			return data
+				.filter((role) => role.is_active)
+				.sort((a, b) => {
+					if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+					return a.name.localeCompare(b.name);
+				})
+				.map((role) => ({
+					label: role.name,
+					value: role.id,
+				}));
 		},
 		// OPTIMIZATION: Roles change very infrequently
 		staleTime: 30 * 60 * 1000, // 30 minutes

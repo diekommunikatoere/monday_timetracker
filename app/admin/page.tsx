@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
 import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
 import { Button, IconButton, IconLink } from "@/components";
@@ -112,6 +112,30 @@ export default function AdminPage() {
 		};
 		loadData();
 	}, [fetchRoles, fetchBoards, sessionToken]);
+
+	// Sort by status and then alphabetically
+	const sortedRoles = useMemo(
+		() =>
+			[...roles].sort((a, b) => {
+				if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+				return a.name.localeCompare(b.name);
+			}),
+		[roles],
+	);
+
+	// Sort boards by sync status and then alphabetically
+	const sortedBoards = useMemo(
+		() =>
+			[...boards].sort((a, b) => {
+				const aEnabled = a.sync_enabled ?? false;
+				const bEnabled = b.sync_enabled ?? false;
+				if (aEnabled !== bEnabled) return aEnabled ? -1 : 1;
+				const aName = (a as any).monday_board?.name || a.board_id;
+				const bName = (b as any).monday_board?.name || b.board_id;
+				return aName.localeCompare(bName);
+			}),
+		[boards],
+	);
 
 	// Role handlers
 	const handleOpenRoleModal = (role?: Role) => {
@@ -443,7 +467,7 @@ export default function AdminPage() {
 							</div>
 						) : (
 							<div className="role-grid">
-								{roles.map((role) => (
+								{sortedRoles.map((role) => (
 									<div key={role.id} className="role-card">
 										<div className="role-card-header">
 											<div className="role-card-title">
@@ -453,12 +477,10 @@ export default function AdminPage() {
 											<span className={`role-card-status ${role.is_active ? "active" : "inactive"}`}>{role.is_active ? "Active" : "Inactive"}</span>
 										</div>
 										<div className="role-card-details">
-											{role.description && (
-												<div className="role-detail-row">
-													<span className="role-detail-label">Description</span>
-													<span className="role-detail-value">{role.description}</span>
-												</div>
-											)}
+											<div className="role-detail-row">
+												<span className="role-detail-label">Description</span>
+												<span className="role-detail-value">{role.description}</span>
+											</div>
 											<div className="role-detail-row">
 												<span className="role-detail-label">Hourly Rate</span>
 												<span className="role-detail-value">{role.hourly_rate.toFixed(2)} €</span>
@@ -471,8 +493,8 @@ export default function AdminPage() {
 												</IconButton>
 											</Tooltip>
 											<Tooltip label={role.is_active ? "Deactivate role" : "Role is inactive"}>
-												<IconButton variant="light" color="red" onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
-													<Icon name="delete" size={21} />
+												<IconButton color={role.is_active ? "var(--color--success-950)" : "var(--color--secondary-900)"} onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
+													<Icon name={role.is_active ? "toggleOn" : "toggleOff"} size={21} filled={role.is_active} color={role.is_active ? "var(--color--success-500)" : "var(--color--text-primary)"} />
 												</IconButton>
 											</Tooltip>
 										</div>
@@ -505,7 +527,7 @@ export default function AdminPage() {
 							</div>
 						) : (
 							<div className="board-grid">
-								{boards.map((board) => (
+								{sortedBoards.map((board) => (
 									<div key={board.board_id} className="board-card">
 										<div className="board-card-header">
 											<Flex align="center" gap="xs">
@@ -515,7 +537,7 @@ export default function AdminPage() {
 														width: 10,
 														height: 10,
 														borderRadius: "50%",
-														backgroundColor: (board as any).config_status === "GREEN" ? "var(--color--success-500)" : (board as any).config_status === "YELLOW" ? "var(--color--secondary-500)" : "var(--color--error-500)",
+														backgroundColor: (board as any).sync_enabled ? "var(--color--success-500)" : "var(--color--error-500)",
 													}}
 												/>
 												<span className="board-card-name">{(board as any).monday_board?.name || board.board_id}</span>
@@ -527,13 +549,11 @@ export default function AdminPage() {
 												<span className="board-detail-label">Board ID</span>
 												<span className="board-detail-value">{board.board_id}</span>
 											</div>
-											{(board as any).last_sync && (
-												<div className="board-detail-row">
-													<span className="board-detail-label">Last Synced</span>
-													<span className="board-detail-value">{new Date((board as any).last_sync).toLocaleString()}</span>
-												</div>
-											)}
-											{(board as any).validation_errors?.length > 0 && (
+											<div className="board-detail-row">
+												<span className="board-detail-label">Last Synced</span>
+												{(board as any).last_sync ? <span className="board-detail-value">{new Date((board as any).last_sync).toLocaleString()}</span> : <span className="board-detail-value">/</span>}
+											</div>
+											{/* {(board as any).validation_errors?.length > 0 && (
 												<div className="board-detail-row" style={{ marginTop: 4 }}>
 													<Flex gap={4} wrap="wrap">
 														{(board as any).validation_errors.map((err: string) => (
@@ -543,29 +563,37 @@ export default function AdminPage() {
 														))}
 													</Flex>
 												</div>
-											)}
+											)} */}
 											<div className="board-sync-options">
-												{board.sync_on_finalize && <Badge size="xs">Sync on Finalize</Badge>}
-												{board.sync_budget_used && <Badge size="xs">Budget Used</Badge>}
+												{board.sync_on_finalize && (
+													<Badge size="xs" variant="light">
+														Sync on Finalize
+													</Badge>
+												)}
+												{board.sync_budget_used && (
+													<Badge size="xs" variant="light">
+														Budget Used
+													</Badge>
+												)}
 											</div>
 										</div>
 										<div className="board-card-actions">
-											<Tooltip label="Sync board now">
+											<Tooltip label="Synchronize board">
 												<IconButton variant="filled" color="var(--color--background-secondary)" onClick={() => handleSyncBoard(board.board_id)} loading={syncingBoards[board.board_id]}>
 													<Icon name="refresh" size={21} color={"var(--color--text-primary)"} />
 												</IconButton>
 											</Tooltip>
-											<Tooltip label="Edit configuration">
+											<Tooltip label="Edit board details">
 												<IconButton variant="filled" color="var(--color--background-secondary)" onClick={() => handleOpenBoardModal(board)}>
 													<Icon name="edit" size={21} color={"var(--color--text-primary)"} />
 												</IconButton>
 											</Tooltip>
-											<Tooltip label="Configure columns">
+											<Tooltip label="Board settings">
 												<IconLink variant="filled" color="var(--color--background-secondary)" href={`/admin/boards/${board.board_id}`}>
 													<Icon name="settings" size={21} color={"var(--color--text-primary)"} />
 												</IconLink>
 											</Tooltip>
-											<Tooltip label="Delete configuration">
+											<Tooltip label="Delete board configuration">
 												<IconButton variant="filled" color="var(--color--primary)" onClick={() => handleDeleteBoard(board)}>
 													<Icon name="delete" size={21} color={"var(--color--text-on-primary)"} />
 												</IconButton>
