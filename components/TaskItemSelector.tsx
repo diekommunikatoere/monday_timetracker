@@ -62,7 +62,6 @@ type TaskGroupsResponse = {
 
 export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues, subItemsOnly }: TaskItemSelectorProps) {
 	// State management for selections
-	const [tasks, setTasks] = useState<ComboboxItemGroup[]>([]);
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
@@ -135,7 +134,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		resetBoard();
 		resetTask();
 		resetRole();
-		setTasks([]);
 		onSelectionChange({
 			boardId: undefined,
 			boardName: undefined,
@@ -213,19 +211,14 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				.sort((a, b) => a.label.localeCompare(b.label));
 		},
 		enabled: !!boardIds?.length,
-		// OPTIMIZATION: Extended cache times for board data
 		staleTime: 10 * 60 * 1000, // 10 minutes - boards rarely change
 		gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
 		refetchOnWindowFocus: false, // Don't refetch on tab focus
 		refetchOnMount: false, // Use cached data on remount
 	});
 
-	// OPTIMIZATION: Sequential prefetch to avoid API overload
-	// This allows the UI to remain responsive while data loads in background
 	useEffect(() => {
 		if (boards.length > 0) {
-			// Use sequential prefetching instead of parallel to avoid overwhelming the API
-			// Each board is fetched one at a time, allowing the cache to populate incrementally
 			const prefetchSequentially = async () => {
 				for (const board of boards) {
 					// Check if already cached before fetching
@@ -412,25 +405,22 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [roles, initialValues?.roleId, initialValues?.roleName, selectedRole?.value]);
 
-	// Update tasks state when query data changes
-	useEffect(() => {
-		if (tasksData?.groups) {
-			const mappedTasks: ComboboxItemGroup[] = tasksData.groups.map((group) => ({
-				group: group.label,
-				items: group.options
-					.filter((option) => !subItemsOnly || !!option.parentItemId)
-					.map((option) => ({
-						value: option.value,
-						label: option.label,
-						name: option.name,
-						parentItemId: option.parentItemId,
-						parentItemName: option.parentItemName,
-					})),
-			}));
-			setTasks(mappedTasks);
-			setError(null);
-		}
-	}, [tasksData, subItemsOnly]);
+	// Derive tasks from query data
+	const tasks = useMemo<ComboboxItemGroup[]>(() => {
+		if (!selectedBoard || !tasksData?.groups || tasksError) return [];
+		return tasksData.groups.map((group) => ({
+			group: group.label,
+			items: group.options
+				.filter((option) => !subItemsOnly || !!option.parentItemId)
+				.map((option) => ({
+					value: option.value,
+					label: option.label,
+					name: option.name,
+					parentItemId: option.parentItemId,
+					parentItemName: option.parentItemName,
+				})),
+		}));
+	}, [tasksData, subItemsOnly, selectedBoard, tasksError]);
 
 	// Set initial task if provided
 	useEffect(() => {
@@ -456,7 +446,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		if (tasksError) {
 			console.error("Error loading tasks:", tasksError);
 			setError("Fehler beim Laden der Aufgaben");
-			setTasks([]);
 		}
 	}, [tasksError]);
 
@@ -466,10 +455,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			const selectedOption = option as DropdownOption;
 			setSelectedBoard(value ? selectedOption : null);
 			setSelectedTask(null);
-
-			if (!value) {
-				setTasks([]);
-			}
 
 			onSelectionChange({
 				boardId: value || undefined,
@@ -533,9 +518,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		[selectedBoard, selectedTask, onSelectionChange],
 	);
 
-	// OPTIMIZATION: Determine loading states
-	// isLoadingTasks: true only on initial load (no cached data)
-	// isFetchingTasks: true during background refetch
 	const hasTaskData = tasks.length > 0 || (tasksData?.groups && tasksData.groups.length > 0);
 	const isTaskDropdownLoading = isLoadingTasks && !hasTaskData;
 
@@ -546,9 +528,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		return "Aufgabe auswählen...";
 	}, [selectedBoard, isTaskDropdownLoading]);
 
-	// OPTIMIZATION: Determine if dropdown should be disabled
-	// The dropdown is now always interactive once a board is selected
-	// It shows loading state via the placeholder and rightSection
 	const isTaskDropdownDisabled = !selectedBoard;
 
 	return (
