@@ -612,8 +612,8 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
 	console.log(`[ColumnSync] syncItemColumns called for item ${itemId} on board ${boardId} (isRecursiveCall: ${isRecursiveCall})`);
 
 	// Resolve parent ID if this is a sub-item
-	// We check if any time entry for this itemId has a parent_item_id
-	const { data: parentInfo } = await supabaseAdmin.from("time_entry").select("parent_item_id").eq("item_id", itemId).not("parent_item_id", "is", null).limit(1).maybeSingle();
+	// Check monday_item dimension table for parent relationship
+	const { data: parentInfo } = await supabaseAdmin.from("monday_item").select("parent_item_id").eq("id", itemId).not("parent_item_id", "is", null).maybeSingle();
 
 	if (parentInfo?.parent_item_id) {
 		console.log(`[ColumnSync] Item ${itemId} is a sub-item. Redirecting sync to parent ${parentInfo.parent_item_id}`);
