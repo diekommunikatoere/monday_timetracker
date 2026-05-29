@@ -24,11 +24,13 @@ export interface ItemManualEntryModalProps {
 	boardId: string;
 	itemName: string;
 	boardName: string;
+	parentItemId?: string;
+	parentItemName?: string;
 	roleId: string;
 	roleName: string;
 }
 
-export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, roleId, roleName }: ItemManualEntryModalProps) {
+export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId, roleName }: ItemManualEntryModalProps) {
 	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: true });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,8 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 					boardName: boardName,
 					itemId: itemId,
 					itemName: itemName,
+					parentItemId: parentItemId,
+					parentItemName: parentItemName,
 					roleId: selectedRoleId,
 					duration: durationSeconds,
 					date: values.date.toISOString(),
@@ -127,7 +131,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 							Aufgabe
 						</Text>
 						<Text size="sm" fw={600}>
-							{boardName} › {itemName}
+							{parentItemName || boardName} › {itemName}
 						</Text>
 					</Flex>
 

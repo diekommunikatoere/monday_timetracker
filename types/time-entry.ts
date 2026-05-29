@@ -17,8 +17,8 @@ export interface TimeEntry {
 	board_name: string | null; // Human-readable board name
 	item_id: string | null;
 	item_name: string | null; // Human-readable task/item name
-	parent_item_id: string | null;
-	parent_item_name: string | null; // Human-readable parent item name
+	parent_item_id?: string | null; // Resolved via monday_item JOIN (not stored on time_entry)
+	parent_item_name?: string | null; // Resolved via monday_item JOIN (not stored on time_entry)
 	role_id: string | null; // Foreign key to role table - primary source of truth
 	role_name: string | null; // Human-readable role name
 	is_draft: boolean;

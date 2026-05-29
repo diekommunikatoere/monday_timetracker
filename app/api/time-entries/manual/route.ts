@@ -103,15 +103,15 @@ export async function POST(request: NextRequest) {
 				comment: comment || null,
 				board_id: boardId || null,
 				item_id: itemId || null,
-				parent_item_id: parentItemId || null,
 				role_id: roleId || null,
 				duration: finalDuration,
 				start_time: finalStartTime,
 				end_time: finalEndTime,
 				is_draft: false,
-				// Dimension metadata for UPSERTing
+				// Dimension metadata for UPSERTing monday_item
 				board_name: boardName,
 				item_name: itemName,
+				parent_item_id: parentItemId,
 				parent_item_name: parentItemName,
 			},
 			userId,

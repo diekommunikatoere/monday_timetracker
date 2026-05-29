@@ -448,7 +448,6 @@ export type Database = {
 					id: string;
 					is_draft: boolean;
 					item_id: string | null;
-					parent_item_id: string | null;
 					role_id: string | null;
 					start_time: string;
 					synced_to_monday: boolean;
@@ -467,7 +466,6 @@ export type Database = {
 					id?: string;
 					is_draft?: boolean;
 					item_id?: string | null;
-					parent_item_id?: string | null;
 					role_id?: string | null;
 					start_time?: string;
 					synced_to_monday?: boolean;
@@ -486,7 +484,6 @@ export type Database = {
 					id?: string;
 					is_draft?: boolean;
 					item_id?: string | null;
-					parent_item_id?: string | null;
 					role_id?: string | null;
 					start_time?: string;
 					synced_to_monday?: boolean;

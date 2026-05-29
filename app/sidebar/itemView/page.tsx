@@ -76,6 +76,8 @@ export default function ItemViewPage() {
 	const itemName = itemDetails?.name;
 	const boardName = itemDetails?.parentBoardName;
 	const effectiveBoardId = itemDetails?.parentBoardId || boardId;
+	const parentItemId = itemDetails?.parentItemId;
+	const parentItemName = itemDetails?.parentItemName;
 	const roleId = "00000000-0000-0000-0000-000000000000"; // Placeholder
 	const roleName = "Standard-Rolle";
 
@@ -119,7 +121,7 @@ export default function ItemViewPage() {
 				<ItemTimeEntriesView timeEntries={timeEntries} itemId={itemId} boardId={effectiveBoardId || boardId} onEdit={handleEdit} />
 			</div>
 
-			<ItemManualEntryModal show={showManualModal} onClose={() => setShowManualModal(false)} itemId={itemId} boardId={effectiveBoardId || boardId} itemName={itemName} boardName={boardName} roleId={roleId} roleName={roleName} />
+			<ItemManualEntryModal show={showManualModal} onClose={() => setShowManualModal(false)} itemId={itemId} boardId={effectiveBoardId || boardId} itemName={itemName} boardName={boardName} parentItemId={parentItemId} parentItemName={parentItemName} roleId={roleId} roleName={roleName} />
 
 			{editingEntry && (
 				<EditTimeEntryModal

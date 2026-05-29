@@ -20,6 +20,7 @@ type TimerSegmentInsert = Database["public"]["Tables"]["timer_segment"]["Insert"
 export interface DimensionMetadata {
 	board_name?: string;
 	item_name?: string;
+	parent_item_id?: string | null;
 	parent_item_name?: string;
 	role_name?: string;
 	task_name?: string;
@@ -291,7 +292,7 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 	}
 
 	// Extract dimension metadata and other non-database fields
-	const { board_name, item_name, parent_item_name, role_name, task_name, ...cleanEntry } = entry;
+	const { board_name, item_name, parent_item_name, role_name, task_name, parent_item_id, ...cleanEntry } = entry;
 
 	// UPSERT dimension tables if names are provided
 	if (cleanEntry.board_id && board_name) {
@@ -299,19 +300,19 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 	}
 
 	// For subitems, ensure we use the parent's board_id if available
-	if (cleanEntry.parent_item_id) {
-		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", cleanEntry.parent_item_id).single();
+	if (parent_item_id) {
+		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", parent_item_id).single();
 		if (parentItem?.board_id) {
 			cleanEntry.board_id = parentItem.board_id;
 		}
 	}
 
 	if (cleanEntry.item_id && item_name) {
-		await upsertMondayItem(cleanEntry.item_id, item_name, cleanEntry.board_id!, cleanEntry.parent_item_id);
+		await upsertMondayItem(cleanEntry.item_id, item_name, cleanEntry.board_id!, parent_item_id);
 	}
 
-	if (cleanEntry.parent_item_id && parent_item_name) {
-		await upsertMondayItem(cleanEntry.parent_item_id, parent_item_name, cleanEntry.board_id!);
+	if (parent_item_id && parent_item_name) {
+		await upsertMondayItem(parent_item_id, parent_item_name, cleanEntry.board_id!);
 	}
 
 	// Apply rounding logic
@@ -598,7 +599,7 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 	}
 
 	// Extract dimension metadata and other non-database fields
-	const { board_name, item_name, parent_item_name, role_name, task_name, id: _id, ...cleanUpdates } = updates;
+	const { board_name, item_name, parent_item_name, role_name, task_name, id: _id, parent_item_id, ...cleanUpdates } = updates;
 
 	// UPSERT dimension tables if names are provided
 	if (cleanUpdates.board_id && board_name) {
@@ -606,9 +607,15 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 	}
 
 	// For subitems, ensure we use the parent's board_id if available
-	const parentItemId = cleanUpdates.parent_item_id || oldEntry.parent_item_id;
-	if (parentItemId) {
-		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", parentItemId).single();
+	// Resolve parentItemId from updates or from the existing monday_item record
+	let resolvedParentItemId = parent_item_id;
+	if (!resolvedParentItemId && cleanUpdates.item_id) {
+		const { data: itemRecord } = await supabaseAdmin.from("monday_item").select("parent_item_id").eq("id", cleanUpdates.item_id).maybeSingle();
+		resolvedParentItemId = itemRecord?.parent_item_id;
+	}
+
+	if (resolvedParentItemId) {
+		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", resolvedParentItemId).single();
 		if (parentItem?.board_id) {
 			cleanUpdates.board_id = parentItem.board_id;
 		}
@@ -618,11 +625,11 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 	const boardId = cleanUpdates.board_id || oldEntry.board_id;
 
 	if (cleanUpdates.item_id && item_name && boardId) {
-		await upsertMondayItem(cleanUpdates.item_id, item_name, boardId, cleanUpdates.parent_item_id || oldEntry.parent_item_id);
+		await upsertMondayItem(cleanUpdates.item_id, item_name, boardId, resolvedParentItemId);
 	}
 
-	if (cleanUpdates.parent_item_id && parent_item_name && boardId) {
-		await upsertMondayItem(cleanUpdates.parent_item_id, parent_item_name, boardId);
+	if (resolvedParentItemId && parent_item_name && boardId) {
+		await upsertMondayItem(resolvedParentItemId, parent_item_name, boardId);
 	}
 
 	// Apply rounding logic
