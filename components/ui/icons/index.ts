@@ -40,4 +40,6 @@ export { default as settings } from "@/components/icons/Settings";
 export { default as star } from "@/components/icons/Star";
 export { default as system } from "@/components/icons/System";
 export { default as today } from "@/components/icons/Today";
+export { default as toggleOff } from "@/components/icons/ToggleOff";
+export { default as toggleOn } from "@/components/icons/ToggleOn";
 export { default as unlock } from "@/components/icons/Unlock";

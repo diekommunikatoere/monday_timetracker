@@ -3,6 +3,7 @@ export interface IconProps {
 	size?: number;
 	color?: string;
 	weight?: "default" | "bold";
+	filled?: boolean;
 	className?: string;
 }
 
@@ -10,5 +11,6 @@ export interface IconComponentProps {
 	size?: number;
 	color?: string;
 	weight?: "default" | "bold";
+	filled?: boolean;
 	className?: string;
 }
