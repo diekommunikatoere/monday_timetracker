@@ -43,7 +43,11 @@ export const useTimeEntriesStore = create<TimeEntriesState>()((set, get) => ({
 			}
 
 			const data = await response.json();
-			set({ timeEntries: data, loading: false });
+
+			// Filter entries with current running timer. They have no end_time and duration of NULL. We don't want to show them in the table, but they should be included in the refetch after saving a draft entry.
+			const cleanData = data.filter((entry: TimeEntry) => entry.end_time !== null && entry.duration !== null);
+
+			set({ timeEntries: cleanData, loading: false });
 		} catch (err) {
 			set({
 				error: err instanceof Error ? err.message : "Unbekannter Fehler",
