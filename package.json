@@ -3,23 +3,11 @@
 	"version": "0.9.4",
 	"private": true,
 	"scripts": {
-		"dev": "npm run services:start && concurrently \"next dev\" \"npm run expose\"",
+		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
 		"expose": "mapps tunnel:create -p 8301",
-		"stop": "kill-port 8301 && kill-port 4049 && kill-port 4040",
-		"services:start": "docker-compose up -d && supabase start",
-		"services:stop": "docker-compose down && supabase stop",
-		"services:restart": "npm run services:stop && npm run services:start",
-		"db:migrate": "supabase db push",
-		"db:reset": "supabase db reset",
-		"db:studio": "open http://localhost:54323",
-		"db:seed": "supabase db reset --db-only",
-		"redis:cli": "docker exec -it timetracker_redis redis-cli",
-		"redis:flush": "docker exec -it timetracker_redis redis-cli FLUSHALL",
-		"redis:gui": "open http://localhost:8081",
-		"supabase:status": "supabase status",
-		"supabase:logs": "supabase logs"
+		"db:migrate": "supabase db push"
 	},
 	"dependencies": {
 		"@mantine/core": "^8.3.14",
