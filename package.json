@@ -10,37 +10,36 @@
 		"db:migrate": "supabase db push"
 	},
 	"dependencies": {
-		"@mantine/core": "^8.3.14",
-		"@mantine/dates": "^8.3.14",
-		"@mantine/hooks": "^8.3.14",
-		"@mantine/notifications": "^8.3.14",
+		"@mantine/core": "^9.3.0",
+		"@mantine/dates": "^9.3.0",
+		"@mantine/hooks": "^9.3.0",
+		"@mantine/notifications": "^9.3.0",
 		"@mondaydotcomorg/api": "^13.0.0",
-		"@supabase/supabase-js": "^2.94.0",
-		"@tanstack/react-query": "^5.90.20",
-		"ioredis": "^5.9.2",
+		"@supabase/supabase-js": "^2.106.2",
+		"@tanstack/react-query": "^5.100.14",
+		"ioredis": "^5.11.0",
 		"jsonwebtoken": "^9.0.3",
-		"monday-sdk-js": "^0.5.7",
-		"next": "16.1.4",
-		"postcss": "^8.5.6",
+		"monday-sdk-js": "^0.5.8",
+		"next": "16.2.7",
+		"postcss": "^8.5.15",
 		"postcss-preset-mantine": "^1.18.0",
 		"postcss-simple-vars": "^7.0.1",
-		"react": "19.2.3",
-		"react-dom": "19.2.3",
-		"sass": "^1.97.3",
-		"zustand": "^5.0.11"
+		"react": "19.2.7",
+		"react-dom": "19.2.7",
+		"sass": "^1.100.0",
+		"zustand": "^5.0.14"
 	},
 	"devDependencies": {
 		"@types/jsonwebtoken": "^9.0.10",
-		"@types/node": "^20.19.31",
-		"@types/react": "19.2.9",
+		"@types/node": "^20.19.41",
+		"@types/react": "19.2.16",
 		"@types/react-dom": "19.2.3",
-		"concurrently": "^9.2.1",
 		"cross-port-killer": "^1.4.0",
-		"supabase": "^2.75.2",
+		"supabase": "^2.104.0",
 		"typescript": "^5.9.3"
 	},
 	"overrides": {
-		"@types/react": "19.2.9",
+		"@types/react": "19.2.16",
 		"@types/react-dom": "19.2.3"
 	}
 }
