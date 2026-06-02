@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 
 			case "move_pulse_into_group": {
 				const { destGroupId } = event;
-				const movedItemId = event.itemId?.toString();
+				const movedItemId = event.pulseId?.toString();
 				const newGroupId = destGroupId?.toString();
 
 				// Update the parent item's group
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 			}
 
 			case "delete_pulse": {
-				await supabaseAdmin.from("monday_item").delete().eq("id", event.itemId?.toString());
+				await supabaseAdmin.from("monday_item").delete().eq("id", event.pulseId?.toString());
 				break;
 			}
 
@@ -152,11 +152,11 @@ export async function POST(request: NextRequest) {
 						is_active: false,
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", event.itemId?.toString());
+					.eq("id", event.pulseId?.toString());
 				break;
 			}
 
-			case "item_restored": {
+			case "restore_pulse": {
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
