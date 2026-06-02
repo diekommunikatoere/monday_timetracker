@@ -31,6 +31,7 @@ const theme = createTheme({
 	primaryShade: 7,
 	black: "#282616",
 	white: "#ffffff",
+	defaultRadius: "sm",
 	other: {},
 });
 

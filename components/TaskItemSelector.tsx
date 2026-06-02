@@ -406,7 +406,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	}, [roles, initialValues?.roleId, initialValues?.roleName, selectedRole?.value]);
 
 	// Derive tasks from query data
-	const tasks = useMemo<ComboboxItemGroup[]>(() => {
+	const tasks = useMemo<ComboboxItemGroup<ComboboxItem>[]>(() => {
 		if (!selectedBoard || !tasksData?.groups || tasksError) return [];
 		return tasksData.groups.map((group) => ({
 			group: group.label,
