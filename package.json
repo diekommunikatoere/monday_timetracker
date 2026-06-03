@@ -20,7 +20,7 @@
 		"ioredis": "^5.11.0",
 		"jsonwebtoken": "^9.0.3",
 		"monday-sdk-js": "^0.5.8",
-		"next": "16.2.7",
+		"next": "16.2.6",
 		"postcss": "^8.5.15",
 		"postcss-preset-mantine": "^1.18.0",
 		"postcss-simple-vars": "^7.0.1",

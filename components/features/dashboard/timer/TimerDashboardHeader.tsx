@@ -37,7 +37,7 @@ export function TimerDashboardHeader(variant?) {
 				<Flex align="center" gap={16} className="header-left-section">
 					<Flex align="center" gap={16} className="logo-container">
 						{/* Logo for light/dark mode */}
-						<Logo size={{ width: 186, height: 32 }} style={logoStyle} />
+						<Logo size={{ width: 186, height: 32 }} style={logoStyle} loading="eager" />
 
 						<ManualTimeEntryButton
 							onClick={() => {

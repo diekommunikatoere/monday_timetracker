@@ -1,9 +1,54 @@
 .selectOption {
+	border-radius: var(--mantine-radius-sm);
+	padding-block: 0.5rem;
+
 	&[aria-selected="true"] {
 		background-color: var(--color--background-secondary);
+		font-weight: 600;
+
+		&:hover {
+			background-color: var(--color--background-secondary-hover);
+		}
 	}
+
+	&[data-combobox-selected] {
+		background-color: var(--color--background-secondary);
+		font-weight: 600;
+	}
+
+	&:hover {
+		background-color: var(--color--background-secondary-hover);
+	}
+
 	svg {
 		color: var(--color--primary);
 		opacity: 1;
+	}
+
+	span {
+		border-color: var(--color--border-layout);
+	}
+
+	span[role="button"] {
+		background-color: var(--color--button-tertiary-bg);
+		color: var(--color--text-on-tertiary);
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-tertiary-bg-hover);
+		}
+
+		svg path {
+			fill: var(--color--icon-on-tertiary);
+		}
+
+		&:disabled,
+		&[data-disabled] {
+			background-color: var(--color--background-disabled);
+			color: var(--color--text-disabled);
+
+			svg path {
+				fill: var(--color--text-disabled);
+			}
+		}
 	}
 }

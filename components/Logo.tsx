@@ -5,7 +5,7 @@ import logoLight from "@/public/img/logo/timetracker_logo_light.svg";
 import logoBlack from "@/public/img/logo/timetracker_logo_black.svg";
 import logoWhite from "@/public/img/logo/timetracker_logo_white.svg";
 
-export const Logo = (props: { size?: { width: number; height: number }; style?: string }) => {
+export const Logo = (props: { size?: { width: number; height: number }; style?: string; loading?: "eager" | "lazy" }) => {
 	let sizeProps;
 
 	if (props.size) {

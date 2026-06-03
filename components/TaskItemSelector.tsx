@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Flex, Text, ComboboxItem, ComboboxItemGroup, Skeleton, Tooltip, Loader } from "@mantine/core";
-import { IconButton, Select } from "@/components";
+import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelect, TreeSelectProps, type TreeNodeData } from "@mantine/core";
+import { Icon, IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
@@ -65,6 +65,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
+	const [expandedValues, setExpandedValues] = useState<string[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -405,41 +406,114 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [roles, initialValues?.roleId, initialValues?.roleName, selectedRole?.value]);
 
-	// Derive tasks from query data
-	const tasks = useMemo<ComboboxItemGroup<ComboboxItem>[]>(() => {
-		if (!selectedBoard || !tasksData?.groups || tasksError) return [];
-		return tasksData.groups.map((group) => ({
-			group: group.label,
-			items: group.options
-				.filter((option) => !subItemsOnly || !!option.parentItemId)
-				.map((option) => ({
-					value: option.value,
-					label: option.label,
+	// Build hierarchical tree data (Group > Job > Task) from query data.
+	// Also build a lookup map from a leaf value to its metadata, and a map
+	// from a leaf value to the ancestor node values needed to reveal it.
+	const { treeData, valueMeta, expansionMap } = useMemo(() => {
+		const meta = new Map<string, { name?: string; parentItemId?: string; parentItemName?: string }>();
+		const expansion = new Map<string, string[]>();
+
+		if (!selectedBoard || !tasksData?.groups || tasksError) {
+			return { treeData: [] as TreeNodeData[], valueMeta: meta, expansionMap: expansion };
+		}
+
+		const groups: TreeNodeData[] = [];
+
+		tasksData.groups.forEach((group, gi) => {
+			const groupValue = `group:${gi}:${group.label}`;
+			const options = group.options;
+
+			// Partition options into top-level items and subitems keyed by their parent.
+			const childrenByParent = new Map<string, typeof options>();
+			const topLevel: typeof options = [];
+			options.forEach((option) => {
+				if (option.parentItemId) {
+					const arr = childrenByParent.get(option.parentItemId) ?? [];
+					arr.push(option);
+					childrenByParent.set(option.parentItemId, arr);
+				} else {
+					topLevel.push(option);
+				}
+			});
+
+			const optionValues = new Set(options.map((o) => o.value));
+			const usedParents = new Set<string>();
+			const itemNodes: TreeNodeData[] = [];
+
+			const makeLeaf = (option: (typeof options)[number], jobValue?: string): TreeNodeData => {
+				meta.set(option.value, {
 					name: option.name,
 					parentItemId: option.parentItemId,
 					parentItemName: option.parentItemName,
-				})),
-		}));
+				});
+				expansion.set(option.value, jobValue ? [groupValue, jobValue] : [groupValue]);
+				return { value: option.value, label: option.name ?? option.label };
+			};
+
+			const sortByName = (a: (typeof options)[number], b: (typeof options)[number]) => (a.name ?? a.label).localeCompare(b.name ?? b.label);
+
+			// Top-level items: containers when they have subitems, otherwise selectable leaves.
+			topLevel.forEach((option) => {
+				const subs = childrenByParent.get(option.value);
+				if (subs && subs.length > 0) {
+					const jobValue = `job:${option.value}`;
+					usedParents.add(option.value);
+					const childNodes = subs
+						.slice()
+						.sort(sortByName)
+						.map((sub) => makeLeaf(sub, jobValue));
+					itemNodes.push({ value: jobValue, label: option.name ?? option.label, children: childNodes });
+				} else if (!subItemsOnly) {
+					itemNodes.push(makeLeaf(option));
+				}
+			});
+
+			// Orphan subitems whose parent item is not present as its own option.
+			childrenByParent.forEach((subs, parentId) => {
+				if (usedParents.has(parentId) || optionValues.has(parentId)) return;
+				const jobValue = `job:${parentId}`;
+				const parentName = subs.find((s) => s.parentItemName)?.parentItemName ?? "Aufgabe";
+				const childNodes = subs
+					.slice()
+					.sort(sortByName)
+					.map((sub) => makeLeaf(sub, jobValue));
+				itemNodes.push({ value: jobValue, label: parentName, children: childNodes });
+			});
+
+			if (itemNodes.length > 0) {
+				groups.push({ value: groupValue, label: group.label, children: itemNodes });
+			}
+		});
+
+		return { treeData: groups, valueMeta: meta, expansionMap: expansion };
 	}, [tasksData, subItemsOnly, selectedBoard, tasksError]);
 
-	// Set initial task if provided
+	// Set initial task if provided and expand the path to reveal it.
 	useEffect(() => {
-		if (initialValues?.itemId && selectedTask?.value !== initialValues.itemId) {
-			const allItems = tasks.flatMap((group) => group.items);
-			const initialTask = allItems.find((task) => (task as DropdownOption).value === initialValues.itemId);
-			if (initialTask) {
-				// Need to cast because ComboboxItem doesn't guarantee label is string, but we know it is
-				setSelectedTask(initialTask as DropdownOption);
-			} else if (initialValues.itemName) {
-				// If not found but we have a name, create a temporary option
-				setSelectedTask({
-					value: initialValues.itemId,
-					label: initialValues.itemName,
-					name: initialValues.itemName,
-				});
+		if (!initialValues?.itemId || selectedTask?.value === initialValues.itemId) return;
+
+		const m = valueMeta.get(initialValues.itemId);
+		if (m) {
+			setSelectedTask({
+				value: initialValues.itemId,
+				label: m.name ?? initialValues.itemName ?? "",
+				name: m.name,
+				parentItemId: m.parentItemId,
+				parentItemName: m.parentItemName,
+			});
+			const path = expansionMap.get(initialValues.itemId);
+			if (path) {
+				setExpandedValues((prev) => Array.from(new Set([...prev, ...path])));
 			}
+		} else if (initialValues.itemName) {
+			// If not found but we have a name, create a temporary option
+			setSelectedTask({
+				value: initialValues.itemId,
+				label: initialValues.itemName,
+				name: initialValues.itemName,
+			});
 		}
-	}, [initialValues?.itemId, initialValues?.itemName, tasks, selectedTask?.value]);
+	}, [initialValues?.itemId, initialValues?.itemName, valueMeta, expansionMap, selectedTask?.value]);
 
 	// Handle tasks error
 	useEffect(() => {
@@ -470,32 +544,41 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		[selectedRole, onSelectionChange],
 	);
 
-	// Handle task selection
+	// Handle task selection. TreeSelect returns only the node value, so we
+	// reconstruct the full selection payload from the metadata lookup map.
+	// Container nodes (groups/jobs) are non-selectable in single mode, but we
+	// guard against their prefixed values defensively.
 	const handleTaskChange = useCallback(
-		(value: string | null, option: ComboboxItem) => {
-			// Find the full option object from state to ensure we have all properties
-			// Mantine's Select might strip extra properties from the option argument
-			let fullOption: DropdownOption | null = null;
-			if (value) {
-				const allItems = tasks.flatMap((group) => group.items);
-				fullOption = (allItems.find((item) => (item as DropdownOption).value === value) as DropdownOption) || null;
+		(value: string | null) => {
+			if (value && (value.startsWith("group:") || value.startsWith("job:"))) {
+				return;
 			}
 
-			const selectedOption = fullOption || (option as DropdownOption);
-			setSelectedTask(value ? selectedOption : null);
+			const m = value ? valueMeta.get(value) : undefined;
+			setSelectedTask(
+				value
+					? {
+							value,
+							label: m?.name ?? value,
+							name: m?.name,
+							parentItemId: m?.parentItemId,
+							parentItemName: m?.parentItemName,
+						}
+					: null,
+			);
 
 			onSelectionChange({
 				boardId: selectedBoard?.value,
 				boardName: selectedBoard?.label,
 				itemId: value || undefined,
-				itemName: selectedOption?.name,
-				parentItemId: selectedOption?.parentItemId,
-				parentItemName: selectedOption?.parentItemName,
+				itemName: m?.name,
+				parentItemId: m?.parentItemId,
+				parentItemName: m?.parentItemName,
 				roleId: selectedRole?.value,
 				roleName: selectedRole?.label,
 			});
 		},
-		[selectedBoard, selectedRole, onSelectionChange, tasks],
+		[selectedBoard, selectedRole, onSelectionChange, valueMeta],
 	);
 
 	// Handle role selection
@@ -518,7 +601,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		[selectedBoard, selectedTask, onSelectionChange],
 	);
 
-	const hasTaskData = tasks.length > 0 || (tasksData?.groups && tasksData.groups.length > 0);
+	const hasTaskData = treeData.length > 0 || (tasksData?.groups && tasksData.groups.length > 0);
 	const isTaskDropdownLoading = isLoadingTasks && !hasTaskData;
 
 	// Placeholder text based on state
@@ -529,6 +612,26 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	}, [selectedBoard, isTaskDropdownLoading]);
 
 	const isTaskDropdownDisabled = !selectedBoard;
+
+	// Add Checkmark before label if item is selected
+	const renderTaskNode: TreeSelectProps["renderNode"] = useCallback(
+		({ node, hasChildren, expanded }) => {
+			const isGroupOrJob = node.value.startsWith("group:") || node.value.startsWith("job:");
+			const isSelected = selectedTask?.value === node.value;
+			return (
+				<Flex align="center" gap="xs" {...node} className={styles.selectOption} style={{ paddingBlock: ".25rem" }}>
+					{hasChildren && (
+						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
+							<Icon name={expanded ? "collapse" : "expand"} size={12} color="var(--color--text-secondary)" />
+						</IconButton>
+					)}
+					{isSelected && <Icon name="check" size={14} color="var(--color--primary)" />}
+					<span style={{ fontStyle: expanded ? "italic" : "normal" }}>{node.label}</span>
+				</Flex>
+			);
+		},
+		[selectedTask],
+	);
 
 	return (
 		<Flex
@@ -577,17 +680,23 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 						</Tooltip>
 					)}
 				</Flex>
-				<Select
+				<TreeSelect
 					id="task-selector"
 					placeholder={taskPlaceholder}
-					data={tasks}
-					value={selectedTask?.value || null}
+					data={treeData}
+					renderNode={renderTaskNode}
+					value={selectedTask?.value ?? null}
 					onChange={handleTaskChange}
+					expandedValues={expandedValues}
+					onExpandedChange={setExpandedValues}
+					// Expand groups/jobs by clicking the whole row, not just the chevron.
+					expandOnClick
 					clearable
-					// OPTIMIZATION: Always searchable once board is selected
-					// The dropdown is interactive even while loading
+					clearButtonProps={{ "aria-label": "Auswahl löschen" }}
+					// Searchable matches group, job and task labels and reveals ancestors.
 					searchable={!!selectedBoard}
 					disabled={isTaskDropdownDisabled}
+					maxDropdownHeight={320}
 					nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : isTaskDropdownLoading ? "Lade Aufgaben..." : "Keine Aufgaben gefunden"}
 					// Show loading indicator for initial load or background refetch
 					rightSection={isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? <Loader size={14} /> : undefined}
