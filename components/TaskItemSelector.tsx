@@ -1,13 +1,14 @@
 // components/TaskItemSelector.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelect, TreeSelectProps, type TreeNodeData } from "@mantine/core";
 import { Icon, IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
 import RefreshIcon from "@/components/icons/Refresh";
+import Fuse, { type FuseResult } from "fuse.js";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 
@@ -601,6 +602,67 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		[selectedBoard, selectedTask, onSelectionChange],
 	);
 
+	// Handle task search
+	// 1) Flatten tree data with joined ancestor labels for each node to support searching by any level.
+	const flatDataSearchable = useMemo(() => {
+		const out: { value: string; path: string }[] = [];
+		const traverse = (nodes: TreeNodeData[], ancestors: string[]) => {
+			for (const n of nodes) {
+				const selfLabel = typeof n.label === "string" ? n.label : n.value;
+				const path = [...ancestors, selfLabel].join(" > ");
+				out.push({ value: n.value, path });
+				if (n.children) {
+					traverse(n.children, [...ancestors, selfLabel]);
+				}
+			}
+		};
+
+		traverse(treeData, []);
+		return out;
+	}, [treeData]);
+
+	// 2) Build Fuse index for searching once per tree data change.
+	const fuseIndex = useMemo(
+		() =>
+			new Fuse(flatDataSearchable, {
+				keys: ["path"],
+				useTokenSearch: true,
+				tokenMatch: "all",
+				ignoreLocation: true,
+				threshold: 0.3,
+				minMatchCharLength: 2,
+			}),
+		[flatDataSearchable],
+	);
+
+	// Cache the matched-value set per unique search query to avoid recomputing matches on every render while typing.
+	const matchCacheRef = useRef(new Map<string, Set<string>>());
+
+	const taskFilter = useCallback(
+		(query: string, node: TreeNodeData) => {
+			if (!query.trim()) return true;
+
+			const cache = matchCacheRef.current;
+			let hitValues = cache.get(query);
+			if (!hitValues) {
+				const hits: FuseResult<{ value: string; path: string }>[] = fuseIndex.search(query);
+				hitValues = new Set(hits.map((h) => h.item.value));
+				cache.set(query, hitValues);
+
+				// Limit cache size to prevent unbounded growth in long sessions with many unique queries. Evict least recently used entry when limit is exceeded.
+				const CACHE_LIMIT = 50;
+				if (cache.size > CACHE_LIMIT) {
+					const firstKey = cache.keys().next().value;
+					if (firstKey !== undefined) {
+						cache.delete(firstKey);
+					}
+				}
+			}
+			return hitValues.has(node.value);
+		},
+		[fuseIndex],
+	);
+
 	const hasTaskData = treeData.length > 0 || (tasksData?.groups && tasksData.groups.length > 0);
 	const isTaskDropdownLoading = isLoadingTasks && !hasTaskData;
 
@@ -684,6 +746,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					id="task-selector"
 					placeholder={taskPlaceholder}
 					data={treeData}
+					filter={taskFilter}
 					renderNode={renderTaskNode}
 					value={selectedTask?.value ?? null}
 					onChange={handleTaskChange}
