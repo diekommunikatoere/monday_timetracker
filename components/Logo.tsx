@@ -16,14 +16,14 @@ export const Logo = (props: { size?: { width: number; height: number }; style?: 
 
 	switch (props.style) {
 		case "brand":
-			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} />;
+			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
 		case "light":
-			return <Image src={logoLight} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} />;
+			return <Image src={logoLight} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
 		case "black":
-			return <Image src={logoBlack} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} />;
+			return <Image src={logoBlack} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
 		case "white":
-			return <Image src={logoWhite} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} />;
+			return <Image src={logoWhite} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
 		default:
-			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} />;
+			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
 	}
 };
