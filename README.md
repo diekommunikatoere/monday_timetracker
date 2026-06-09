@@ -1,130 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TimeTracker
 
-## Time Tracker App
+A Monday.com app for tracking billable time against board items. It embeds into Monday.com as two surfaces: a **dashboard** (board view) and an **item sidebar**.
 
-A time tracking application with Monday.com integration for saving time entries to Monday boards.
+**Dashboard** — the main workspace. Contains a timer for tracking time against any item, a log of all time entries across all connected boards. Finalized entries sync duration and cost back to the configured Monday.com columns.
 
-### Features
+**Item sidebar** — opens alongside a specific Monday.com item. Shows all time entries logged against that item and lets you add manual entries directly to it.
 
-- ⏱️ Timer functionality with start/pause/stop controls
-- 📊 Time entry management and display
-- 🔗 Monday.com API integration for board management
-- 💾 SQLite database for local time tracking
+**Admin panel** — configure roles and hourly rates, choose which boards to sync, map Monday.com columns (Time Spent, Total Cost), and set board-specific rate overrides per role.
 
-## Monday.com Integration
+Other:
 
-This app includes Monday.com API integration to fetch boards from a specific workspace and eventually save time entries as subitems.
+- Webhook listener keeps the local DB in sync when Monday items are moved or deleted
+- Cron job reconciles board data every 30 minutes as a fallback
+- UI theme follows the user's Monday.com light/dark preference
 
-### Setup
+## Tech stack
 
-1. **Install Dependencies**
+- **Next.js** (App Router) + **TypeScript**
+- **Mantine UI** for components
+- **Zustand** for client state, **React Query** for server state
+- **Supabase** (PostgreSQL) as the primary database
+- **Redis** for caching Monday.com API responses
+- **Monday.com SDK** + GraphQL API for board/item data and webhook events
 
-   ```bash
-   npm install @mondaydotcomorg/api
-   ```
+## Environment variables
 
-2. **Environment Variables**
-   Create a `.env.local` file in the root directory:
+```env
+# App
+PORT=8301
+APP_ID=<monday_app_id>
+NODE_ENV=development
 
-   ```env
-   MONDAY_API_KEY=your_monday_api_token_here
-   ```
+# Monday.com
+MONDAY_API_TOKEN=<api_token>
+MONDAY_SIGNING_SECRET=<webhook_signing_secret>
 
-3. **Get Monday API Key**
-   - Go to your Monday.com account
-   - Navigate to Admin → API
-   - Generate a new API token
-   - Copy the token to your `.env.local` file
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=<publishable_key>
+NEXT_SUPABASE_SECRET_KEY=<secret_key>
 
-### API Endpoints
+# Redis
+REDIS_URL=redis://default:<password>@<host>:<port>
 
-#### GET /api/boards
-
-Fetches all boards from the specified Monday workspace.
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "workspaceId": 9960133,
-  "boards": [
-    {
-      "id": "123456789",
-      "name": "Project Board",
-      "description": "Main project tracking",
-      "board_kind": "public",
-      "state": "active",
-      "updated_at": "2025-10-30T07:23:05.441Z",
-      "workspace": {
-        "id": "9960133",
-        "name": "Main Workspace"
-      },
-      "columns": [...],
-      "groups": [...]
-    }
-  ],
-  "count": 1
-}
+# Optional
+NEXT_PUBLIC_APP_URL=https://<your_domain>
+CRON_SECRET=<secret_for_cron_endpoints>
 ```
 
-**Error Responses:**
-
-- `401`: Invalid Monday API key
-- `403`: Insufficient permissions for Monday API
-- `500`: Server error or API errors
-
-### Testing the Integration
-
-1. Start the development server:
-
-   ```bash
-   npm run dev
-   ```
-
-2. Test the boards endpoint:
-
-   ```bash
-   curl http://localhost:3000/api/boards
-   ```
-
-3. Expected response (if no boards in workspace):
-
-   ```json
-   {"success":true,"workspaceId":9960133,"boards":[],"count":0}
-   ```
-
-## Getting Started
-
-First, run the development server:
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Database migrations live in [supabase/migrations/](supabase/migrations/).
