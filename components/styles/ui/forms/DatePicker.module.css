@@ -1,15 +1,15 @@
 .date-picker {
-	/* Base date picker styling */
+    /* Base date picker styling */
 }
 
 .date-picker--error {
-	border-color: var(--color--error-500);
+    border-color: var(--color--error-500);
 }
 
 .date-picker--warning {
-	border-color: var(--color--secondary-500);
+    border-color: var(--color--secondary-500);
 }
 
 .date-picker--success {
-	border-color: var(--color--success-500);
+    border-color: var(--color--success-500);
 }

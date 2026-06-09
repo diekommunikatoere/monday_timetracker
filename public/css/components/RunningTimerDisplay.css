@@ -1,39 +1,39 @@
 .timer-display {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 4px 4px 4px 32px;
-	background-color: var(--color--background-secondary);
-	border-radius: var(--border-radius-small);
+    display: flex;
+    padding: 4px 4px 4px 32px;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color--background-secondary);
+    border-radius: var(--border-radius-small);
 
-	.timer-time {
-		font-size: 1.4rem;
-		line-height: 1;
-		font-weight: 500;
-		color: var(--color--text-disabled);
-		font-family: var(--font--mono);
+    .timer-time {
+        color: var(--color--text-disabled);
+        font-weight: 500;
+        font-size: 1.4rem;
+        font-family: var(--font--mono);
+        line-height: 1;
 
-		&.active {
-			color: var(--color--text-primary);
-			animation: none;
-		}
+        &.active {
+            color: var(--color--text-primary);
+            animation: none;
+        }
 
-		&.paused {
-			color: var(--color--text-disabled);
-			animation: blink 1.5s step-start infinite;
-		}
-	}
+        &.paused {
+            color: var(--color--text-disabled);
+            animation: blink 1.5s step-start infinite;
+        }
+    }
 
-	.btn-reset {
-		&:disabled {
-			cursor: not-allowed;
-			background-color: var(--color--tertiary-light);
-		}
-	}
+    .btn-reset {
+        &:disabled {
+            background-color: var(--color--tertiary-light);
+            cursor: not-allowed;
+        }
+    }
 }
 
 @keyframes blink {
-	50% {
-		color: var(--color--text-primary);
-	}
+    50% {
+        color: var(--color--text-primary);
+    }
 }

@@ -22,22 +22,28 @@ import styles from "@/components/styles/features/timer/TimerDisplay.module.css";
  * @param disabled - Whether the reset button should be disabled
  */
 export function TimerDisplay({ elapsedTime, status, onReset, disabled }: TimerDisplayProps) {
-	const isActive = status !== "idle";
-	const isPaused = status === "paused";
+    const isActive = status !== "idle";
+    const isPaused = status === "paused";
 
-	const activeColor = "var(--color--text-on-primary)";
-	const disabledColor = "var(--color--text-disabled)";
-
-	return (
-		<Flex direction="row" align="center" justify="center" gap="lg">
-			<Tooltip label="Timer zurücksetzen" position="top" withArrow>
-				<IconButton className={`btn-reset ${styles.timerResetButton}`} onClick={onReset} variant="filled" colorVariant="primary" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
-					<Icon name="reset" size={21} />
-				</IconButton>
-			</Tooltip>
-			<Text className={`${styles.time} ${isActive ? styles.isActive : ""} ${isPaused ? styles.isPaused : ""}`}>{formatTime(elapsedTime)}</Text>
-		</Flex>
-	);
+    return (
+        <Flex direction="row" align="center" justify="center" gap="lg">
+            <Tooltip label="Timer zurücksetzen" position="top" withArrow>
+                <IconButton
+                    className={`btn-reset ${styles.timerResetButton}`}
+                    onClick={onReset}
+                    variant="primary"
+                    size="lg"
+                    aria-label="Timer zurücksetzen"
+                    disabled={disabled}
+                >
+                    <Icon name="reset" size={21} />
+                </IconButton>
+            </Tooltip>
+            <Text className={`${styles.time} ${isActive ? styles.isActive : ""} ${isPaused ? styles.isPaused : ""}`}>
+                {formatTime(elapsedTime)}
+            </Text>
+        </Flex>
+    );
 }
 
 export default TimerDisplay;

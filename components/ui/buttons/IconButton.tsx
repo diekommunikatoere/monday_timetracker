@@ -1,35 +1,23 @@
 "use client";
 
 import { ActionIcon } from "@mantine/core";
-import styles from "@/components/styles/ui/buttons/IconGroup.module.css";
-
 import { IconButtonProps } from "./types";
+import classes from "@/components/styles/ui/buttons/IconGroup.module.css";
 
-export function IconButton({ children, colorVariant, onClick, href, ...props }: IconButtonProps) {
-	let buttonVariant: "buttonPrimary" | "buttonSecondary" | "buttonTertiary" | "buttonPrimaryMuted" | "default";
+export function IconButton({ children, onClick, href, disabled, ...props }: IconButtonProps) {
+    let className = props.className || "";
 
-	switch (colorVariant) {
-		case "primary":
-			buttonVariant = "buttonPrimary";
-			break;
-		case "secondary":
-			buttonVariant = "buttonSecondary";
-			break;
-		case "tertiary":
-			buttonVariant = "buttonTertiary";
-			break;
-		case "primary-muted":
-			buttonVariant = "buttonPrimaryMuted";
-			break;
-		default:
-			buttonVariant = "default";
-	}
+    if (props.variant) {
+        className = className + ` ${classes.root} ${classes[`icon-button--${props.variant}`]}`;
+    } else {
+        className = className + ` ${classes.root} `;
+    }
 
-	return (
-		<ActionIcon classNames={{ root: (styles.iconButton, styles[buttonVariant]) }} onClick={onClick} {...props}>
-			{children}
-		</ActionIcon>
-	);
+    return (
+        <ActionIcon classNames={{ root: `icon-button ${className}` }} onClick={onClick} disabled={disabled} {...props}>
+            {children}
+        </ActionIcon>
+    );
 }
 
 export default IconButton;

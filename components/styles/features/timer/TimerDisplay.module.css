@@ -1,25 +1,25 @@
 /* components/features/timer/TimerDisplay.module.css */
 
 .time {
-	font-size: var(--font--size-xxl); /* Use your new token! */
-	line-height: 1;
-	font-weight: var(--font--weight-bold);
-	color: var(--color--text-disabled);
-	font-family: var(--font--mono);
-	transition: var(--transition);
+    color: var(--color--text-disabled);
+    font-weight: var(--font--weight-bold);
+    font-size: var(--font--size-xxl);
+    font-family: var(--font--mono);
+    line-height: 1;
+    transition: var(--transition);
 }
 
 /* Modifiers act as unique classes in Modules */
 .isActive {
-	color: var(--color--text-primary);
+    color: var(--color--text-primary);
 }
 
 .isPaused {
-	animation: blink 1.5s step-start infinite;
+    animation: blink 1.5s step-start infinite;
 }
 
 @keyframes blink {
-	50% {
-		opacity: 0.5; /* Cleaner than changing colors */
-	}
+    50% {
+        opacity: 0.5;
+    }
 }

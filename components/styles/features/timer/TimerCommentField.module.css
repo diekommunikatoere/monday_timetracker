@@ -1,40 +1,40 @@
 .wrapper {
-	width: 100%;
+    width: 100%;
 
-	.input {
-		font-size: 0.9rem;
-		border-color: var(--color--border-ui);
-		border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
-		transition: border-color 0.3s ease;
+    .input {
+        font-size: 0.9rem;
+        border-color: var(--color--border-ui);
+        border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
+        transition: border-color 0.3s ease;
 
-		&::placeholder {
-			color: var(--color--text-placeholder);
-		}
+        &::placeholder {
+            color: var(--color--text-placeholder);
+        }
 
-		&[data-disabled] {
-			background-color: var(--color--background-disabled);
-			cursor: not-allowed;
+        &[data-disabled] {
+            background-color: var(--color--background-disabled);
+            cursor: not-allowed;
 
-			&::placeholder {
-				color: var(--color--text-disabled);
-			}
-		}
-	}
+            &::placeholder {
+                color: var(--color--text-disabled);
+            }
+        }
+    }
 
-	.input {
-		&:focus-within {
-			border-color: var(--color--primary);
-		}
+    .input {
+        &:focus-within {
+            border-color: var(--color--primary);
+        }
 
-		&::placeholder {
-			color: var(--color--text-placeholder);
-		}
-	}
+        &::placeholder {
+            color: var(--color--text-placeholder);
+        }
+    }
 }
 
 .timerIconButton {
-	aspect-ratio: 1 / 1;
-	height: 100%;
-	width: auto;
-	border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
+    aspect-ratio: 1 / 1;
+    width: auto;
+    height: 100%;
+    border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
 }

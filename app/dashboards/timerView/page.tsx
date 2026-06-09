@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
+import { TimerDashboardHeader } from "@/components/features/dashboard";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import { Flex } from "@mantine/core";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";

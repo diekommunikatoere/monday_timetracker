@@ -1,5 +1,5 @@
 .button.button--timer {
-	/* &.play-pause {
+    /* &.play-pause {
 		border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
 	}
 
@@ -11,8 +11,8 @@
 		border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
 	} */
 
-	&:disabled {
-		cursor: not-allowed;
-		background-color: var(--color--tertiary-light);
-	}
+    &:disabled {
+        background-color: var(--color--tertiary-light);
+        cursor: not-allowed;
+    }
 }

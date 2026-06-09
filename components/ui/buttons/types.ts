@@ -1,27 +1,32 @@
 import React from "react";
-import { ButtonProps as MantineButtonProps, ButtonGroupProps as MantineButtonGroupProps, ActionIconProps as MantineActionIconProps } from "@mantine/core";
+import {
+    ButtonProps as MantineButtonProps,
+    ButtonGroupProps as MantineButtonGroupProps,
+    ActionIconProps as MantineActionIconProps,
+} from "@mantine/core";
 
 export type ButtonProps = MantineButtonProps & {
-	iconLeft?: React.ReactNode;
-	iconRight?: React.ReactNode;
-	children: React.ReactNode;
-	onClick?: () => void;
-	loading?: boolean;
-	disabled?: boolean;
+    iconLeft?: React.ReactNode;
+    iconRight?: React.ReactNode;
+    children: React.ReactNode;
+    onClick?: () => void;
+    loading?: boolean;
+    disabled?: boolean;
 };
 
 export type ButtonGroupProps = MantineButtonGroupProps & {
-	children: React.ReactNode;
+    children: React.ReactNode;
 };
 
 export type IconButtonProps = MantineActionIconProps & {
-	children: React.ReactNode;
-	colorVariant?: "primary" | "secondary" | "tertiary" | "primary-muted" | "default";
-	onClick?: () => void;
-	href?: string;
+    children: React.ReactNode;
+    onClick?: () => void;
+    href?: string;
+    disabled?: boolean;
 };
 
 export type IconLinkProps = MantineActionIconProps & {
-	children: React.ReactNode;
-	href: string;
+    children: React.ReactNode;
+    href: string;
+    disabled?: boolean;
 };

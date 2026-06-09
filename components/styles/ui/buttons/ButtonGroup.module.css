@@ -1,0 +1,19 @@
+.button-group {
+    button {
+        &:first-child {
+            border-right-width: 0.5px;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        &:last-child {
+            border-left-width: 0.5px;
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+        &:not(:first-child):not(:last-child) {
+            border-right-width: 0.5px;
+            border-left-width: 0.5px;
+            border-radius: 0;
+        }
+    }
+}

@@ -1,10 +1,10 @@
 .modal-header {
-	padding: 16px;
-	border-bottom: 1px solid var(--color--border-layout);
+    padding: 16px;
+    border-bottom: 1px solid var(--color--border-layout);
 
-	h2 {
-		font-weight: 600;
-		font-size: 18px;
-		color: var(--color--text-primary);
-	}
+    h2 {
+        color: var(--color--text-primary);
+        font-weight: 600;
+        font-size: 18px;
+    }
 }

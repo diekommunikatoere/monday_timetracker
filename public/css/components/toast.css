@@ -1,5 +1,5 @@
 .toast-notification {
-	/* bottom: 20px;
+    /* bottom: 20px;
 	right: 20px;
 	z-index: 1000;
 	padding: 16px 24px;
@@ -9,8 +9,8 @@
 	font-size: 14px;
 	box-shadow: var(--box-shadow-medium); */
 
-	&.toast-positive {
-		background-color: var(--color--success-dark);
-		color: var(--color--text-on-primary);
-	}
+    &.toast-positive {
+        color: var(--color--text-on-primary);
+        background-color: var(--color--success-dark);
+    }
 }

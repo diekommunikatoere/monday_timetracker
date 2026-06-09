@@ -1,45 +1,46 @@
 {
-	"name": "timetracker",
-	"version": "0.9.5",
-	"private": true,
-	"scripts": {
-		"dev": "next dev",
-		"build": "next build",
-		"start": "next start",
-		"expose": "mapps tunnel:create -p 8301",
-		"db:migrate": "supabase db push"
-	},
-	"dependencies": {
-		"@mantine/core": "^9.3.0",
-		"@mantine/dates": "^9.3.0",
-		"@mantine/hooks": "^9.3.0",
-		"@mantine/notifications": "^9.3.0",
-		"@mondaydotcomorg/api": "^13.0.0",
-		"@supabase/supabase-js": "^2.106.2",
-		"@tanstack/react-query": "^5.100.14",
-		"ioredis": "^5.11.0",
-		"jsonwebtoken": "^9.0.3",
-		"monday-sdk-js": "^0.5.8",
-		"next": "16.2.7",
-		"postcss": "^8.5.15",
-		"postcss-preset-mantine": "^1.18.0",
-		"postcss-simple-vars": "^7.0.1",
-		"react": "19.2.7",
-		"react-dom": "19.2.7",
-		"sass": "^1.100.0",
-		"zustand": "^5.0.14"
-	},
-	"devDependencies": {
-		"@types/jsonwebtoken": "^9.0.10",
-		"@types/node": "^20.19.41",
-		"@types/react": "19.2.16",
-		"@types/react-dom": "19.2.3",
-		"cross-port-killer": "^1.4.0",
-		"supabase": "^2.104.0",
-		"typescript": "^5.9.3"
-	},
-	"overrides": {
-		"@types/react": "19.2.16",
-		"@types/react-dom": "19.2.3"
-	}
+    "name": "timetracker",
+    "version": "0.9.5",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "expose": "mapps tunnel:create -p 8301",
+        "db:migrate": "supabase db push"
+    },
+    "dependencies": {
+        "@mantine/core": "^9.3.0",
+        "@mantine/dates": "^9.3.0",
+        "@mantine/hooks": "^9.3.0",
+        "@mantine/notifications": "^9.3.0",
+        "@mondaydotcomorg/api": "^13.0.0",
+        "@supabase/supabase-js": "^2.106.2",
+        "@tanstack/react-query": "^5.100.14",
+        "ioredis": "^5.11.0",
+        "jsonwebtoken": "^9.0.3",
+        "monday-sdk-js": "^0.5.8",
+        "next": "16.2.6",
+        "postcss": "^8.5.15",
+        "postcss-preset-mantine": "^1.18.0",
+        "postcss-simple-vars": "^7.0.1",
+        "react": "19.2.7",
+        "react-dom": "19.2.7",
+        "sass": "^1.100.0",
+        "zustand": "^5.0.14"
+    },
+    "devDependencies": {
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/node": "^20.19.41",
+        "@types/react": "19.2.16",
+        "@types/react-dom": "19.2.3",
+        "cross-port-killer": "^1.4.0",
+        "prettier-plugin-css-order": "^2.2.0",
+        "supabase": "^2.104.0",
+        "typescript": "^5.9.3"
+    },
+    "overrides": {
+        "@types/react": "19.2.16",
+        "@types/react-dom": "19.2.3"
+    }
 }

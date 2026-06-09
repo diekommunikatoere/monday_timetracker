@@ -3,7 +3,7 @@
 import { ButtonGroupProps } from "@/components/ui/buttons/types";
 import { Button } from "@mantine/core";
 
-import "@/components/styles/ui/buttons/ButtonGroup.module.css";
+import classes from "@/components/styles/ui/buttons/ButtonGroup.module.css";
 
 export function ButtonGroup({ children, className, ...props }: ButtonGroupProps) {
 	if (!className) {
@@ -11,7 +11,7 @@ export function ButtonGroup({ children, className, ...props }: ButtonGroupProps)
 	}
 
 	return (
-		<Button.Group className={`button-group${className}`} {...props}>
+		<Button.Group className={`${classes["button-group"]} ${className}`} {...props}>
 			{children}
 		</Button.Group>
 	);

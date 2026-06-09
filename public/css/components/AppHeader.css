@@ -1,37 +1,37 @@
 #appHeader {
-	position: relative;
-	display: flex;
-	align-items: center;
-	column-gap: 32px;
-	row-gap: 16px;
-	width: 100%;
-	padding: 16px;
-	border-bottom: 1px solid var(--color--border);
-	flex-wrap: wrap;
-	justify-content: center;
+    position: relative;
+    display: flex;
+    width: 100%;
+    padding: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    row-gap: 16px;
+    column-gap: 32px;
+    border-bottom: 1px solid var(--color--border);
 
-	.header-left-section {
-		flex: 1;
-		min-width: 200px;
-		flex-wrap: wrap;
+    .header-left-section {
+        min-width: 200px;
+        flex: 1;
+        flex-wrap: wrap;
 
-		.logo-container {
-			flex: 1;
-			justify-content: flex-start;
-		}
-	}
+        .logo-container {
+            flex: 1;
+            justify-content: flex-start;
+        }
+    }
 }
 
 @media (min-width: 820px) {
-	#appHeader {
-		justify-content: flex-start;
-		flex-wrap: nowrap;
-		padding: 32px;
+    #appHeader {
+        padding: 32px;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
 
-		.header-left-section {
-			flex: unset;
-			min-width: unset;
-			flex-wrap: nowrap;
-		}
-	}
+        .header-left-section {
+            min-width: unset;
+            flex: unset;
+            flex-wrap: nowrap;
+        }
+    }
 }
