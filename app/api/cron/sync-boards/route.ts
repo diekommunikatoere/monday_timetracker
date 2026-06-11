@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { getBoardTasks } from "@/lib/monday";
-import { registerBoardWebhooks } from "@/lib/monday/webhooks";
+import { registerBoardWebhooks, reconcileWebhooks } from "@/lib/monday/webhooks";
 import { upsertMondayItemsBatch } from "@/lib/database";
 import { ApiClient } from "@mondaydotcomorg/api";
 
@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
 		if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
+
+		// Opt-in: `?reconcile=true` deletes stale/duplicate webhooks before
+		// re-registering, instead of the default register-missing-only behavior.
+		const reconcile = request.nextUrl.searchParams.get("reconcile") === "true";
 
 		const token = process.env.MONDAY_API_TOKEN;
 		if (!token) {
@@ -96,8 +100,12 @@ export async function GET(request: NextRequest) {
 						}
 					}
 
-					// Verify/Register Webhooks
-					await registerBoardWebhooks(board.id, token);
+					// Verify/Register Webhooks (reconcile also clears stale/duplicate ones)
+					if (reconcile) {
+						await reconcileWebhooks(board.id, token);
+					} else {
+						await registerBoardWebhooks(board.id, token);
+					}
 				}
 
 				// B. Sync Items (Full reconciliation)
