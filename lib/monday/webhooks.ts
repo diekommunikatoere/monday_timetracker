@@ -1,7 +1,10 @@
 import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-const WEBHOOK_EVENTS = ["create_item", "create_pulse", "change_name", "item_moved_to_any_group", "item_archived", "item_deleted", "item_restored", "create_subitem", "move_subitem"];
+// Valid Monday `WebhookEventType` enum values to subscribe to. Note these are the
+// *subscription* names, which differ from the `event.type` names in delivered payloads
+// (e.g. subscribing to `create_item` delivers an event with type `create_pulse`).
+const WEBHOOK_EVENTS = ["create_item", "change_name", "item_moved_to_any_group", "item_archived", "item_deleted", "item_restored", "create_subitem", "move_subitem", "change_subitem_name"];
 
 /**
  * Registers missing webhooks for a board.
@@ -18,45 +21,36 @@ export async function registerBoardWebhooks(boardId: string, token: string) {
 		const webhookUrl = `${appUrl}/api/webhooks/monday`;
 		const client = new ApiClient({ token, apiVersion: "2025-10" });
 
-		// 1. Get existing webhooks for the board from Monday API
-		const getWebhooksQuery = `
-			query ($boardId: ID!) {
-				webhooks(board_id: $boardId) {
+		// 1. Determine which events we've already registered for this board+url.
+		// Monday's `webhooks` query never returns the target url, so we dedup against
+		// our own records, which do store it.
+		const { data: dbWebhooks } = await supabaseAdmin.from("monday_webhook").select("event").eq("board_id", boardId).eq("url", webhookUrl).eq("is_active", true);
+
+		const registeredEvents = new Set(dbWebhooks?.map((w) => w.event) || []);
+
+		// 2. Register any missing events. Each event is isolated so one failure
+		// (e.g. an invalid event type) doesn't abort the rest of the loop.
+		const createWebhookMutation = `
+			mutation ($boardId: ID!, $url: String!, $event: WebhookEventType!) {
+				create_webhook (board_id: $boardId, url: $url, event: $event) {
 					id
-					event
-					config
 				}
 			}
 		`;
 
-		const response = await client.request<any>(getWebhooksQuery, { boardId });
-		const existingMondayWebhooks = response.data?.data?.webhooks || [];
-
-		// 2. Determine which events need a webhook
 		for (const event of WEBHOOK_EVENTS) {
-			const alreadyExists = existingMondayWebhooks.some((w: any) => w.event === event && w.config?.url === webhookUrl);
+			if (registeredEvents.has(event)) {
+				continue;
+			}
 
-			if (!alreadyExists) {
-				console.log(`Registering webhook for event ${event} on board ${boardId}`);
+			console.log(`Registering webhook for event ${event} on board ${boardId}`);
 
-				const createWebhookMutation = `
-					mutation ($boardId: ID!, $url: String!, $event: WebhookEventType!) {
-						create_webhook (board_id: $boardId, url: $url, event: $event) {
-							id
-						}
-					}
-				`;
-
+			try {
 				const createResponse = await client.request<any>(createWebhookMutation, {
 					boardId,
 					url: webhookUrl,
 					event,
 				});
-
-				if (createResponse.error || createResponse.data?.error) {
-					console.error(`Failed to register webhook for ${event}:`, createResponse.error || createResponse.data?.error);
-					continue;
-				}
 
 				const webhookId = createResponse.data?.data?.create_webhook?.id;
 				if (webhookId) {
@@ -69,6 +63,8 @@ export async function registerBoardWebhooks(boardId: string, token: string) {
 						is_active: true,
 					});
 				}
+			} catch (eventError) {
+				console.error(`Failed to register webhook for ${event} on board ${boardId}:`, eventError);
 			}
 		}
 
