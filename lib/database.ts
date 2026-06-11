@@ -821,3 +821,23 @@ export async function cleanupOrphanedSoftDeletes(): Promise<TimeEntry[]> {
 
 	return deletedEntries;
 }
+
+/**
+ * Permanently delete monday_items trashed more than `days` ago (default 31, a 1-day
+ * buffer over Monday's 30-day trash retention) along with their time entries.
+ * Delegates to the purge_trashed_monday_items RPC so deletion is transactional.
+ */
+export async function purgeTrashedMondayItems(days = 31): Promise<{ items: number; timeEntries: number }> {
+	const { data, error } = await supabaseAdmin.rpc("purge_trashed_monday_items" as any, { p_days: days });
+
+	if (error) {
+		console.error("Error purging trashed monday items:", error);
+		return { items: 0, timeEntries: 0 };
+	}
+
+	const row = Array.isArray(data) ? data[0] : data;
+	return {
+		items: Number(row?.purged_items ?? 0),
+		timeEntries: Number(row?.purged_time_entries ?? 0),
+	};
+}

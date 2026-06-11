@@ -140,50 +140,102 @@ export async function POST(request: NextRequest) {
 				break;
 			}
 
+			case "move_pulse_into_board": {
+				// Fires when an item moves to another (tracked) board, and also when a
+				// subitem is converted to an item. board_id and group_id both change;
+				// clearing parent_item_id handles the subitem->item conversion case.
+				const movedItemId = event.pulseId?.toString();
+				const newBoardId = event.boardId?.toString();
+				const newGroupId = event.destGroupId?.toString();
+				const now = new Date().toISOString();
+
+				await supabaseAdmin
+					.from("monday_item")
+					.update({
+						board_id: newBoardId,
+						group_id: newGroupId,
+						parent_item_id: null,
+						updated_at: now,
+					})
+					.eq("id", movedItemId);
+
+				// Subitems follow their parent to the new board and group.
+				await supabaseAdmin
+					.from("monday_item")
+					.update({
+						board_id: newBoardId,
+						group_id: newGroupId,
+						updated_at: now,
+					})
+					.eq("parent_item_id", movedItemId);
+				break;
+			}
+
 			case "delete_pulse": {
-				await supabaseAdmin.from("monday_item").delete().eq("id", event.pulseId?.toString());
+				// Soft-delete: Monday keeps trashed items restorable for 30 days, and a
+				// hard delete would orphan time entries (item_id ON DELETE SET NULL).
+				// Item-delete payloads carry itemId; subitem-delete payloads carry both.
+				const deletedItemId = (event.itemId || event.pulseId)?.toString();
+				const trashedAt = new Date().toISOString();
+
+				await supabaseAdmin
+					.from("monday_item")
+					.update({
+						is_active: false,
+						deleted_at: trashedAt,
+						updated_at: trashedAt,
+					})
+					.eq("id", deletedItemId);
+
+				// Monday sends no events for a deleted item's subitems, so cascade the
+				// trash to them. Only touch ones not already trashed.
+				await supabaseAdmin
+					.from("monday_item")
+					.update({
+						is_active: false,
+						deleted_at: trashedAt,
+						updated_at: trashedAt,
+					})
+					.eq("parent_item_id", deletedItemId)
+					.is("deleted_at", null);
 				break;
 			}
 
 			case "archive_pulse": {
+				const archivedItemId = (event.itemId || event.pulseId)?.toString();
+
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
 						is_active: false,
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", event.pulseId?.toString());
+					.eq("id", archivedItemId);
+
+				// Archiving a parent archives its subitems too, with no separate events.
+				await supabaseAdmin
+					.from("monday_item")
+					.update({
+						is_active: false,
+						updated_at: new Date().toISOString(),
+					})
+					.eq("parent_item_id", archivedItemId);
 				break;
 			}
 
 			case "restore_pulse": {
+				// Clears both archive and trash state. Monday emits a separate
+				// restore_pulse per item/subitem, so we don't cascade here.
+				const restoredItemId = (event.itemId || event.pulseId)?.toString();
+
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
 						is_active: true,
+						deleted_at: null,
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", event.itemId?.toString());
-				break;
-			}
-
-			case "create_subitem":
-			case "create_subpulse": {
-				const { parentItemId: subParentId, pulseName } = event;
-				const subParentItemId = subParentId?.toString();
-
-				// Resolve parent's board_id and group_id (not the subitems board)
-				const parentInfo = subParentItemId ? await resolveParentInfo(subParentItemId, event) : { boardId: event.boardId, groupId: null };
-
-				await supabaseAdmin.from("monday_item").upsert({
-					id: event.itemId.toString(),
-					board_id: parentInfo.boardId || event.boardId,
-					group_id: parentInfo.groupId,
-					parent_item_id: subParentItemId,
-					name: pulseName || "Unnamed Subitem",
-					is_active: true,
-					updated_at: new Date().toISOString(),
-				});
+					.eq("id", restoredItemId);
 				break;
 			}
 
@@ -201,18 +253,6 @@ export async function POST(request: NextRequest) {
 						updated_at: new Date().toISOString(),
 					})
 					.eq("id", event.subitem?.toString());
-				break;
-			}
-
-			case "change_subitem_name": {
-				const { value } = event;
-				await supabaseAdmin
-					.from("monday_item")
-					.update({
-						name: value?.name || "Unnamed Subitem",
-						updated_at: new Date().toISOString(),
-					})
-					.eq("id", event.itemId?.toString());
 				break;
 			}
 
