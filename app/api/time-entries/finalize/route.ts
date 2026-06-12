@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
 			p_role_id: roleId || null,
 			p_duration: duration, // Pass the duration override
 			p_date: date ? new Date(date).toISOString() : null, // Pass the date override
+			p_start_time: startTime ? new Date(startTime).toISOString() : null, // Honor the exact start the user saw
+			p_end_time: endTime ? new Date(endTime).toISOString() : null, // Honor the exact end the user saw
 		} as any);
 
 		if (error) {
