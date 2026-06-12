@@ -7,6 +7,13 @@ export const getCurrentTimeString = (): string => {
 };
 
 /**
+ * Format a Date as a local HH:MM string
+ */
+export const formatTimeString = (date: Date): string => {
+	return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+};
+
+/**
  * Add seconds to a HH:MM time string
  */
 export const addSecondsToTimeString = (timeStr: string, seconds: number): string => {
