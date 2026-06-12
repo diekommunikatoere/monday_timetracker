@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { getItemDetails } from "@/lib/monday";
+import { syncItemColumns } from "@/lib/columnSync";
+
+/**
+ * After an item is trashed or restored, the parent item's budget/time columns in
+ * Monday are stale until something re-pushes them. Trigger that re-sync.
+ * - Subitem: syncItemColumns redirects to and re-pushes the parent's columns.
+ * - Top-level item: only on restore (includeSelf) — a trashed top-level item is
+ *   gone from Monday, so there's no column to update.
+ * A subitem's stored board_id is its parent's board, which is what the sync needs.
+ */
+async function resyncItemBudget(itemId: string | undefined, includeSelf: boolean): Promise<void> {
+	if (!itemId) return;
+
+	const { data: row } = await supabaseAdmin.from("monday_item").select("parent_item_id, board_id").eq("id", itemId).maybeSingle();
+	if (!row?.board_id) return;
+
+	const targetItemId = row.parent_item_id || (includeSelf ? itemId : null);
+	if (!targetItemId) return;
+
+	try {
+		await syncItemColumns(targetItemId, row.board_id, "webhook:monday-lifecycle");
+	} catch (error) {
+		console.error(`[webhook] Failed to re-sync budget for item ${targetItemId}:`, error);
+	}
+}
 
 /**
  * Resolves the parent item's board_id and group_id using:
@@ -198,6 +223,9 @@ export async function POST(request: NextRequest) {
 					})
 					.eq("parent_item_id", deletedItemId)
 					.is("deleted_at", null);
+
+				// Re-push the parent's budget column now that this item's time is excluded.
+				await resyncItemBudget(deletedItemId, false);
 				break;
 			}
 
@@ -236,6 +264,10 @@ export async function POST(request: NextRequest) {
 						updated_at: new Date().toISOString(),
 					})
 					.eq("id", restoredItemId);
+
+				// Re-push budget now that this item's time counts again (parent for a
+				// subitem; the item itself for a restored top-level item).
+				await resyncItemBudget(restoredItemId, true);
 				break;
 			}
 
