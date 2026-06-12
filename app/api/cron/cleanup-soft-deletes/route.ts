@@ -1,6 +1,6 @@
 // app/api/cron/cleanup-soft-deletes/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { cleanupOrphanedSoftDeletes } from "@/lib/database";
+import { cleanupOrphanedSoftDeletes, purgeTrashedMondayItems } from "@/lib/database";
 import { syncAfterDelete } from "@/lib/columnSync";
 import { cacheHelper } from "@/lib/redis";
 
@@ -55,10 +55,16 @@ export async function GET(request: NextRequest) {
 			}
 		}
 
+		// Permanently purge monday_items trashed > 31 days ago and their time entries.
+		// No Monday sync needed — the item is already permanently gone from Monday.
+		const purged = await purgeTrashedMondayItems();
+
 		return NextResponse.json({
 			success: true,
 			orphanedDeleted: deletedEntries.length,
 			redisProcessed: processedFromRedis,
+			purgedItems: purged.items,
+			purgedTimeEntries: purged.timeEntries,
 			timestamp: new Date().toISOString(),
 		});
 	} catch (error: any) {

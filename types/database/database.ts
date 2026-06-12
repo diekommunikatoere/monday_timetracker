@@ -6,31 +6,6 @@ export type Database = {
 	__InternalSupabase: {
 		PostgrestVersion: "14.1";
 	};
-	graphql_public: {
-		Tables: {
-			[_ in never]: never;
-		};
-		Views: {
-			[_ in never]: never;
-		};
-		Functions: {
-			graphql: {
-				Args: {
-					extensions?: Json;
-					operationName?: string;
-					query?: string;
-					variables?: Json;
-				};
-				Returns: Json;
-			};
-		};
-		Enums: {
-			[_ in never]: never;
-		};
-		CompositeTypes: {
-			[_ in never]: never;
-		};
-	};
 	public: {
 		Tables: {
 			board_config: {
@@ -284,6 +259,7 @@ export type Database = {
 			monday_item: {
 				Row: {
 					board_id: string;
+					deleted_at: string | null;
 					group_id: string | null;
 					id: string;
 					is_active: boolean;
@@ -293,6 +269,7 @@ export type Database = {
 				};
 				Insert: {
 					board_id: string;
+					deleted_at?: string | null;
 					group_id?: string | null;
 					id: string;
 					is_active?: boolean;
@@ -302,6 +279,7 @@ export type Database = {
 				};
 				Update: {
 					board_id?: string;
+					deleted_at?: string | null;
 					group_id?: string | null;
 					id?: string;
 					is_active?: boolean;
@@ -801,6 +779,13 @@ export type Database = {
 					user_photo_urls: Json;
 				}[];
 			};
+			purge_trashed_monday_items: {
+				Args: { p_days?: number };
+				Returns: {
+					purged_items: number;
+					purged_time_entries: number;
+				}[];
+			};
 			soft_reset_timer: {
 				Args: {
 					p_old_draft_id: string;
@@ -923,9 +908,6 @@ export type CompositeTypes<
 		: never;
 
 export const Constants = {
-	graphql_public: {
-		Enums: {},
-	},
 	public: {
 		Enums: {},
 	},
