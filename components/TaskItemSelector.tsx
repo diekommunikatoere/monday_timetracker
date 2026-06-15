@@ -67,6 +67,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
 	const [expandedValues, setExpandedValues] = useState<string[]>([]);
+	const [searchValue, setSearchValue] = useState("");
+	const [dropdownOpened, setDropdownOpened] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -126,6 +128,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 	const resetTask = useCallback(() => {
 		setSelectedTask(null);
+		setSearchValue("");
 	}, []);
 
 	const resetRole = useCallback(() => {
@@ -530,6 +533,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			const selectedOption = option as DropdownOption;
 			setSelectedBoard(value ? selectedOption : null);
 			setSelectedTask(null);
+			setSearchValue("");
 
 			onSelectionChange({
 				boardId: value || undefined,
@@ -758,11 +762,32 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					clearButtonProps={{ "aria-label": "Auswahl löschen" }}
 					// Searchable matches group, job and task labels and reveals ancestors.
 					searchable={!!selectedBoard}
+					searchValue={searchValue}
+					onSearchChange={setSearchValue}
+					dropdownOpened={dropdownOpened}
+					onDropdownOpen={() => setDropdownOpened(true)}
+					onDropdownClose={() => setDropdownOpened(false)}
 					disabled={isTaskDropdownDisabled}
 					maxDropdownHeight={320}
 					nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : isTaskDropdownLoading ? "Lade Aufgaben..." : "Keine Aufgaben gefunden"}
-					// Show loading indicator for initial load or background refetch
-					rightSection={isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? <Loader size={14} /> : undefined}
+					// Show loader, or a clear-search button when the user has typed but nothing is selected yet.
+					rightSection={
+						isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? (
+							<Loader size={14} />
+						) : searchValue && !selectedTask ? (
+							<IconButton
+								variant="filled"
+								colorVariant="tertiary"
+								size="xs"
+								onMouseDown={(e) => e.preventDefault()}
+								onClick={() => { setSearchValue(""); setDropdownOpened(true); }}
+								aria-label="Suche löschen"
+							>
+								<Icon name="close" size={12} color="var(--color--text-secondary)" />
+							</IconButton>
+						) : undefined
+					}
+					rightSectionPointerEvents="auto"
 					classNames={{ option: styles.selectOption }}
 				/>
 			</div>
