@@ -780,7 +780,10 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 								colorVariant="tertiary"
 								size="xs"
 								onMouseDown={(e) => e.preventDefault()}
-								onClick={() => { setSearchValue(""); setDropdownOpened(true); }}
+								onClick={() => {
+									setSearchValue("");
+									setDropdownOpened(true);
+								}}
 								aria-label="Suche löschen"
 							>
 								<Icon name="close" size={12} color="var(--color--text-secondary)" />
