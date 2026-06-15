@@ -30,6 +30,8 @@ interface SaveTimerModalProps {
 		comment?: string;
 		date?: Date;
 		duration?: string;
+		startTime?: string;
+		endTime?: string;
 	};
 }
 
@@ -69,7 +71,6 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 	// Timer store - using new API
 	const globalComment = useTimerStore((state) => state.comment);
-	const elapsedTime = useTimerStore((state) => state.elapsedTime);
 	const draftId = useTimerStore((state) => state.draftId);
 	const sessionId = useTimerStore((state) => state.sessionId);
 
@@ -104,7 +105,6 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	useEffect(() => {
 		if (show) {
 			setError(null);
-			setIsLocked(true);
 			updateSource.current = null;
 
 			// If initialData is provided, use it; otherwise use current timer state
@@ -113,37 +113,32 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 				setDate(initialData.date || new Date());
 				setDuration(initialData.duration || "00:00");
 				setLocalComment(initialData.comment || "");
+
+				// Reopened draft with stored times: show them and keep them fixed
+				if (initialData.startTime && initialData.endTime) {
+					setStartTime(initialData.startTime);
+					setEndTime(initialData.endTime);
+					setIsLocked(false);
+					// Prevent the duration-sync effect from recomputing the historical times
+					updateSource.current = "times";
+					return;
+				}
 			} else {
 				setSelectedTask(null);
 				setDate(new Date());
-				// Round the elapsed time for display
+				// Snapshot the timer's elapsed time at open (timer is paused here); read
+				// imperatively so this effect does not re-run on every timer tick.
+				const elapsedTime = useTimerStore.getState().elapsedTime;
 				const roundedSeconds = roundDuration(Math.floor(elapsedTime / 1000));
 				setDuration(secondsToDuration(roundedSeconds));
 				setLocalComment(""); // Clear local comment when not using initialData
 			}
 
-			const currentTime = getCurrentTimeString();
-			setEndTime(currentTime);
+			// Default: lock the end time to "now" (running timer, or a draft without stored times)
+			setIsLocked(true);
+			setEndTime(getCurrentTimeString());
 		}
-	}, [show, elapsedTime, initialData, secondsToDuration]);
-
-	// Live update for locked end time
-	useEffect(() => {
-		if (!show || !isLocked) return;
-
-		const interval = setInterval(() => {
-			const currentTime = getCurrentTimeString();
-			if (currentTime !== endTime) {
-				updateSource.current = "lock";
-				setEndTime(currentTime);
-				// When end time updates automatically, we need to update start time based on duration
-				const durationSeconds = durationToSeconds(duration);
-				setStartTime(subtractSecondsFromTimeString(currentTime, durationSeconds));
-			}
-		}, 10000); // Check every 10 seconds
-
-		return () => clearInterval(interval);
-	}, [show, isLocked, endTime, duration, durationToSeconds]);
+	}, [show, initialData, secondsToDuration]);
 
 	// Sync: When duration changes (from input or buttons), update start_time (if locked) or end_time (if unlocked)
 	useEffect(() => {
@@ -246,9 +241,10 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			// Use actual task name from selection, with fallback
 			const taskName = selectedTask.itemName || "Unbenannter Zeit-Eintrag";
 
-			// Build full ISO date-time strings from date + time inputs
+			// Build full ISO date-time strings from date + time inputs.
+			// Derive the end from start + duration so it can never invert and crosses midnight correctly.
 			const startTimeIso = combineDateAndTime(date, startTime);
-			const endTimeIso = combineDateAndTime(date, endTime);
+			const endTimeIso = new Date(new Date(startTimeIso).getTime() + durationSeconds * 1000).toISOString();
 
 			// Get fresh context for the API call
 			const context = rawContext || (await monday.get("context"));
@@ -371,7 +367,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 									</Tooltip>
 								}
 								rightSection={
-									<Tooltip label={isLocked ? "Endzeit fixiert (Live)" : "Endzeit fixieren"} position="top" withArrow>
+									<Tooltip label={isLocked ? "Endzeit fixiert" : "Endzeit fixieren"} position="top" withArrow>
 										<IconButton variant="filled" color={isLocked ? "var(--color--primary)" : "var(--color--background-secondary)"} onClick={() => setIsLocked(!isLocked)} aria-label="Endzeit fixieren">
 											<Icon name={isLocked ? "lock" : "unlock"} size={16} color={isLocked ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
 										</IconButton>
