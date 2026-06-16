@@ -294,17 +294,21 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 	// Extract dimension metadata and other non-database fields
 	const { board_name, item_name, parent_item_name, role_name, task_name, parent_item_id, ...cleanEntry } = entry;
 
-	// UPSERT dimension tables if names are provided
-	if (cleanEntry.board_id && board_name) {
-		await upsertMondayBoard(cleanEntry.board_id, board_name);
-	}
-
-	// For subitems, ensure we use the parent's board_id if available
+	// For subitems, persist against the parent's board. Resolve this BEFORE any
+	// monday_board upsert so a subitems board is never registered as a tracked
+	// board (which would let it be fetched/flattened as a normal board).
 	if (parent_item_id) {
 		const { data: parentItem } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", parent_item_id).single();
 		if (parentItem?.board_id) {
 			cleanEntry.board_id = parentItem.board_id;
 		}
+	}
+
+	// UPSERT the board dimension only for top-level items. For a subitem, board_name
+	// describes its (untracked) subitems board, and its parent board is already a
+	// tracked board — registering the subitems board here is what corrupts sync.
+	if (cleanEntry.board_id && board_name && !parent_item_id) {
+		await upsertMondayBoard(cleanEntry.board_id, board_name);
 	}
 
 	if (cleanEntry.item_id && item_name) {
@@ -601,13 +605,9 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 	// Extract dimension metadata and other non-database fields
 	const { board_name, item_name, parent_item_name, role_name, task_name, id: _id, parent_item_id, ...cleanUpdates } = updates;
 
-	// UPSERT dimension tables if names are provided
-	if (cleanUpdates.board_id && board_name) {
-		await upsertMondayBoard(cleanUpdates.board_id, board_name);
-	}
-
-	// For subitems, ensure we use the parent's board_id if available
-	// Resolve parentItemId from updates or from the existing monday_item record
+	// For subitems, persist against the parent's board. Resolve this BEFORE any
+	// monday_board upsert so a subitems board is never registered as a tracked board.
+	// Resolve parentItemId from updates or from the existing monday_item record.
 	let resolvedParentItemId = parent_item_id;
 	if (!resolvedParentItemId && cleanUpdates.item_id) {
 		const { data: itemRecord } = await supabaseAdmin.from("monday_item").select("parent_item_id").eq("id", cleanUpdates.item_id).maybeSingle();
@@ -619,6 +619,12 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 		if (parentItem?.board_id) {
 			cleanUpdates.board_id = parentItem.board_id;
 		}
+	}
+
+	// UPSERT the board dimension only for top-level items. For a subitem, board_name
+	// describes its (untracked) subitems board (see insertTimeEntry).
+	if (cleanUpdates.board_id && board_name && !resolvedParentItemId) {
+		await upsertMondayBoard(cleanUpdates.board_id, board_name);
 	}
 
 	// Use board_id from updates or fallback to old entry

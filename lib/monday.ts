@@ -202,6 +202,42 @@ export async function getConnectedBoards(boardIds: string[]): Promise<Array<Boar
 	}
 }
 
+/**
+ * Detects a Monday "subitems board" — the auto-generated board that holds an
+ * item's subitems. Such a board must never be fetched as a normal board:
+ * getBoardTasks would persist its subitems as top-level items (board_id = the
+ * subitems board, parent_item_id = null), corrupting the dimension table. The
+ * reliable signal is that every item on a subitems board has a parent_item,
+ * which a normal board's items never do.
+ *
+ * Returns false on any error so a transient API failure can't misclassify a real
+ * board as a subitems board (which would silently hide all its tasks).
+ */
+export async function isSubitemsBoard(boardId: string): Promise<boolean> {
+	const query = `
+		query ($boardId: ID!) {
+			boards(ids: [$boardId]) {
+				items_page(limit: 1) {
+					items {
+						parent_item {
+							id
+						}
+					}
+				}
+			}
+		}
+	`;
+
+	try {
+		const response: any = await client.request(query, { boardId });
+		const firstItem = response.boards?.[0]?.items_page?.items?.[0];
+		return !!firstItem?.parent_item?.id;
+	} catch (error) {
+		console.error(`[isSubitemsBoard] Failed to check board ${boardId}:`, error);
+		return false;
+	}
+}
+
 // Get tasks (items and subitems) for a board with caching
 // OPTIMIZED: Uses separate queries for items and subitems to reduce complexity
 export async function getBoardTasks(
@@ -213,6 +249,15 @@ export async function getBoardTasks(
 	// Validate boardId
 	if (!boardId || isNaN(Number(boardId)) || Number(boardId) <= 0) {
 		throw new Error("boardId must be a valid positive integer");
+	}
+
+	// Guard: never treat a subitems board as a normal board. Its items are
+	// subitems; fetching them here would flatten them into top-level rows with a
+	// null parent_item_id and the subitems board as board_id. Subitems are synced
+	// correctly via Phase 2 when their *parent* board is fetched.
+	if (await isSubitemsBoard(boardId)) {
+		console.warn(`[getBoardTasks] Board ${boardId} is a subitems board; refusing to fetch its items as top-level tasks.`);
+		return { groups: [] };
 	}
 
 	const startTime = Date.now();
