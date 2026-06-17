@@ -2,6 +2,9 @@
 	"name": "timetracker",
 	"version": "0.10.0",
 	"private": true,
+	"engines": {
+		"node": ">=24.0.0"
+	},
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
@@ -31,7 +34,7 @@
 	},
 	"devDependencies": {
 		"@types/jsonwebtoken": "^9.0.10",
-		"@types/node": "^20.19.41",
+		"@types/node": "^24",
 		"@types/react": "19.2.16",
 		"@types/react-dom": "19.2.3",
 		"cross-port-killer": "^1.4.0",
