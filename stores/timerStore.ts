@@ -1,54 +1,45 @@
-// stores/timerStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import type { TimerStore, TimerStatus, ServerSyncRef } from "@/types/timer.types";
 
-/**
- * Initial state for the timer store
- */
+/** Initial state, also re-applied by `reset()`. */
 const initialState = {
-	// Session data
+	/** Active `timer_session` id, or null when idle. */
 	sessionId: null as string | null,
+	/** Draft `time_entry` id backing the running timer. */
 	draftId: null as string | null,
+	/** Elapsed run time in milliseconds (server-derived). */
 	elapsedTime: 0,
+	/** ISO start time of the current run segment. */
 	startTime: null as string | null,
+	/** Timer lifecycle: idle / running / paused. */
 	status: "idle" as TimerStatus,
 
-	// Comment
 	comment: "",
 
-	// UI state
 	isSaving: false,
 	isLoading: false,
 	error: null as string | null,
 
-	// Server sync reference
+	/** Baseline for computing elapsed time locally between server syncs. */
 	_serverSync: null as ServerSyncRef | null,
 };
 
 /**
- * Timer store - pure state container with simple setters
- *
- * Design principles:
- * - No API calls in the store (moved to useTimer hook)
- * - Simple, predictable state updates
- * - Clear separation between state and actions
- * - Persist only essential data for session recovery
+ * Timer state for the active session: ids, elapsed time, status, and the
+ * in-progress comment. A pure state container with simple setters — no API calls
+ * live here; the orchestration that drives them is in the `useTimer` hook
+ * (`components/features/timer/hooks/useTimer.ts`). Only the data needed to recover
+ * a session across reloads (`comment`, `draftId`, `sessionId`) is persisted to
+ * localStorage.
  */
 export const useTimerStore = create<TimerStore>()(
 	persist(
 		(set, get) => ({
 			...initialState,
 
-			// ============================================
-			// Session Management
-			// ============================================
-
-			/**
-			 * Set session data from API response
-			 * Pass null to clear session
-			 */
+			/** Apply session data from an API response; pass `null` to clear the session. */
 			setSession: (session) => {
 				if (session === null) {
 					set({
@@ -68,28 +59,17 @@ export const useTimerStore = create<TimerStore>()(
 				});
 			},
 
-			/**
-			 * Set timer status (idle, running, paused)
-			 */
+			/** Set the timer status (idle / running / paused). */
 			setStatus: (status) => {
 				set({ status });
 			},
 
-			/**
-			 * Set elapsed time in milliseconds
-			 */
+			/** Set elapsed time, in milliseconds. */
 			setElapsedTime: (elapsedTime) => {
 				set({ elapsedTime });
 			},
 
-			// ============================================
-			// Server Sync
-			// ============================================
-
-			/**
-			 * Update server sync reference for local time calculation
-			 * Called when receiving elapsed time from server
-			 */
+			/** Record a server-provided elapsed-time baseline used to tick locally. */
 			updateServerSync: (baseTime) => {
 				set({
 					_serverSync: {
@@ -99,63 +79,37 @@ export const useTimerStore = create<TimerStore>()(
 				});
 			},
 
-			/**
-			 * Clear server sync reference
-			 */
+			/** Drop the server sync baseline. */
 			clearServerSync: () => {
 				set({ _serverSync: null });
 			},
 
-			// ============================================
-			// Comment
-			// ============================================
-
-			/**
-			 * Update comment text
-			 */
+			/** Update the comment text. */
 			setComment: (comment) => {
 				set({ comment });
 			},
 
-			/**
-			 * Clear comment
-			 */
+			/** Clear the comment. */
 			clearComment: () => {
 				set({ comment: "" });
 			},
 
-			// ============================================
-			// UI State
-			// ============================================
-
-			/**
-			 * Set saving state
-			 */
+			/** Set the saving flag. */
 			setSaving: (isSaving) => {
 				set({ isSaving });
 			},
 
-			/**
-			 * Set loading state
-			 */
+			/** Set the loading flag. */
 			setLoading: (isLoading) => {
 				set({ isLoading });
 			},
 
-			/**
-			 * Set error message
-			 */
+			/** Set the error message (or null). */
 			setError: (error) => {
 				set({ error });
 			},
 
-			// ============================================
-			// Full Reset
-			// ============================================
-
-			/**
-			 * Reset all state to initial values
-			 */
+			/** Reset all state back to initial values. */
 			reset: () => {
 				set({
 					...initialState,
@@ -176,15 +130,9 @@ export const useTimerStore = create<TimerStore>()(
 	)
 );
 
-// ============================================
-// Selector Hooks (for optimized re-renders)
-// Using useShallow to prevent infinite loops with object selectors
-// ============================================
+// Selector hooks — narrow slices using useShallow to avoid re-render loops on object results.
 
-/**
- * Select only session-related state
- * Uses useShallow for shallow comparison of object result
- */
+/** Session-related slice (id, draft, start, status). Shallow-compared. */
 export function useTimerSession() {
 	return useTimerStore(
 		useShallow((state) => ({
@@ -196,26 +144,17 @@ export function useTimerSession() {
 	);
 }
 
-/**
- * Select only elapsed time
- * Primitive value, no shallow comparison needed
- */
+/** Elapsed time only. */
 export function useTimerElapsed() {
 	return useTimerStore((state) => state.elapsedTime);
 }
 
-/**
- * Select only comment
- * Primitive value, no shallow comparison needed
- */
+/** Comment only. */
 export function useTimerComment() {
 	return useTimerStore((state) => state.comment);
 }
 
-/**
- * Select only UI state
- * Uses useShallow for shallow comparison of object result
- */
+/** UI flags (saving, loading, error). Shallow-compared. */
 export function useTimerUIState() {
 	return useTimerStore(
 		useShallow((state) => ({
@@ -226,10 +165,7 @@ export function useTimerUIState() {
 	);
 }
 
-/**
- * Select computed values
- * Uses useShallow for shallow comparison of object result
- */
+/** Derived booleans (isActive, hasSession, canSave, isPaused). Shallow-compared. */
 export function useTimerComputed() {
 	return useTimerStore(
 		useShallow((state) => ({

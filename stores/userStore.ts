@@ -1,18 +1,14 @@
-// stores/userStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useMondayStore } from "./mondayStore";
-
-// function specific imports
-import { useState, useEffect, useCallback } from "react";
 import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
-// Monday.com theme values from context
+/** Raw theme value as reported by the monday context. */
 export type MondayTheme = "black" | "light" | "dark";
 
-// Mapped theme values for the application
+/** Theme the app actually renders with (monday's "black" collapses to "dark"). */
 export type AppTheme = "light" | "dark";
 
 /**
@@ -54,25 +50,31 @@ type SupabaseUser = {
 	email: string;
 } | null;
 
+/**
+ * The authenticated user: monday identity, the linked Supabase profile, and
+ * theme preference. Only `theme` is persisted (localStorage) — user data is
+ * session-based and repopulated on boot. In practice these fields are populated
+ * by `mondayStore.initializeMondayContext`; the setters below are secondary
+ * entry points used by a few flows.
+ */
 interface UserState {
-	// Monday.com user data
+	/** monday identity + profile flags, or null before init. */
 	mondayUser: MondayUser;
 
-	// Supabase user data
+	/** Linked Supabase user, or null until authenticated. */
 	supabaseUser: SupabaseUser;
 
-	// Theme preferences - stores the raw Monday theme value
+	/** Persisted theme preference, stored as the raw monday theme value. */
 	theme: MondayTheme;
 
-	// Computed app theme (light/dark)
+	/** Theme actually rendered, derived from `theme`. */
 	appTheme: AppTheme;
 
-	// Authentication status
 	authenticated: boolean;
 
-	// Actions
 	setMondayUser: (user: UserState["mondayUser"]) => void;
 	setSupabaseUser: (user: UserState["supabaseUser"]) => void;
+	/** Flip light/dark, update derived `appTheme`, and persist to the DB via `/api/user/theme`. */
 	toggleTheme: () => Promise<void>;
 }
 
@@ -85,6 +87,10 @@ export const useUserStore = create<UserState>()(
 			appTheme: "dark",
 			authenticated: false,
 
+			/**
+			 * Populate `mondayUser` and theme directly from the monday context — a
+			 * lighter alternative to the full `mondayStore` boot flow.
+			 */
 			setMondayUser: async () => {
 				const context = await monday.get("context");
 
@@ -113,6 +119,7 @@ export const useUserStore = create<UserState>()(
 
 				console.log(`[setMondayUser] Theme initialized: ${mondayTheme} -> ${appTheme}`);
 			},
+			/** Derive `supabaseUser` from the already-loaded monday user; no-op until authenticated. */
 			setSupabaseUser: () => {
 				console.log("Setting Supabase user...");
 				if (!useUserStore.getState().mondayUser || !useUserStore.getState().authenticated) return;
@@ -156,6 +163,11 @@ export const useUserStore = create<UserState>()(
 					console.error("Failed to persist theme change:", error);
 				}
 			},
+			/**
+			 * Find or create the Supabase user for the current monday session via
+			 * `/api/auth/monday-user`, then flip `authenticated`. Not declared on
+			 * `UserState` — `mondayStore` runs this during the main boot flow.
+			 */
 			setAuthenticated: async () => {
 				const sessionToken = useMondayStore.getState().sessionToken;
 				if (!sessionToken) return;

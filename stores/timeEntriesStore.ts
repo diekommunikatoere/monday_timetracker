@@ -1,21 +1,26 @@
-// stores/timeEntriesStore.ts
 import { create } from "zustand";
 import { TimeEntry } from "@/types/time-entry";
 import { useMondayStore } from "./mondayStore";
 
+/**
+ * The current user's finalized time entries, as rendered in the dashboard table.
+ * The store never fetches on its own — call `fetchTimeEntries` from an effect.
+ * Not persisted.
+ */
 interface TimeEntriesState {
-	// Time entries data
 	timeEntries: TimeEntry[];
-
-	// Loading states
 	loading: boolean;
 	error: string | null;
 
-	// Actions
+	/**
+	 * Load the current user's entries from `GET /api/time-entries`. No-op without
+	 * a monday session token. The in-progress timer entry is filtered out (see impl).
+	 */
 	fetchTimeEntries: (userId: string) => Promise<void>;
 	setTimeEntries: (entries: TimeEntry[]) => void;
 	setLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
+	/** Re-run `fetchTimeEntries`; call after saving a draft to refresh the table. */
 	refetch: (userId: string) => Promise<void>;
 }
 
@@ -44,7 +49,9 @@ export const useTimeEntriesStore = create<TimeEntriesState>()((set, get) => ({
 
 			const data = await response.json();
 
-			// Filter entries with current running timer. They have no end_time and duration of NULL. We don't want to show them in the table, but they should be included in the refetch after saving a draft entry.
+			// The running timer's entry has no end_time and a NULL duration. Exclude it
+			// from the table here, but it stays server-side so a refetch after saving a
+			// draft still picks it up once finalized.
 			const cleanData = data.filter((entry: TimeEntry) => entry.end_time !== null && entry.duration !== null);
 
 			set({ timeEntries: cleanData, loading: false });

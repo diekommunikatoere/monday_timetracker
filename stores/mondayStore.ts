@@ -1,23 +1,38 @@
-// stores/mondayStore.ts
 import { create } from "zustand";
 import mondaySdk from "monday-sdk-js";
 import { useUserStore, MondayTheme, mapMondayThemeToAppTheme } from "./userStore";
 
 const monday = mondaySdk();
 
+/**
+ * The monday SDK bridge and the app's boot store. Holds the raw monday context
+ * and the session token that every other store and API call authenticates with.
+ * `initializeMondayContext` is the entry point each page runs on mount. Not persisted.
+ */
 interface MondayState {
+	/** Raw context object returned by the monday SDK. */
 	rawContext: any;
+	/** Signed monday session token (JWT) sent as `Authorization: Bearer …` on API calls. */
 	sessionToken: string | null;
 	isLoading: boolean;
+	/** True once the initial context + user load has completed. */
 	isInitialized: boolean;
+	/** True once the `monday.listen("context")` listener has been registered. */
 	isListenerSetup: boolean;
 	error: string | null;
+	/** Current platform theme reported by monday, tracked for theme syncing. */
 	mondayTheme: MondayTheme | null;
 
+	/**
+	 * Boot the app: fetch context + the `me` query + session token in parallel,
+	 * populate `userStore`, authenticate against `/api/auth/monday-user`, and wire
+	 * up the context listener. Idempotent once initialized (unless a prior error).
+	 */
 	initializeMondayContext: () => Promise<void>;
 	setRawContext: (context: any) => void;
 	setLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
+	/** Register the `monday.listen("context")` listener for live theme updates. Idempotent. */
 	setupContextListener: () => void;
 }
 
