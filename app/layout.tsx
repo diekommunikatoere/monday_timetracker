@@ -3,11 +3,9 @@
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
-import "@/public/css/light.css";
-import "@/public/css/dark.css";
 import "@/public/css/fonts.css";
-import "./globals.scss";
 import { themeTokens } from "@/components/ui/theme/tokens";
+import "./globals.scss";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/components/ToastProvider";
 import { StoreProvider } from "@/components/StoreProvider";
