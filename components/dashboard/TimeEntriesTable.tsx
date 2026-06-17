@@ -8,7 +8,7 @@ import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntry } from "@/types/time-entry";
-import { secondsToDuration } from "@/lib/utils";
+import { secondsToDuration, formatTimeString } from "@/lib/utils";
 import SaveTimerModal from "./SaveTimerModal";
 import EditTimeEntryModal from "./EditTimeEntryModal";
 import BulkActionButtons from "./BulkActionButtons";
@@ -224,6 +224,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 								comment: selectedDraft.comment || "",
 								date: new Date(selectedDraft.start_time),
 								duration: secondsToDuration(selectedDraft.duration),
+								startTime: formatTimeString(new Date(selectedDraft.start_time)),
+								endTime: formatTimeString(new Date(selectedDraft.end_time)),
 							}
 						: undefined
 				}

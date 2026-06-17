@@ -1,37 +1,46 @@
-// stores/itemTimeEntriesStore.ts
 "use client";
 
 import { create } from "zustand";
 import { TimeEntry } from "@/types/time-entry";
 import { useMondayStore } from "./mondayStore";
 
+/**
+ * Time entries for a single monday item (the sidebar item view), across all users.
+ * Where `timeEntriesStore` holds the current user's dashboard list, this store is
+ * scoped to one item/board and exposes per-role and per-user aggregations. Set the
+ * item context first, then fetch. Not persisted.
+ */
 export interface ItemTimeEntriesState {
-	// Current item context
+	/** The monday item these entries belong to. */
 	itemId: string | null;
+	/** The board that owns the item. */
 	boardId: string | null;
 
-	// Entries data - all users
+	/** All entries for the item, from every user. */
 	timeEntries: TimeEntry[];
 
-	// Aggregations
+	/** Total tracked seconds across all entries. */
 	totalDuration: number;
+	/** Duration totals keyed by role id. */
 	durationByRole: Record<string, { roleId: string; roleName: string; duration: number }>;
+	/** Duration totals keyed by user id. */
 	durationByUser: Record<string, { userId: string; userName: string; duration: number }>;
 
-	// Loading states
 	loading: boolean;
 	error: string | null;
 
-	// Filters
+	/** Active filters; changing them via `setFilters` triggers a refetch. */
 	filters: {
 		dateRange: { start: Date | null; end: Date | null };
 		roleId: string | null;
 		userId: string | null;
 	};
 
-	// Actions
+	/** Set the item/board this store is scoped to. Call before fetching. */
 	setItemContext: (itemId: string, boardId: string) => void;
+	/** Load entries + aggregations from `GET /api/items/:itemId/time-entries`. No-op until the item context and a session token are set. */
 	fetchItemTimeEntries: () => Promise<void>;
+	/** Merge in new filter values and refetch. */
 	setFilters: (filters: Partial<ItemTimeEntriesState["filters"]>) => void;
 	refetch: () => Promise<void>;
 }
@@ -83,7 +92,7 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 
 			const data = await response.json();
 
-			// The API response structure should match ItemTimeEntriesResponse from plan
+			// Flatten the API's byRole/byUser arrays into lookup maps keyed by id.
 			set({
 				timeEntries: data.entries,
 				totalDuration: data.aggregations.totalDuration,

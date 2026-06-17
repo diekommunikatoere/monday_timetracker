@@ -1,24 +1,32 @@
-// stores/appStore.ts
 import { create } from "zustand";
 import { useMondayStore } from "./mondayStore";
 
+/**
+ * App-level state: the boards connected to the current widget instance, plus
+ * shared loading/error flags. Board IDs originate from the monday widget context;
+ * `loadConnectedBoards` resolves them to board names via the API. Not persisted.
+ */
 interface AppState {
-	// Connected boards from Monday context
+	/** Board IDs supplied by the monday widget context. */
 	connectedBoardIds: number[];
+	/** Resolved board metadata (id + name) for the connected boards. */
 	connectedBoards: Array<{
 		id: string;
 		name: string;
 	}>;
 
-	// App-level UI state
 	isLoading: boolean;
 	error: string | null;
 
-	// Actions
 	setConnectedBoardIds: (ids: number[]) => void;
 	setConnectedBoards: (boards: AppState["connectedBoards"]) => void;
 	setLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
+	/**
+	 * Resolve the current `connectedBoardIds` to board names via
+	 * `POST /api/connectedBoards`. No-op when there are no IDs or no monday
+	 * session token is available yet.
+	 */
 	loadConnectedBoards: () => Promise<void>;
 }
 

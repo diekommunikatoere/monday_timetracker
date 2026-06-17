@@ -11,34 +11,40 @@ declare global {
 	}
 }
 
+/**
+ * Draft state for the active timer entry: the comment / task name the user is
+ * editing, plus the machinery to persist them. While typing, the comment
+ * auto-saves (debounced) to the draft; `saveDraft` finalizes the draft into a
+ * real time entry. `comment` and `taskName` are persisted to localStorage so an
+ * in-progress draft survives a reload.
+ */
 interface DraftState {
-	// Comment state
+	/** Current comment text for the draft. */
 	comment: string;
 
-	// Draft metadata
+	/** Display name for the draft entry, usually derived from the comment. */
 	taskName: string;
 
-	// Saving states
 	isSaving: boolean;
 	error: string | null;
 
-	// Debounce timer reference
+	/** Handle for the in-flight auto-save debounce, so it can be cancelled. */
 	debounceTimerId: NodeJS.Timeout | null;
 
-	// Actions
+	/** Set the comment and, when no task name is set yet, derive one from it. */
 	setComment: (comment: string) => void;
 	clearComment: () => void;
 	setTaskName: (taskName: string) => void;
 
-	// Auto-save (debounced)
+	/** Debounced (500 ms) auto-save of the comment to the draft via `PATCH /api/timer/draft`. */
 	autoSaveDraft: (params: { comment: string; sessionId?: string }) => void;
 
-	// Manual save
+	/** Finalize the draft into a saved time entry via `POST /api/timer/finalize`. */
 	saveDraft: (params: { draftId: string; taskName?: string; comment: string; onSaved?: () => void; showToast?: (message: string, type: string, duration: number) => void }) => Promise<void>;
 
-	// Internal state management
 	setSaving: (isSaving: boolean) => void;
 	setError: (error: string | null) => void;
+	/** Cancel any pending auto-save debounce. Call on unmount. */
 	clearDebounce: () => void;
 }
 

@@ -1,15 +1,12 @@
 /* components/features/timer/TimerDisplay.module.css */
 
 .time {
-    color: var(--color--text-disabled);
-    font-weight: var(--font--weight-bold);
-    font-size: var(--font--size-xxl);
-    font-family: var(--font--mono);
-    line-height: 1;
-    transition: var(--transition);
+	font: var(--font--size-xxl)/var(--font--line-height-xxl) var(--font--mono);
+	font-weight: var(--font--weight-bold);
+	color: var(--color--text-disabled);
+	transition: var(--transition);
 }
 
-/* Modifiers act as unique classes in Modules */
 .isActive {
     color: var(--color--text-primary);
 }
@@ -19,7 +16,7 @@
 }
 
 @keyframes blink {
-    50% {
-        opacity: 0.5;
-    }
+	50% {
+		opacity: 0.5;
+	}
 }

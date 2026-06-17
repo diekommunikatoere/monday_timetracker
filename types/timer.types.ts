@@ -16,7 +16,14 @@ export interface ServerSyncRef {
 }
 
 /**
- * Timer session from database
+ * Timer session as used by the client (store / hooks / API responses).
+ *
+ * NOTE: this collides by name with the DB-row `TimerSession` exported from
+ * `@/types/database` (the generated `timer_session` Row). They are different
+ * shapes — this one nests an optional `time_entry` and is what the realtime
+ * subscription and timer API routes hand back. Import from `@/types/timer.types`
+ * when you mean this client shape, and from `@/types/database` when you mean the
+ * raw row.
  */
 export interface TimerSession {
 	id: string;
@@ -219,7 +226,14 @@ export type TimerStore = TimerStoreState & TimerStoreActions;
 // ============================================
 
 /**
- * Helper to convert boolean isPaused to TimerStatus
+ * Derive the {@link TimerStatus} string from the DB's boolean `is_paused` flag.
+ *
+ * `is_paused` alone is ambiguous (a missing session also reads as "not paused"),
+ * so the presence of a session is required to distinguish `idle` from `running`.
+ *
+ * @param isPaused   - The session's `is_paused` flag.
+ * @param hasSession - Whether an active `timer_session` exists for the user.
+ * @returns `"idle"` when no session, else `"paused"` / `"running"`.
  */
 export function toTimerStatus(isPaused: boolean, hasSession: boolean): TimerStatus {
 	if (!hasSession) return "idle";
@@ -227,7 +241,11 @@ export function toTimerStatus(isPaused: boolean, hasSession: boolean): TimerStat
 }
 
 /**
- * Helper to convert TimerStatus to boolean isPaused
+ * Inverse of {@link toTimerStatus}: collapse a {@link TimerStatus} back to the
+ * DB's boolean `is_paused` flag (both `idle` and `running` map to `false`).
+ *
+ * @param status - The UI timer status.
+ * @returns `true` only when `status === "paused"`.
  */
 export function fromTimerStatus(status: TimerStatus): boolean {
 	return status === "paused";

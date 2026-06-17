@@ -1,8 +1,23 @@
+// lib/supabase/pagination.ts
+// Helpers for fetching more than 1 000 rows from Supabase, which caps a single
+// query at 1 000 results. Two strategies are provided: range-based (simple,
+// fine for moderate data) and keyset/cursor-based (efficient for large tables).
+
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
 /**
- * Configuration options for pagination strategies
+ * Shared configuration accepted by both {@link fetchAllWithRange} and
+ * {@link fetchAllWithKeyset}.
+ *
+ * @property batchSize - Rows to request per Supabase query. Capped at 1 000
+ *                       (the PostgREST hard limit). Defaults to `1000`.
+ * @property maxRows   - Optional upper bound on total rows returned across all
+ *                       batches. Useful for safety limits on unbounded tables.
+ *                       Defaults to unlimited.
+ * @property delayMs   - Milliseconds to wait between batch requests. Use a
+ *                       small value (e.g. `50`) if you need to avoid hammering
+ *                       the DB under a tight rate limit. Defaults to `0`.
  */
 export interface PaginationConfig {
 	/** Number of rows to fetch per batch (default: 1000, max: 1000) */
@@ -14,7 +29,22 @@ export interface PaginationConfig {
 }
 
 /**
- * Result type for paginated queries
+ * Unified result shape returned by both {@link fetchAllWithRange} and
+ * {@link fetchAllWithKeyset}.
+ *
+ * When `success` is `false` the function has already logged the error and
+ * `data` contains all rows that were fetched **before** the failure — it is
+ * non-empty when the error occurred mid-pagination.
+ *
+ * @typeParam T - Row type inferred from the table/view being queried. Typed as
+ *               `any[]` at runtime because dynamic table names prevent
+ *               compile-time narrowing; cast the result at the call site.
+ *
+ * @property data    - Flattened array of all rows received across every batch.
+ * @property count   - `data.length` — convenience alias; always equals `data.length`.
+ * @property batches - Number of batch requests that were issued. Useful for diagnostics.
+ * @property success - `true` when all batches completed without error.
+ * @property error   - Human-readable error message when `success` is `false`.
  */
 export interface PaginatedResult<T> {
 	/** All fetched data consolidated into a single array */
@@ -30,14 +60,27 @@ export interface PaginatedResult<T> {
 }
 
 /**
- * Fetches all records from a table or view using range-based pagination.
- * Uses .range(start, end) to paginate through results.
+ * Fetches every row from a Supabase table or view using **offset/range
+ * pagination** (`.range(start, end)`), working around the PostgREST 1 000-row
+ * cap by issuing multiple sequential requests.
  *
- * @param client - Supabase client instance
- * @param table - Table or view name to query
- * @param select - Columns to select (default: '*')
- * @param config - Pagination configuration options
- * @returns Promise<PaginatedResult<any>> - Consolidated results from all batches
+ * Prefer this strategy for tables with fewer than ~10 000 rows. For larger
+ * tables, use {@link fetchAllWithKeyset} to avoid the performance penalty of
+ * high-offset queries. Use {@link recommendPaginationStrategy} if unsure.
+ *
+ * On error the function logs to `console.error`, sets `success: false`, and
+ * returns whatever rows were collected before the failure — **do not** assume
+ * `data` is empty when `success` is `false`.
+ *
+ * The `client` parameter accepts either `supabaseAdmin` (server-side,
+ * service-role) or the anon `supabase` client. Always use `supabaseAdmin`
+ * from `lib/supabase/server.ts` for server routes.
+ *
+ * @param client - Typed Supabase client (`SupabaseClient<Database>`).
+ * @param table  - Name of the table or view as it appears in the Supabase schema.
+ * @param select - PostgREST column selector string (default: `'*'`).
+ * @param config - Optional {@link PaginationConfig} overrides.
+ * @returns A {@link PaginatedResult} containing all rows and batch diagnostics.
  *
  * @example
  * ```typescript
@@ -128,16 +171,33 @@ export async function fetchAllWithRange(client: SupabaseClient<Database>, table:
 }
 
 /**
- * Fetches all records from a table or view using keyset pagination.
- * Uses a cursor column (e.g., 'id' or 'created_at') with .gt() for efficient pagination.
- * This method is more performant for large datasets as it avoids OFFSET overhead.
+ * Fetches every row from a Supabase table or view using **keyset (cursor)
+ * pagination**, advancing via `.gt(cursorColumn, lastCursor)` instead of
+ * offset arithmetic.
  *
- * @param client - Supabase client instance
- * @param table - Table or view name to query
- * @param cursorColumn - Column to use for cursor-based pagination (default: 'id')
- * @param select - Columns to select (default: '*')
- * @param config - Pagination configuration options
- * @returns Promise<PaginatedResult<any>> - Consolidated results from all batches
+ * **Prefer this over {@link fetchAllWithRange} for tables larger than
+ * ~10 000 rows** — high-offset queries degrade as the table grows; keyset
+ * pagination stays O(log n) when `cursorColumn` is indexed.
+ *
+ * Constraints:
+ * - `cursorColumn` **must be unique and sortable** (typically `'id'` for UUIDs
+ *   or a monotonic timestamp). Non-unique cursor columns will produce
+ *   duplicates or skipped rows at batch boundaries.
+ * - Rows are always returned **ascending by `cursorColumn`**; the ordering
+ *   cannot be changed without breaking cursor tracking.
+ * - If a row is inserted mid-pagination with a cursor value smaller than the
+ *   current cursor, it will be missed. For append-only tables this is safe.
+ *
+ * On error the function logs to `console.error`, sets `success: false`, and
+ * returns whatever rows were collected before the failure.
+ *
+ * @param client       - Typed Supabase client (`SupabaseClient<Database>`).
+ * @param table        - Name of the table or view as it appears in the Supabase schema.
+ * @param cursorColumn - Unique, indexed column to use as the pagination cursor
+ *                       (default: `'id'`). Must be included in `select`.
+ * @param select       - PostgREST column selector string (default: `'*'`).
+ * @param config       - Optional {@link PaginationConfig} overrides.
+ * @returns A {@link PaginatedResult} containing all rows and batch diagnostics.
  *
  * @example
  * ```typescript
@@ -246,12 +306,15 @@ export async function fetchAllWithKeyset(client: SupabaseClient<Database>, table
 }
 
 /**
- * Utility function to determine which pagination strategy to use based on table size.
- * For tables with less than 10,000 rows, range-based is fine.
- * For larger tables, keyset pagination is recommended.
+ * Returns the recommended pagination strategy for a given table size.
  *
- * @param estimatedRowCount - Estimated number of rows in the table
- * @returns 'range' | 'keyset' - Recommended strategy
+ * The threshold is 10 000 rows: below that, the offset overhead of
+ * {@link fetchAllWithRange} is negligible; above it, {@link fetchAllWithKeyset}
+ * avoids the O(n) scan cost of high-offset queries.
+ *
+ * @param estimatedRowCount - Approximate row count (e.g. from a `COUNT(*)` or a
+ *                            monitoring dashboard). An exact number is not required.
+ * @returns `'range'` for smaller tables, `'keyset'` for larger ones.
  */
 export function recommendPaginationStrategy(estimatedRowCount: number): "range" | "keyset" {
 	return estimatedRowCount > 10000 ? "keyset" : "range";
