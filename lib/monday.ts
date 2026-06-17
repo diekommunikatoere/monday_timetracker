@@ -1,3 +1,5 @@
+// lib/monday.ts — monday.com GraphQL API client: boards, items, subitems, user details, linked items.
+
 import { ApiClient, ClientError } from "@mondaydotcomorg/api";
 import { NextRequest } from "next/server";
 import { cacheHelper } from "./redis";
@@ -11,13 +13,14 @@ const CACHE_TTL = {
 };
 
 // Inline type definitions for API responses
+/** Generic wrapper returned by the monday.com `ApiClient` before unwrapping. */
 type APIResponse<T> = {
 	loading: boolean;
 	error: APIError | null;
 	data: T;
 };
 
-// Type definition for BoardsResponse
+/** Raw shape returned by the `boards(ids: [...])` query used in {@link getConnectedBoards}. */
 type BoardsResponse = {
 	boards: Array<{
 		id: string;
@@ -26,13 +29,19 @@ type BoardsResponse = {
 	error?: APIError;
 };
 
-// Type for items without subitems (low complexity query)
+/**
+ * A monday item fetched **without** subitems — used in the Phase 1 low-complexity
+ * items query inside {@link getBoardTasks} to keep the per-request complexity budget low.
+ */
 type SimpleItem = {
 	id: string;
 	name: string;
 };
 
-// Type for items with subitems (separate query)
+/**
+ * A monday item with its subitems pre-fetched. Used in the legacy high-complexity
+ * query path; the current implementation uses a dedicated subitems-board query instead.
+ */
 type ItemWithSubitems = {
 	id: string;
 	subitems: Array<{
@@ -41,7 +50,10 @@ type ItemWithSubitems = {
 	}>;
 };
 
-// Type for paginated items response
+/**
+ * Paginated response shape for the `boards.groups.items_page` query used in Phase 1
+ * of {@link getBoardTasks}. The `cursor` field drives subsequent `next_items_page` calls.
+ */
 type ItemsPageResponse = {
 	boards: Array<{
 		groups: Array<{
@@ -60,7 +72,10 @@ type ItemsPageResponse = {
 	error?: APIError;
 };
 
-// Type for subitems query response
+/**
+ * Paginated response shape for the subitems query in Phase 2 of {@link getBoardTasks}.
+ * Each item carries its `parent_item.id` so subitems can be bucketed by parent.
+ */
 type SubitemsResponse = {
 	items: ItemWithSubitems[];
 	complexity?: {
@@ -69,7 +84,10 @@ type SubitemsResponse = {
 	error?: APIError;
 };
 
-// Type definition for TasksResponse (legacy, kept for compatibility)
+/**
+ * Legacy combined response that fetched items and subitems in a single high-complexity
+ * query. Retained for type compatibility; the active code path uses two separate queries.
+ */
 type TasksResponse = {
 	boards: Array<{
 		groups: Array<{
@@ -94,6 +112,7 @@ type TasksResponse = {
 	error?: APIError;
 };
 
+/** Error shape returned inline by monday.com API responses (not thrown). */
 type APIError = {
 	message: string;
 	status: number;
@@ -103,10 +122,20 @@ type APIError = {
 	}>;
 };
 
-// Board option type for caching
+/**
+ * A board flattened to a `{ value, label }` pair for use in select inputs and caching.
+ * `value` is the board's monday.com ID (string); `label` is the board name.
+ */
 type BoardOption = { value: string; label: string };
 
-// Task group type for caching
+/**
+ * A grouped list of task options ready for a grouped `<Select>` component.
+ * Each entry represents one monday board group; `options` contains the items
+ * (or subitems, with their parent name prepended) within that group.
+ *
+ * Subitems are labelled `"<parentName> > <subitemName>"` and carry
+ * `parentItemId` / `parentItemName` for later look-ups.
+ */
 type TaskGroup = {
 	label: string;
 	options: Array<{
@@ -119,14 +148,24 @@ type TaskGroup = {
 	}>;
 };
 
-// Internal type for tracking items during pagination
+/**
+ * Accumulator used during the Phase 1 pagination loop in {@link getBoardTasks}.
+ * Groups are collected before subitems are fetched so both phases can be joined
+ * without re-fetching.
+ */
 type GroupItems = {
 	groupId: string;
 	groupTitle: string;
-	groupPosition: string;
+	groupPosition: string; // Numeric string; used for sort ordering
 	items: SimpleItem[];
 };
 
+/**
+ * A minimal monday.com item reference returned by {@link findLinkedItems}.
+ *
+ * @property id      - monday.com item ID.
+ * @property boardId - ID of the board the item belongs to.
+ */
 export interface LinkedItem {
 	id: string;
 	boardId: string;
@@ -141,7 +180,16 @@ if (!token) {
 // Create client instance once
 const client = new ApiClient({ token, apiVersion: "2025-10" });
 
-// Get connected boards by IDs - with Redis caching
+/**
+ * Resolves a list of monday.com board IDs to their names, for use in board-selection UIs.
+ *
+ * Results are cached in Redis under `monday:boards:<sorted-ids>` for
+ * {@link CACHE_TTL.BOARDS} seconds (1 hour). As a side-effect, each board is
+ * upserted into the local `monday_board` dimension table (fire-and-forget).
+ *
+ * @param boardIds - monday.com board IDs to look up. Empty / invalid input returns `[]`.
+ * @returns An array of `{ value: boardId, label: boardName }` options, in API-response order.
+ */
 export async function getConnectedBoards(boardIds: string[]): Promise<Array<BoardOption>> {
 	if (!boardIds || !Array.isArray(boardIds) || boardIds.length === 0) {
 		return [];
@@ -238,8 +286,29 @@ export async function isSubitemsBoard(boardId: string): Promise<boolean> {
 	}
 }
 
-// Get tasks (items and subitems) for a board with caching
-// OPTIMIZED: Uses separate queries for items and subitems to reduce complexity
+/**
+ * Fetches all items and subitems for a board and returns them as grouped
+ * `TaskGroup` options, sorted by group position then alphabetically within each group.
+ *
+ * **Two-phase strategy** to stay within monday's complexity budget:
+ * - **Phase 1** — fetches all items (no subitems) via `items_page` with cursor-based
+ *   pagination, 200 items per page.
+ * - **Phase 2** — discovers the auto-generated subitems board for this board, then
+ *   paginates its items directly (200 per page). Each subitem carries `parent_item.id`
+ *   so subitems can be bucketed by parent without a costly `items(ids:[...])` batch call.
+ *
+ * **Subitems-board guard**: if `boardId` itself is a subitems board (detected via
+ * {@link isSubitemsBoard}), the function returns `{ groups: [] }` immediately rather
+ * than flattening subitems as top-level items, which would corrupt the dimension table.
+ *
+ * As a side-effect, all discovered items and subitems are batch-upserted into the
+ * `monday_item` table (fire-and-forget via {@link upsertMondayItemsBatch}).
+ *
+ * @param boardId    - Valid positive-integer monday.com board ID (string form).
+ * @param searchTerm - Reserved parameter; not currently applied server-side.
+ * @returns `{ groups }` where each group's `options` are the items/subitems inside it.
+ * @throws If `boardId` is not a valid positive integer, or on unrecoverable API errors.
+ */
 export async function getBoardTasks(
 	boardId: string,
 	searchTerm?: string,
@@ -685,8 +754,16 @@ export async function getBoardTasks(
 	return result;
 }
 
-// Batch fetch tasks for multiple boards (for prefetching)
-// OPTIMIZED: Sequential fetching to avoid overwhelming the API
+/**
+ * Fetches board tasks for multiple boards **sequentially** (not in parallel) to
+ * avoid saturating monday's per-account API complexity budget.
+ *
+ * Boards that fail individually are logged and stored as `{ groups: [] }` in the
+ * result so a single bad board does not abort the batch.
+ *
+ * @param boardIds - monday.com board IDs to pre-fetch.
+ * @returns A `Map<boardId, { groups }>` with an entry for every input board ID.
+ */
 export async function getBatchBoardTasks(boardIds: string[]): Promise<Map<string, { groups: TaskGroup[] }>> {
 	const startTime = Date.now();
 	const results = new Map<string, { groups: TaskGroup[] }>();
@@ -709,13 +786,27 @@ export async function getBatchBoardTasks(boardIds: string[]): Promise<Map<string
 	return results;
 }
 
-// Invalidate all board caches (for forced refresh)
+/**
+ * Clears all Redis board caches matching `monday:boards:*`.
+ *
+ * Use when a board name changes or when forcing a cold refresh for all
+ * boards (e.g. after an admin sync operation).
+ */
 export async function invalidateAllBoardCaches(): Promise<void> {
 	await cacheHelper.clearPattern("monday:boards:*");
 	console.log("[invalidateAllBoardCaches] Cleared all monday caches");
 }
 
-// Extract and validate monday.com context from API requests
+/**
+ * Parses the legacy `monday-context` request header and returns the decoded context data.
+ *
+ * **Deprecated path** — only used by `/api/sync/board/[boardId]`. All other routes
+ * should use the JWT-based pattern via {@link verifyMondayJwt} in `lib/monday-auth.ts`.
+ *
+ * @param request - The incoming Next.js request with a `monday-context` header.
+ * @returns The `data` field of the decoded context object.
+ * @throws If the header is absent or the JSON is invalid / missing `user.id` or `account.id`.
+ */
 export async function getMondayContext(request: NextRequest) {
 	const contextHeader = request.headers.get("monday-context");
 	if (!contextHeader) {
@@ -734,7 +825,20 @@ export async function getMondayContext(request: NextRequest) {
 	}
 }
 
-// Get details for a specific user including teams and photos - with Redis caching
+/**
+ * Fetches a monday.com user's team memberships and profile photo URLs.
+ *
+ * Results are cached under `monday:user_details:<userId>` for
+ * {@link CACHE_TTL.USER_TEAMS} seconds (24 hours) — team membership is
+ * treated as stable.
+ *
+ * On any API error the function **does not throw** — it returns empty teams
+ * and `null` photo URLs so callers can degrade gracefully.
+ *
+ * @param userId - monday.com user ID (string).
+ * @returns Object with `teams` (id + name pairs) and `photo_urls` at five sizes.
+ *          All `photo_urls` values are `null` if the user has no avatar.
+ */
 export async function getUserDetails(userId: string): Promise<{
 	teams: Array<{ id: string; name: string }>;
 	photo_urls: {
@@ -830,15 +934,37 @@ export async function getUserDetails(userId: string): Promise<{
 	}
 }
 
-// Get teams for a specific user - with Redis caching
+/**
+ * Convenience wrapper around {@link getUserDetails} that returns only the `teams` array.
+ *
+ * Shares the same 24-hour Redis cache. Returns `[]` if `userId` is falsy
+ * or on any API error.
+ *
+ * @param userId - monday.com user ID.
+ * @returns Array of `{ id, name }` team objects the user belongs to.
+ */
 export async function getUserTeams(userId: string): Promise<Array<{ id: string; name: string }>> {
 	const details = await getUserDetails(userId);
 	return details.teams;
 }
 
 /**
- * Find items on a target board that are linked to a specific item on a source board
- * via connect_boards (board_relation) columns.
+ * Returns the IDs of items on `targetBoardId` that are linked to `itemId` on `boardId`
+ * via `connect_boards` / `board_relation` columns.
+ *
+ * **Algorithm**:
+ * 1. Fetches all columns on `boardId` and filters to those of type `board_relation` /
+ *    `connect_boards` whose `settings_str` JSON references `targetBoardId`.
+ * 2. Reads the `column_values` for `itemId`, extracting item IDs from those columns.
+ *    - Prefers the `linked_item_ids` field (monday API 2025-04+).
+ *    - Falls back to parsing `linkedPulseIds` from the raw `value` JSON for older responses.
+ *
+ * On any error (missing params, API failure) returns `[]` rather than throwing.
+ *
+ * @param boardId       - Source board containing `itemId`.
+ * @param itemId        - The item whose linked items you want.
+ * @param targetBoardId - Only links pointing at this board are returned.
+ * @returns Array of monday.com item ID strings on `targetBoardId`.
  */
 export async function findLinkedItems(boardId: string, itemId: string, targetBoardId: string): Promise<string[]> {
 	if (!boardId || !itemId || !targetBoardId) {
@@ -942,7 +1068,18 @@ export async function findLinkedItems(boardId: string, itemId: string, targetBoa
 }
 
 /**
- * Get item details including parent item and board
+ * Fetches structural metadata for a single monday.com item.
+ *
+ * Returns the item's board, group, and — if it is a subitem — its parent
+ * item's board and group. This is used to resolve where a subitem lives
+ * when the webhook payload omits the parent context.
+ *
+ * Returns `null` on any API error or if the item does not exist.
+ *
+ * @param itemId - monday.com item ID.
+ * @returns Flat object with `id`, `name`, `groupId`, `boardId`, `boardName`,
+ *          and optional `parentItemId`, `parentItemName`, `parentGroupId`,
+ *          `parentBoardId`, `parentBoardName`. `null` if not found.
  */
 export async function getItemDetails(itemId: string) {
 	const query = `

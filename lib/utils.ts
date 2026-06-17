@@ -1,6 +1,6 @@
-/**
- * Re-exporting from specialized modules
- */
+// lib/utils.ts — Barrel re-export for lib/time/ and lib/permissions/.
+// Import time utilities (formatDuration, formatTime, etc.) and permission helpers
+// (getTimeEntryPermissions) from here rather than from the sub-modules directly.
 export * from "./time";
 export * from "./permissions";
 

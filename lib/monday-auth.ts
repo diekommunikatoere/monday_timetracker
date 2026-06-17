@@ -1,5 +1,19 @@
+// lib/monday-auth.ts — Verifies monday.com session-token JWTs for server-side auth.
+
 import jwt from "jsonwebtoken";
 
+/**
+ * Decoded identity extracted from a monday.com session-token JWT.
+ *
+ * All IDs are **monday.com IDs**, not internal Supabase IDs. To resolve
+ * the Supabase user, pass `userId` to {@link getUserProfileByMondayId} or
+ * {@link findOrCreateUserByMondayId} from `lib/database/users.ts`.
+ *
+ * @property userId    - monday.com user ID (string-coerced from the JWT `dat.user_id` number).
+ * @property accountId - monday.com account/workspace ID (`dat.account_id`).
+ * @property isAdmin   - `true` when `dat.is_admin` is truthy — gates admin-only API routes.
+ * @property isValid   - `false` on any verification failure; always check this before using other fields.
+ */
 export interface MondaySession {
 	userId: string;
 	accountId: string;
@@ -8,9 +22,24 @@ export interface MondaySession {
 }
 
 /**
- * Verifies the monday.com session token (JWT)
- * @param token The JWT from the Authorization header
- * @returns Decoded session data or invalid status
+ * Verifies a monday.com session-token JWT and returns the decoded identity.
+ *
+ * The client obtains the raw token via `monday.get("sessionToken")` and
+ * sends it as `Authorization: Bearer <token>`. Pass the full header value
+ * here — the `"Bearer "` prefix is stripped automatically.
+ *
+ * On any failure (missing secret, malformed token, expired, `dat` payload
+ * absent) the function **does not throw** — it returns `{ isValid: false }`
+ * so callers can handle auth errors uniformly with a single `if (!session.isValid)` check.
+ *
+ * Typical route preamble:
+ * ```ts
+ * const session = verifyMondayJwt(request.headers.get("authorization") ?? "");
+ * if (!session.isValid) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+ * ```
+ *
+ * @param token - The raw `Authorization` header value, with or without `"Bearer "` prefix.
+ * @returns A {@link MondaySession} — check `isValid` before trusting any other field.
  */
 export function verifyMondayJwt(token: string): MondaySession {
 	const secret = process.env.MONDAY_SIGNING_SECRET;

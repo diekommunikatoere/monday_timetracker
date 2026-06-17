@@ -1,10 +1,21 @@
 /**
- * Monday.com Column Sync Service
+ * lib/monday/columnSync.ts — monday.com column sync service.
  *
- * Provides functionality for:
- * - Fetching board columns for configuration
- * - Updating column values on items
- * - Syncing time tracking data to monday.com boards
+ * Write-back layer that pushes computed time values (total time, per-role breakdown,
+ * remaining budget) from Supabase into configured monday.com board columns after a
+ * time entry is finalized, updated, or deleted.
+ *
+ * Provides:
+ * - {@link getBoardColumns} / {@link getCompatibleColumns} / {@link getColumnsForPurpose}
+ *   — fetching and filtering board columns for sync configuration.
+ * - {@link updateColumnValue} / {@link updateColumnValueWithRetry}
+ *   — writing a value to a specific monday.com column with optional exponential-backoff retry.
+ * - {@link formatTimeValue} / {@link formatTimeByRoleBreakdown} / {@link formatBudgetValue}
+ *   — formatting helpers for the three sync-purpose value types.
+ * - {@link invalidateColumnsCache} — cache invalidation after column schema changes.
+ *
+ * Column compatibility metadata ({@link COMPATIBLE_COLUMN_TYPES}) and purpose helpers
+ * live in `./utils` and are re-exported here for consumer convenience.
  */
 
 import { ApiClient, ClientError } from "@mondaydotcomorg/api";
@@ -31,6 +42,15 @@ const client = new ApiClient({ token, apiVersion: "2025-10" });
 // Type Definitions
 // ============================================
 
+/**
+ * Raw monday.com column as returned by the `boards.columns` GraphQL field.
+ *
+ * @property id           - Stable column ID used in mutations (e.g. `"numbers0"`).
+ * @property title        - Human-readable column name shown in the board UI.
+ * @property type         - monday column type string (e.g. `"numbers"`, `"text"`, `"long_text"`).
+ * @property description  - Optional column description set by the board owner. `null` when absent.
+ * @property settings_str - Raw JSON string of column settings (board-relation targets, etc.).
+ */
 export type MondayColumn = {
 	id: string;
 	title: string;
@@ -39,6 +59,18 @@ export type MondayColumn = {
 	settings_str: string;
 };
 
+/**
+ * A monday.com column enriched with sync-compatibility metadata, returned by
+ * {@link getBoardColumns} for display in the admin column-mapping UI.
+ *
+ * @property id                  - Stable column ID (same as {@link MondayColumn.id}).
+ * @property title               - Column name shown in the UI.
+ * @property type                - monday column type string.
+ * @property typeLabel           - Human-readable label from {@link COMPATIBLE_COLUMN_TYPES}, or falls back to `type`.
+ * @property description         - Column description or `null`.
+ * @property isCompatible        - `true` when this column type can receive any sync value.
+ * @property compatiblePurposes  - Which {@link SyncPurpose} values this column type accepts.
+ */
 export type MondayColumnOption = {
 	id: string;
 	title: string;
@@ -77,8 +109,15 @@ type ChangeColumnValueResponse = {
 // ============================================
 
 /**
- * Fetches all columns for a specific board
- * Includes compatibility information for sync configuration
+ * Fetches all columns for a monday.com board, annotated with sync-compatibility metadata.
+ *
+ * Results are cached in Redis under `monday:columns:<boardId>` for
+ * {@link COLUMNS_CACHE_TTL} seconds (5 minutes). Use {@link invalidateColumnsCache}
+ * after column schema changes.
+ *
+ * @param boardId - Valid positive-integer monday.com board ID (string form).
+ * @returns Array of {@link MondayColumnOption} in the order returned by the API.
+ * @throws If `boardId` is not a valid positive integer, the board is not found, or on API errors.
  */
 export async function getBoardColumns(boardId: string): Promise<MondayColumnOption[]> {
 	if (!boardId || isNaN(Number(boardId)) || Number(boardId) <= 0) {
@@ -155,7 +194,11 @@ export async function getBoardColumns(boardId: string): Promise<MondayColumnOpti
 }
 
 /**
- * Get only columns compatible with time sync
+ * Returns only the columns from {@link getBoardColumns} where `isCompatible` is `true` —
+ * i.e. columns whose type can receive at least one {@link SyncPurpose} value.
+ *
+ * @param boardId - Valid positive-integer monday.com board ID.
+ * @returns Filtered subset of {@link MondayColumnOption}.
  */
 export async function getCompatibleColumns(boardId: string): Promise<MondayColumnOption[]> {
 	const allColumns = await getBoardColumns(boardId);
@@ -163,7 +206,14 @@ export async function getCompatibleColumns(boardId: string): Promise<MondayColum
 }
 
 /**
- * Get columns compatible with a specific sync purpose
+ * Returns only the columns from {@link getBoardColumns} that support a given
+ * {@link SyncPurpose} (e.g. `"total_time"`, `"time_by_role"`, `"remaining_budget"`).
+ *
+ * Use this to populate a column-picker restricted to the purpose the admin is configuring.
+ *
+ * @param boardId - Valid positive-integer monday.com board ID.
+ * @param purpose - The {@link SyncPurpose} to filter by.
+ * @returns Columns whose `compatiblePurposes` includes `purpose`.
  */
 export async function getColumnsForPurpose(boardId: string, purpose: SyncPurpose): Promise<MondayColumnOption[]> {
 	const allColumns = await getBoardColumns(boardId);
@@ -175,7 +225,8 @@ export async function getColumnsForPurpose(boardId: string, purpose: SyncPurpose
 // ============================================
 
 /**
- * GraphQL mutation to update a column value
+ * GraphQL mutation used by {@link updateColumnValue} to write a single column value.
+ * The `value` variable must be a **JSON-encoded string** (monday's API requires this).
  */
 const CHANGE_COLUMN_VALUE_MUTATION = `
 	mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
@@ -191,6 +242,14 @@ const CHANGE_COLUMN_VALUE_MUTATION = `
 	}
 `;
 
+/**
+ * Return value from {@link updateColumnValue} and {@link updateColumnValueWithRetry}.
+ *
+ * @property success   - `true` if the mutation succeeded.
+ * @property itemId    - monday.com item ID echoed back from the mutation response.
+ * @property itemName  - Item name echoed back from the mutation response.
+ * @property error     - Human-readable error message when `success` is `false`.
+ */
 export type UpdateColumnResult = {
 	success: boolean;
 	itemId?: string;
@@ -199,7 +258,19 @@ export type UpdateColumnResult = {
 };
 
 /**
- * Update a column value on a monday.com item
+ * Writes a value to a single column on a monday.com item.
+ *
+ * The `value` is JSON-serialised before being sent — monday.com requires all
+ * column values to be passed as a JSON string even for primitive types.
+ *
+ * Does **not** retry on failure. For write-back paths that need resilience, use
+ * {@link updateColumnValueWithRetry} instead.
+ *
+ * @param boardId  - monday.com board ID containing the item.
+ * @param itemId   - monday.com item ID to update.
+ * @param columnId - Column ID to write (e.g. `"numbers0"`).
+ * @param value    - The value to write; will be `JSON.stringify`-ed before the API call.
+ * @returns {@link UpdateColumnResult} — check `success` before trusting other fields.
  */
 export async function updateColumnValue(boardId: string, itemId: string, columnId: string, value: string | number): Promise<UpdateColumnResult> {
 	const startTime = Date.now();
@@ -254,7 +325,15 @@ export async function updateColumnValue(boardId: string, itemId: string, columnI
 // ============================================
 
 /**
- * Format seconds into various time formats
+ * Converts a duration in seconds into the display format specified by `format`.
+ *
+ * - `"hours"`   — decimal hours rounded to 2 decimal places (e.g. `2.5`).
+ * - `"seconds"` — raw integer seconds passed through unchanged.
+ * - `"hh:mm"`   — zero-padded hours and minutes string (e.g. `"02:30"`). Seconds are truncated.
+ *
+ * @param totalSeconds - Duration to format. // Duration in seconds
+ * @param format       - One of the {@link TimeFormat} values from `@/types/database`.
+ * @returns A number for `"hours"` / `"seconds"`, a string for `"hh:mm"`.
  */
 export function formatTimeValue(totalSeconds: number, format: TimeFormat): string | number {
 	switch (format) {
@@ -273,7 +352,19 @@ export function formatTimeValue(totalSeconds: number, format: TimeFormat): strin
 }
 
 /**
- * Format time breakdown by role as text
+ * Formats a per-role time breakdown as a multi-line text string suitable for
+ * writing to a monday `text` or `long_text` column.
+ *
+ * Each line is `"<roleName>: <formattedTime>"`. When `includeTotal` is `true`
+ * (default) a `"Total: <time>"` line is appended.
+ *
+ * Returns `"No time tracked"` when `breakdown` is empty.
+ *
+ * @param breakdown       - Array of `{ roleName, totalSeconds, color? }` entries.
+ *                          `totalSeconds` is the accumulated tracked time for that role. // Duration in seconds
+ * @param options.includeTotal - Append a total-time line. Default: `true`.
+ * @param options.format       - {@link TimeFormat} applied to all time values. Default: `"hh:mm"`.
+ * @returns Newline-separated string.
  */
 export function formatTimeByRoleBreakdown(breakdown: Array<{ roleName: string; totalSeconds: number; color?: string }>, options: { includeTotal?: boolean; format?: TimeFormat } = {}): string {
 	const { includeTotal = true, format = "hh:mm" } = options;
@@ -299,7 +390,17 @@ export function formatTimeByRoleBreakdown(breakdown: Array<{ roleName: string; t
 }
 
 /**
- * Format remaining budget value
+ * Formats a remaining-budget monetary value as a currency string.
+ *
+ * Defaults to the Euro symbol (`"€"`). Negative values are prefixed with `"-"`;
+ * when `showNegative` is `false`, negatives are clamped to `"€0"`.
+ *
+ * **Note**: the currency symbol is a display-only hint — no exchange-rate logic is applied.
+ *
+ * @param remaining                   - Budget amount (may be negative for over-budget). // Monetary value
+ * @param options.currencySymbol      - Symbol prepended to the formatted value. Default: `"€"`.
+ * @param options.showNegative        - If `false`, values below zero are shown as `<symbol>0`. Default: `true`.
+ * @returns Formatted string, e.g. `"€1234.56"`, `"-€23.00"`, or `"€0"`.
  */
 export function formatBudgetValue(remaining: number, options: { currencySymbol?: string; showNegative?: boolean } = {}): string {
 	const { currencySymbol = "€", showNegative = true } = options;
@@ -321,7 +422,21 @@ const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 /**
- * Update column value with exponential backoff retry
+ * Writes a column value with exponential-backoff retry on transient errors.
+ *
+ * Retries up to `retries` times (default: {@link MAX_RETRIES} = 3). A failure is
+ * considered retryable when the error message contains `"rate"`, `"timeout"`,
+ * `"network"`, `"502"`, or `"503"`. Non-retryable errors (permission, schema) abort
+ * immediately without waiting.
+ *
+ * Initial delay is {@link INITIAL_RETRY_DELAY} ms (1 s); each retry doubles the delay.
+ *
+ * @param boardId  - monday.com board ID.
+ * @param itemId   - monday.com item ID.
+ * @param columnId - Column ID to update.
+ * @param value    - Value to write.
+ * @param retries  - Maximum number of attempts. Default: 3.
+ * @returns {@link UpdateColumnResult} from the last attempt.
  */
 export async function updateColumnValueWithRetry(boardId: string, itemId: string, columnId: string, value: string | number, retries = MAX_RETRIES): Promise<UpdateColumnResult> {
 	let lastError: string | undefined;
@@ -359,7 +474,13 @@ export async function updateColumnValueWithRetry(boardId: string, itemId: string
 // ============================================
 
 /**
- * Invalidate column cache for a specific board
+ * Removes the Redis column cache entry for `boardId` (`monday:columns:<boardId>`).
+ *
+ * Call this after the admin changes column mappings or after a board's column
+ * schema is known to have changed, so the next {@link getBoardColumns} call
+ * fetches fresh data rather than returning stale column definitions.
+ *
+ * @param boardId - monday.com board ID whose column cache should be cleared.
  */
 export async function invalidateColumnsCache(boardId: string): Promise<void> {
 	await cacheHelper.del(`monday:columns:${boardId}`);
