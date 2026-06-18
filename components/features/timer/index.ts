@@ -1,3 +1,4 @@
+// components/features/timer/index.ts — barrel re-exports for the timer feature.
 export * from "./ManualTimeEntryModal";
 export * from "./TimerComment";
 export * from "./TimerContainer";

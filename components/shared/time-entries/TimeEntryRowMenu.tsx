@@ -6,6 +6,18 @@ import { useUserStore } from "@/stores/userStore";
 import { useTimeEntryPermissions } from "../hooks/useTimeEntryPermissions";
 import { TimeEntry } from "@/types/time-entry";
 
+/**
+ * Props for {@link TimeEntryRowMenu}.
+ *
+ * Generic over the row type `T` so the menu can be reused with any shape that
+ * carries the fields the permission check needs (`id`, `user_id`, `is_draft`).
+ *
+ * @typeParam T - Row shape; must expose `id`, `user_id`, and optional `is_draft`.
+ * @property entry    - The row to render the menu for.
+ * @property onEdit   - Optional edit handler; only shown when the user has `canEdit`. For draft entries it acts as a save action and is labelled "Speichern".
+ * @property onDelete - Optional delete handler; only shown when the user has `canDelete`.
+ * @property style    - Optional inline style applied to the trigger `IconButton`.
+ */
 export interface TimeEntryRowMenuProps<T> {
 	entry: T;
 	onEdit?: (entry: T) => void;
@@ -13,6 +25,20 @@ export interface TimeEntryRowMenuProps<T> {
 	style?: React.CSSProperties;
 }
 
+/**
+ * Per-row actions menu (edit / save-draft / delete) for a time entry.
+ *
+ * Reads the current user's Supabase id from {@link useUserStore} and derives
+ * `canEdit` / `canDelete` via {@link useTimeEntryPermissions}. Renders
+ * **nothing** (`null`) when the current user has neither permission — i.e. for
+ * rows owned by other users. For draft entries (`is_draft: true`) the edit item
+ * is relabelled to a save ("Speichern") action. Styled with CSS vars
+ * (`--color--border-ui`, `--color--background-primary`, `--box-shadow--md`).
+ *
+ * @typeParam T - Row shape with at least `{ id, user_id, is_draft?, style? }`.
+ * @param props - {@link TimeEntryRowMenuProps}.
+ * @returns A Mantine `Menu` with the applicable items, or `null` if the user can neither edit nor delete.
+ */
 export function TimeEntryRowMenu<T extends { id: string; user_id: string; is_draft?: boolean; style?: React.CSSProperties }>({ entry, onEdit, onDelete, style }: TimeEntryRowMenuProps<T>) {
 	const currentUserId = useUserStore((s) => s.supabaseUser?.id);
 	const { canEdit, canDelete } = useTimeEntryPermissions({

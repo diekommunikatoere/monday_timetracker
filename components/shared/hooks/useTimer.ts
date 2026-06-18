@@ -8,6 +8,29 @@ import { supabase } from "@/lib/supabase/client";
 import { UseTimerReturn } from "@/types/timer.types";
 import { TimerSession } from "@/types/database";
 
+/**
+ * Aggregates timer state + actions for the current user.
+ *
+ * Pulls reactive state from {@link useTimerStore}, the current user's identity
+ * from {@link useUserStore} (`supabaseUser`), and sets up a **realtime Supabase
+ * subscription** on the `public.timer_session` table that pushes incoming
+ * `TimerSession` rows back into the store via `setSession` — but **only** when
+ * the payload's `user_id` matches the current user (per-row ownership filter on
+ * top of RLS). The subscription is torn down on unmount / when the user changes.
+ *
+ * The `actions` object wires cross-store side effects: `reset` clears the
+ * timer store and refetches the user's entries from {@link useTimeEntriesStore},
+ * `openSaveModal` opens the save dialog via {@link useModalStore}
+ * (`openTimerSave`), and `updateComment` writes through to the store. Several
+ * actions (`start`, `pause`, `resume`, `saveAsDraft`, `confirmSaveAsDraft`) are
+ * currently **stubs** awaiting feature-hook logic (see `TODO` in
+ * `confirmSaveAsDraft`) — wire them up before relying on them.
+ *
+ * @returns A {@link UseTimerReturn}: `state` (raw {@link TimerState}),
+ *   `actions` (memoized {@link TimerActions}), and computed booleans
+ *   `isActive` (`status === "running"`), `hasSession` (`sessionId !== null`),
+ *   `canSave` (`hasSession && !isSaving`).
+ */
 export function useTimer(): UseTimerReturn {
 	/* Reactive state selectors */
 	// Core timer state

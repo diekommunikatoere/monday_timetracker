@@ -6,20 +6,31 @@ import { Icon, IconButton } from "@/components";
 import type { TimerControlsProps } from "@/types/timer.types";
 
 /**
- * TimerControls - Presentational component for timer action buttons
+ * `TimerControls` — presentational row of timer action buttons.
  *
- * This is a pure presentational component that:
- * - Receives all data and callbacks via props
- * - Has NO store access
- * - Only handles rendering
+ * Pure / "dumb" component with **no store access**; all data and callbacks
+ * arrive via props (typed by {@link TimerControlsProps}). It renders exactly
+ * two `IconButton`s: a play/pause toggle (icon depends on {@link TimerStatus})
+ * and a save button that opens the save modal via `onSave`.
  *
- * @param status - Timer status (idle, running, paused)
- * @param hasSession - Whether there is an active timer session
- * @param hasComment - Whether there is a comment to save
- * @param isSaving - Whether a save operation is in progress
- * @param onPlayPause - Callback for play/pause button
- * @param onSaveAsDraft - Callback for save as draft button
- * @param onSave - Callback for save button (opens modal)
+ * Note: this component does **not** expose a save-as-draft action — that lives
+ * in {@link TimerComment}. The two action clusters are kept separate so the
+ * save/draft semantics stay close to the inputs they relate to.
+ *
+ * @param status     - Current timer status; `"running"` shows the pause icon,
+ *                     anything else shows the play icon.
+ * @param hasSession- Whether an active timer session is present; gates the
+ *                     save button (disabled when there is nothing to save).
+ * @param hasComment - Whether a non-empty comment exists (forwarded from the
+ *                     container; reserved for future affordances).
+ * @param isSaving  - True while a save request is in flight; shows loading
+ *                     spinners and disables both buttons.
+ * @param onPlayPause- Fired by the play/pause button. The container maps this
+ *                     to `actions.start` / `actions.pause` / `actions.resume`
+ *                     depending on the current status.
+ * @param onSave    - Fired by the save button to open the save modal
+ *                     (`actions.openSaveModal` from {@link useTimer}).
+ * @returns A row containing the play/pause and save buttons.
  */
 export function TimerControls({ status, hasSession, hasComment, isSaving, onPlayPause, onSave }: TimerControlsProps) {
 	const isRunning = status === "running";

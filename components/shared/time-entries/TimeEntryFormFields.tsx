@@ -4,12 +4,46 @@ import { Flex, Group, TextInput, Tooltip } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
 import { Button, ButtonGroup, DatePicker, Icon, IconButton, Select } from "@/components";
 
+/**
+ * Descriptor for a single quick-adjust (+/-) button rendered under the duration
+ * field by {@link TimeEntryFormFields}.
+ *
+ * @property label   - Button text (e.g. `"+15"` or `"-5"`); supplied by the config.
+ * @property minutes - Signed delta in **minutes**; positive for add, negative for subtract. Passed to `quickAdjustments.onAdjust`.
+ * @property variant  - Optional Mantine button variant; falls back to `"default"` in the renderer.
+ */
 export type TimeEntryQuickAdjust = {
 	label: string;
 	minutes: number;
 	variant?: "default";
 };
 
+/**
+ * Props for {@link TimeEntryFormFields}, a controlled, presentational form.
+ *
+ * The component holds **no state of its own** — every value and mutation
+ * callback is provided by the parent, typically via {@link useTimeEntryForm}.
+ * All time/duration strings are `"HH:MM"` 24-hour local-time; see
+ * {@link TimeEntryFormValues} for the unit convention.
+ *
+ * @property date                 - Calendar day (`Date`) selected in the date picker.
+ * @property onDateChange         - Fired with the new `Date` when the picker changes.
+ * @property duration             - Tracked duration as an `"HH:MM"` string.
+ * @property onDurationChange      - Fired with the new `"HH:MM"` string on duration edit.
+ * @property startTime            - Entry start time as an `"HH:MM"` local-time string.
+ * @property onStartTimeChange     - Fired with the new `"HH:MM"` string.
+ * @property endTime              - Entry end time as an `"HH:MM"` local-time string.
+ * @property onEndTimeChange       - Fired with the new `"HH:MM"` string.
+ * @property comment               - Free-text note (empty string when none).
+ * @property onCommentChange       - Fired with the new comment string.
+ * @property isLocked              - When `true`, the end-time input is disabled and styled as a live-tracking field; toggled by {@link onLockToggle}.
+ * @property onLockToggle          - Fired when the lock button next to the end time is clicked.
+ * @property onStartTimeNowClick   - Optional; when provided, renders a "now" icon button that sets the start time.
+ * @property onEndTimeNowClick     - Optional; when provided, renders a "now" icon button that sets the end time.
+ * @property quickAdjustments      - Optional `{ add?, subtract?, onAdjust }` to render quick-add / quick-subtract button groups; buttons pass their {@link TimeEntryQuickAdjust.minutes} to `onAdjust`.
+ * @property taskSelector         - Optional `{ show, node }`; when `show` is true, `node` is inserted into the form (e.g. a monday task picker).
+ * @property roleSelector         - Optional `{ show, roles, selectedRoleId, onRoleChange, loading? }`; when `show` is true, renders a searchable role `Select`.
+ */
 export interface TimeEntryFormFieldsProps {
 	// Core fields
 	date: Date;
@@ -51,6 +85,19 @@ export interface TimeEntryFormFieldsProps {
 	};
 }
 
+/**
+ * Presentational, fully-controlled form for editing a single time entry's
+ * date, times, duration, task, role, and comment.
+ *
+ * Renders start/end `TimeInput`s (with optional "now" + lock affordances), a
+ * duration `TimeInput` paired with a `DatePicker`, optional quick-adjust and
+ * task/role selectors, and a free-text comment input. All copy is German.
+ * Designed to be driven by {@link useTimeEntryForm}; see that hook for the
+ * field-sync semantics.
+ *
+ * @param props - {@link TimeEntryFormFieldsProps}.
+ * @returns A column `Flex` of Mantine inputs.
+ */
 export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 	const { date, onDateChange, duration, onDurationChange, startTime, onStartTimeChange, endTime, onEndTimeChange, comment, onCommentChange, isLocked, onLockToggle, onStartTimeNowClick, onEndTimeNowClick, quickAdjustments, taskSelector, roleSelector } = props;
 

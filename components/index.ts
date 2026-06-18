@@ -1,3 +1,6 @@
+// components/index.ts
+// Barrel re-exporting the public UI components (buttons, icons, forms, modals, logo).
+
 export * from "./ui/buttons/Button";
 export * from "./ui/buttons/ButtonGroup";
 export * from "./ui/buttons/IconButton";

@@ -9,17 +9,25 @@ import type { TimerDisplayProps } from "@/types/timer.types";
 import styles from "@/components/styles/features/timer/TimerDisplay.module.css";
 
 /**
- * TimerDisplay - Presentational component for displaying elapsed time
+ * `TimerDisplay` — presentational read-out of elapsed time plus a reset button.
  *
- * This is a pure presentational component that:
- * - Receives all data via props
- * - Has NO store access
- * - Only handles rendering and local UI state
+ * Pure / "dumb" component with **no store access**; all data arrives via props
+ * (typed by {@link TimerDisplayProps}). The elapsed time is rendered through
+ * {@link formatTime}, which formats an `HH:MM:SS` string.
  *
- * @param elapsedTime - Time in milliseconds to display
- * @param status - Timer status (idle, running, paused)
- * @param onReset - Callback when reset button is clicked
- * @param disabled - Whether the reset button should be disabled
+ * **Unit gotcha:** despite `formatTime`'s parameter being named `seconds`, it
+ * actually expects **milliseconds** (it divides by 1000 internally). The
+ * `elapsedTime` prop therefore must be milliseconds — which it is, as the
+ * `useTimer` store holds ms (the Supabase RPC returns `elapsed_time_ms` and the
+ * local tick adds `Date.now() - syncedAt`). The CSS modifiers `.isActive` and
+ * `.isPaused` toggle styling based on {@link TimerStatus}.
+ *
+ * @param elapsedTime - Elapsed time in **milliseconds** to display.
+ * @param status      - Current timer status; drives the active/paused CSS state.
+ * @param onReset     - Fired when the reset button is clicked
+ *                      (`actions.reset` from {@link useTimer}).
+ * @param disabled    - Disables the reset button (e.g. when no session or mid-save).
+ * @returns A row containing the reset icon button and the formatted time text.
  */
 export function TimerDisplay({ elapsedTime, status, onReset, disabled }: TimerDisplayProps) {
 	const isActive = status !== "idle";

@@ -1,3 +1,6 @@
+// components/StoreProvider.tsx
+// Client-side wrapper that rehydrates persisted Zustand stores after mount.
+
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -6,9 +9,14 @@ import { useUserStore } from "@/stores/userStore";
 import { useDraftStore } from "@/stores/draftStore";
 
 /**
- * StoreProvider component to handle Zustand store hydration for Next.js SSR
- * This ensures persisted stores are properly hydrated after the client-side mount
- * preventing hydration mismatches
+ * Rehydrates the app's persisted Zustand stores (`timerStore`, `userStore`,
+ * `draftStore`) on first client mount. **This must run client-side only** —
+ * the stores are persisted to `localStorage`, so calling `persist.rehydrate()`
+ * during SSR would read browser storage and cause hydration mismatches. A
+ * `useRef` guard ensures rehydration fires exactly once per provider instance.
+ *
+ * @param children - React subtree to render once mounted.
+ * @returns `children` unchanged (this provider renders no UI of its own).
  */
 export function StoreProvider({ children }: { children: React.ReactNode }) {
 	const hydrated = useRef(false);

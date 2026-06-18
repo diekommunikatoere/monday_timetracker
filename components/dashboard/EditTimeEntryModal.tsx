@@ -16,6 +16,14 @@ import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 
 import "@mantine/dates/styles.css";
 
+/**
+ * Props for {@link EditTimeEntryModal}.
+ *
+ * @property show     - Controls {@link Modal} visibility.
+ * @property onClose  - Closes the modal (cancel / after a successful save).
+ * @property entry    - The existing {@link TimeEntry} to edit; its fields seed the form when the modal opens.
+ * @property onSaved  - Fired after a successful PATCH so the parent can refresh.
+ */
 interface EditTimeEntryModalProps {
 	show: boolean;
 	onClose: () => void;
@@ -23,6 +31,29 @@ interface EditTimeEntryModalProps {
 	onSaved: () => void;
 }
 
+/**
+ * Modal for editing an existing, finalized time entry.
+ *
+ * When `show` becomes true (or `entry.id` changes) it seeds {@link TimeEntryFormFields}
+ * from `entry`: `start_time`/`end_time` (**ISO 8601**) are split into a date and
+ * `HH:MM` time strings, and `duration` (**seconds**) is converted to `HH:MM` via
+ * `secondsToDuration`. A {@link TaskItemSelector} is pre-filled from the entry's
+ * board/item/role so the user can reassign the task.
+ *
+ * On save it PATCHes `/api/time-entries/:id` with the new fields — `duration`
+ * back to **seconds** via `durationToSeconds`, start/end combined into **ISO 8601**
+ * — and sends `expectedUpdatedAt` (`entry.updated_at`) for optimistic-concurrency
+ * control. A `409` response is surfaced as a conflict toast and the save is
+ * aborted without closing; other errors set the inline error. On success it
+ * `refetch`es `useTimeEntriesStore` for the current user, calls `onSaved`, and
+ * closes.
+ *
+ * Reads from: `useTimeEntriesStore` (refetch), `useUserStore` (Supabase user),
+ * `useMondayStore` (session token), `useToast`.
+ *
+ * @param props - Component props.
+ * @returns A {@link Modal} titled "Zeiteintrag bearbeiten" with the form and update/cancel buttons.
+ */
 export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: EditTimeEntryModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);

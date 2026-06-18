@@ -8,6 +8,20 @@ import { TimeRangeCell } from "./columns/TimeRangeCell";
 import { formatDuration } from "@/lib/utils";
 import { TimeEntryRowMenu } from "./TimeEntryRowMenu";
 
+/**
+ * Callback + context bundle passed into the column factories below.
+ *
+ * `currentUserId` is the Supabase `user_profiles.id` of the logged-in user;
+ * it gates per-row checkbox visibility (only own rows get a checkbox) and the
+ * header select-all's "own entries" count.
+ *
+ * @property onEdit        - Wired into {@link TaskCell} / {@link TimeEntryRowMenu} as the edit action.
+ * @property onDelete      - Wired into the cell menus as the delete action.
+ * @property onSelectRow   - Row-checkbox callback `(id, selected)`; rendered only for rows owned by `currentUserId`.
+ * @property onSelectAll   - Header-checkbox callback `(selected)`; checked against own-entry count.
+ * @property selectedIds   - Currently-selected row ids.
+ * @property currentUserId - Supabase user id used for ownership checks.
+ */
 interface ConfigOptions {
 	onEdit?: (entry: TimeEntry) => void;
 	onDelete?: (entry: TimeEntry) => void;
@@ -17,6 +31,22 @@ interface ConfigOptions {
 	currentUserId?: string;
 }
 
+/**
+ * Builds the column set for the **dashboard** time-entries view.
+ *
+ * Returns an ordered array of {@link ColumnDef} covering: a row-select checkbox
+ * (own entries only), task (via {@link TaskCell}, which embeds a
+ * {@link TimeEntryRowMenu}), board name, role (via {@link RoleCell}), comment,
+ * date, start ("… Uhr"), end ("… Uhr"), and total duration formatted via
+ * `formatDuration`. Date/time cells render `entry.start_time` /
+ * `entry.end_time` — **ISO 8601 timestamp strings** — localized with `de-DE`.
+ * The total uses `formatDuration(row.duration)` where `row.duration` is in
+ * **seconds**.
+ *
+ * @param opts - {@link ConfigOptions}; destructured for `onEdit`, `onDelete`,
+ *   `onSelectRow`, `onSelectAll`, `selectedIds`, `currentUserId`.
+ * @returns Array of {@link ColumnDef} for {@link TimeEntryTable}.
+ */
 export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll, selectedIds = [], currentUserId }: ConfigOptions): ColumnDef<TimeEntry>[] => [
 	{
 		id: "checkbox",
@@ -116,6 +146,18 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	},
 ];
 
+/**
+ * Builds the column set for the compact **sidebar** time-entries view.
+ *
+ * A trimmed column array: total duration (`formatDuration`, **seconds** input,
+ * shown bold), role (via {@link RoleCell} with `showCommentIcon` so the
+ * `entry.comment` is reachable via a tooltip), date (2-digit year), a
+ * start–end time range (via {@link TimeRangeCell}), and an actions column
+ * embedding a {@link TimeEntryRowMenu}. No select column here.
+ *
+ * @param opts - {@link ConfigOptions}; only `onEdit` and `onDelete` are used.
+ * @returns Array of {@link ColumnDef} for {@link TimeEntryTable}.
+ */
 export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDef<TimeEntry>[] => [
 	{
 		id: "total",

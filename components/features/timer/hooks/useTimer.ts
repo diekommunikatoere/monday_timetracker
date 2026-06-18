@@ -1,4 +1,4 @@
-// hooks/useTimer.ts
+// components/features/timer/hooks/useTimer.ts
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -30,16 +30,34 @@ interface RealTimeTimerSessionPayload {
 }
 
 /**
- * Unified Timer Hook
+ * `useTimer` — unified hook that owns **all** timer logic for the feature.
  *
- * This hook encapsulates ALL timer logic:
- * - Session loading on mount
- * - Real-time Supabase subscription for cross-device sync
- * - Timer interval management for elapsed time
- * - API calls with Monday context
- * - Auto-save debouncing for comments
+ * Centralises everything the timer UI needs so components never touch the
+ * underlying stores directly:
+ *  - Loads the user's active session on mount (via `/api/timer/session`).
+ *  - Subscribes to Supabase realtime on the `timer_session` table for
+ *    cross-device sync, filtering to the current user and debouncing updates by
+ *    200 ms. While running it re-fetches authoritative elapsed time through the
+ *    `get_current_elapsed_time` RPC to avoid clock drift.
+ *  - Runs a 1-second `setInterval` tick that recomputes elapsed time locally as
+ *    `baseElapsedTime + (Date.now() - syncedAt)` (all values in **milliseconds**).
+ *  - Debounces comment auto-save (500 ms) via `useDraftStore.autoSaveDraft`.
+ *  - Wraps all timer API calls (`start`/`pause`/`resume`/`reset`/`soft-reset`)
+ *    with monday `rawContext` + `Bearer sessionToken` auth headers.
  *
- * Components should use this hook instead of accessing stores directly.
+ * While the store has not hydrated yet it returns a safe loading placeholder
+ * (`isLoading: true`, `sessionId: null`, no actions wired). Reads from
+ * `useTimerStore` (reactive state + `getState()` actions), `useUserStore`,
+ * `useMondayStore`, `useDraftStore`, `useModalStore`, and `useTimeEntriesStore`.
+ *
+ * Exposed to the tree by {@link TimerProvider} and consumed via
+ * `useTimerContext` ({@link TimerContainer} etc.).
+ *
+ * @returns A {@link UseTimerReturn}: `{ state, isActive, hasSession, canSave, actions }`
+ *          where `state` is the {@link TimerState} snapshot and `actions` is the
+ *          memoised {@link TimerActions} bundle (`start`, `pause`, `resume`,
+ *          `reset`, `saveAsDraft`, `confirmSaveAsDraft`, `openSaveModal`,
+ *          `updateComment`).
  */
 export function useTimer(): UseTimerReturn {
 	const hydrated = useHydration();

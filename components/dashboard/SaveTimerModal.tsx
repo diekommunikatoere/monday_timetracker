@@ -21,6 +21,19 @@ import "@/public/css/components/SaveTimerModal.css";
 
 const monday = mondaySdk();
 
+/**
+ * Optional seed data for {@link SaveTimerModal} when reopening a saved draft.
+ *
+ * When omitted the modal reads live state from `useTimerStore` instead.
+ *
+ * @property draftId       - Draft row id to finalize (falls back to the store's `draftId`).
+ * @property taskSelection - Pre-selected board/item/role ({@link TaskSelection}).
+ * @property comment       - Pre-filled comment.
+ * @property date          - Entry date.
+ * @property duration      - `HH:MM` duration string.
+ * @property startTime     - `HH:MM` start-of-day time string.
+ * @property endTime       - `HH:MM` end-of-day time string.
+ */
 interface SaveTimerModalProps {
 	show: boolean;
 	onClose: () => void;
@@ -38,14 +51,37 @@ interface SaveTimerModalProps {
 import { getCurrentTimeString, addSecondsToTimeString, subtractSecondsFromTimeString, calculateDurationBetweenTimes } from "@/lib/utils";
 
 /**
- * SaveTimerModal - Modal for saving a timer session to a time entry
+ * Modal that finalizes a running timer (or a saved draft) into a persisted time
+ * entry.
  *
- * This component allows the user to:
- * - View and adjust the duration with quick buttons
- * - Select a date for the time entry
- * - Select a task/item to associate the time entry with
- * - Add/edit a comment
- * - Save the time entry
+ * Manages its own date / `HH:MM` duration / `HH:MM` start & end time fields with
+ * a lock toggle that pins the end time to "now". The three fields are kept
+ * mutually consistent via a `updateSource` ref that breaks feedback loops:
+ * editing duration recomputes the opposite time boundary (start when locked,
+ * end when unlocked); editing a time recomputes the duration and unlocks the end
+ * time. Quick-adjust buttons nudge the duration in whole minutes.
+ *
+ * **Two modes:**
+ * - With `initialData` (reopening a draft from {@link TimeEntriesTable}): the
+ *   supplied values — including stored start/end times — are shown and kept
+ *   fixed (unlocked), and the draft is finalized via `POST /api/time-entries/finalize`.
+ * - Without `initialData` (live timer): duration is snapshotted once from the
+ *   paused timer's elapsed milliseconds (`useTimerStore.elapsedTime`, converted
+ *   to seconds and rounded), the end time defaults to "now", and after a
+ *   successful finalize it also calls `POST /api/timer/soft-reset` to clear the
+ *   session and `resetTimer()` to clear local state.
+ *
+ * On save the end time is *derived* from `start + duration` (in **seconds**) to
+ * guarantee it never inverts and crosses midnight correctly; `duration` is sent
+ * to the API in **seconds**, `date` as an ISO string, and start/end as full
+ * **ISO 8601** timestamps. Reads the monday `context` from `useMondayStore`
+ * (falling back to `monday.get("context")`) and the bearer `sessionToken`.
+ *
+ * Reads from: `useTimerStore`, `useUserStore`, `useTimeEntriesStore` (refetch),
+ * `useMondayStore`, `useToast`.
+ *
+ * @param props - Component props.
+ * @returns A {@link Modal} titled "Zeiteintrag speichern" with time/duration inputs, quick-adjust buttons, a {@link TaskItemSelector}, a comment field, and save/cancel buttons.
  */
 export default function SaveTimerModal({ show, onClose, initialData }: SaveTimerModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);

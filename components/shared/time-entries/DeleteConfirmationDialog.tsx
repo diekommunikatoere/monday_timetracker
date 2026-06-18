@@ -4,6 +4,14 @@
 import { Text, Group } from "@mantine/core";
 import { Button, Modal } from "@/components";
 
+/**
+ * Props for {@link DeleteConfirmationDialog}.
+ *
+ * @property show     - Whether the modal is visible.
+ * @property onConfirm- Called when the user confirms deletion (the actual delete is the caller's responsibility).
+ * @property onCancel - Called on dismiss / cancel button; the same callback is used for the modal's `onClose`.
+ * @property count    - Number of entries being deleted; drives singular vs plural copy (`"Eintrag"` / `"Einträge"`).
+ */
 interface DeleteConfirmationDialogProps {
 	show: boolean;
 	onConfirm: () => void;
@@ -11,6 +19,16 @@ interface DeleteConfirmationDialogProps {
 	count: number;
 }
 
+/**
+ * Confirmation modal shown before deleting one or more time entries.
+ *
+ * All copy is hard-coded in **German**. The body advertises a 5-second undo
+ * window, but the undo behaviour itself lives in the caller — this component
+ * only emits `onConfirm` / `onCancel`.
+ *
+ * @param props - {@link DeleteConfirmationDialogProps}.
+ * @returns A `Modal` (from `@/components`) with confirm/cancel buttons, or the modal's empty close state.
+ */
 export default function DeleteConfirmationDialog({ show, onConfirm, onCancel, count }: DeleteConfirmationDialogProps) {
 	return (
 		<Modal show={show} onClose={onCancel}>

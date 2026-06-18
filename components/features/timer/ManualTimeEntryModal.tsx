@@ -16,10 +16,43 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
+/**
+ * Props for {@link ManualTimeEntryModal}.
+ *
+ * @property show    - When `true`, the modal is rendered open; toggling to
+ *                     `false` triggers the close transition.
+ * @property onClose - Called when the user dismisses the modal (cancel button,
+ *                     backdrop, or after a successful save).
+ */
 interface ManualTimeEntryModalProps {
 	show: boolean;
 	onClose: () => void;
 }
+
+/**
+ * `ManualTimeEntryModal` — modal for entering a completed time entry by hand
+ * (no running timer session required).
+ *
+ * Wraps the shared {@link TimeEntryFormFields} driven by {@link useTimeEntryForm},
+ * and adds a `TaskItemSelector` (sub-items only) so the user picks a monday.com
+ * task to attach the entry to. On save it POSTs to `/api/time-entries/manual`
+ * with the monday `rawContext` (falling back to `monday.get("context")`) in the
+ * `monday-context` header and the `sessionToken` as a Bearer token.
+ *
+ * **Units:** the on-screen `duration` is an `"HH:MM"` string; it is converted to
+ * **seconds** via {@link durationToSeconds} before being sent as `duration`.
+ * `startTime`/`endTime` are combined with the date via {@link combineDateAndTime}
+ * into ISO timestamps. The `date` is sent as a full ISO string.
+ *
+ * The form is reset every time the modal opens (see the `useEffect` on `show`).
+ * Errors from a missing task, a zero duration, or a failed API call are surfaced
+ * inline in red text. After a successful save it shows a toast, refetches the
+ * user's time entries through `useTimeEntriesStore`, and calls `onClose`.
+ *
+ * @param props.show    - Whether the modal is open.
+ * @param props.onClose - Close handler invoked on dismiss / successful save.
+ * @returns A `Modal` containing the manual entry form and save/cancel actions.
+ */
 
 export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);

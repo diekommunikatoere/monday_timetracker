@@ -7,6 +7,19 @@ import { useMemo } from "react";
 import { ColumnDef } from "@/components/ui/tables/types";
 import styles from "@/components/styles/features/time-entries/TimeEntryTable.module.css";
 
+/**
+ * Props for {@link TimeEntryTable}.
+ *
+ * @property timeEntries  - The {@link TimeEntry} rows to render; `duration` on each is in **seconds**.
+ * @property columns      - Column definitions (see `ColumnDef` from `@/components/ui/tables/types`); produced by {@link getDashboardColumns} / {@link getSidebarColumns} in `TimeEntryTableConfigs`.
+ * @property loading      - When truthy, renders a centered `Loader` instead of the table.
+ * @property error        - When non-null, renders a centered red error message instead of the table.
+ * @property selectedIds  - Ids currently selected via row checkboxes; drives row highlight and the select-all indeterminate state.
+ * @property onSelectRow  - Optional row-checkbox callback `(id, selected)`.
+ * @property onSelectAll  - Optional header-checkbox callback `(selected)`.
+ * @property minWidth     - Optional explicit table minimum width (string or number); when omitted it is summed from each visible column's `minWidth`.
+ * @property scrollable   - When true, wraps the table in a `ScrollContainer` using `calculatedMinWidth`.
+ */
 export interface TimeEntryTableProps {
 	timeEntries: TimeEntry[];
 	columns: ColumnDef<TimeEntry>[];
@@ -19,6 +32,21 @@ export interface TimeEntryTableProps {
 	scrollable?: boolean;
 }
 
+/**
+ * Presentational table renderer for a list of {@link TimeEntry} rows.
+ *
+ * Expects fully-built {@link ColumnDef}s (it does not define its own columns —
+ * see {@link TimeEntryTableConfigs}). Hides any column flagged `col.hidden`,
+ * and computes three derived values: the header select-all checkbox state
+ * (`checked` / `indeterminate`), the visible column list, and a `minWidth`
+ * either taken from props or summed from visible columns. Renders distinct
+ * empty states for loading, error, and "no rows". Draft rows
+ * (`entry.is_draft`) are highlighted, and selected rows get a stronger
+ * highlight via the `TimeEntryTable.module.css` styles.
+ *
+ * @param props - {@link TimeEntryTableProps}.
+ * @returns A Mantine `Table` (optionally inside a `ScrollContainer`), or one of the loading/error/empty states.
+ */
 export function TimeEntryTable({ timeEntries, columns, loading, error, selectedIds = [], onSelectRow, onSelectAll, minWidth, scrollable }: TimeEntryTableProps) {
 	const selectAllState = useMemo(() => {
 		const total = timeEntries.length;

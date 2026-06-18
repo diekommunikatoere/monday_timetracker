@@ -11,7 +11,25 @@ import RefreshIcon from "@/components/icons/Refresh";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 
-// Selection data type passed to parent
+/**
+ * Selection payload emitted to the parent whenever the user picks (or clears)
+ * a board, task, or role. **All fields are optional and `undefined` when
+ * unset** — every `onSelectionChange` call delivers the *full* current
+ * selection, not a delta, so consumers can replace their state wholesale.
+ *
+ * Note that `parentItemId`/`parentItemName` describe the **parent item** of a
+ * subitem task (monday.com subitems), not the group; they are derived from the
+ * task option's metadata, not stored separately.
+ *
+ * @property boardId         - monday.com board id (stringified).
+ * @property boardName       - Human-readable board label.
+ * @property itemId          - Selected task/item id (stringified).
+ * @property itemName        - Selected task/item name.
+ * @property parentItemId    - Id of the parent item when `itemId` is a subitem.
+ * @property parentItemName  - Name of the parent item when `itemId` is a subitem.
+ * @property roleId          - Supabase `role.id` (UUID) of the selected role.
+ * @property roleName        - Display name of the selected role.
+ */
 export interface TaskSelection {
 	boardId?: string;
 	boardName?: string;
@@ -23,6 +41,16 @@ export interface TaskSelection {
 	roleName?: string;
 }
 
+/**
+ * Props for {@link TaskItemSelector}. The component is a controlled-from-outside
+ * selector that reports every change upward via {@link onSelectionChange} and
+ * optionally exposes a reset callback to its parent.
+ *
+ * @property onSelectionChange - Fired on every board/task/role change with the full {@link TaskSelection}.
+ * @property onResetRef        - If provided, called once with a `reset()` function the parent can invoke to clear all selections.
+ * @property initialValues     - Optional preselected board/task/role; reconciled against loaded data (or rendered from the supplied names as a fallback).
+ * @property subItemsOnly      - When `true`, top-level items without subitems are hidden from the task tree — only selectable leaves are subitems.
+ */
 interface TaskItemSelectorProps {
 	onSelectionChange: (data: TaskSelection) => void;
 	onResetRef?: (resetFn: () => void) => void;
@@ -37,7 +65,19 @@ interface TaskItemSelectorProps {
 	subItemsOnly?: boolean;
 }
 
-// Option type
+/**
+ * Internal option shape shared by the board, task, and role dropdowns. `value`
+ * is the selectable identifier; `label` is what Mantine displays; `name`
+ * carries the monday.com item name (which may differ from `label` for tasks);
+ * `parentItemId`/`parentItemName` are populated only for subitem options.
+ *
+ * @property value          - Selectable identifier (stringified id).
+ * @property label          - Display label shown in the dropdown.
+ * @property name           - monday.com item name, where applicable.
+ * @property disabled       - Reserved disabled flag (not currently set by the selector).
+ * @property parentItemId   - Parent item id for subitems; absent for top-level items.
+ * @property parentItemName - Parent item name for subitems; absent for top-level items.
+ */
 type DropdownOption = {
 	value: string;
 	label: string;
@@ -47,6 +87,15 @@ type DropdownOption = {
 	parentItemName?: string;
 };
 
+/**
+ * Response shape returned by `GET /api/tasks?boardId=…`. Tasks are grouped by
+ * monday.com group; each option within a group is a flattened task (top-level
+ * or subitem). The selector repartitions these into a Group>Job>Task tree.
+ *
+ * @property groups         - One entry per monday.com group.
+ * @property groups[].label - Group title.
+ * @property groups[].options - Flattened task options belonging to the group.
+ */
 type TaskGroupsResponse = {
 	groups: {
 		label: string;
@@ -60,6 +109,35 @@ type TaskGroupsResponse = {
 	}[];
 };
 
+/**
+ * Three-step selector for choosing a board, a task, and a role for a time
+ * entry. Boards come from the monday.com context (`boardIds`) plus any
+ * `initialValues.boardId`; tasks are fetched per board from `/api/tasks` and
+ * rendered in a {@link TreeSelect} as a **Group → Job → Task** tree (top-level
+ * items with subitems become non-selectable "job" containers); roles are read
+ * directly from Supabase (`role` table).
+ *
+ * Data flow: each React Query (`@tanstack/react-query`) query is cached with
+ * generous `staleTime`/`gcTime`, tasks are **prefetched** for all loaded
+ * boards on mount, and a **Supabase realtime** subscription on
+ * `monday_item`/`monday_group` (filtered by `board_id`) invalidates the task
+ * query so changes appear without a manual refresh. The refresh button calls
+ * `/api/tasks/refresh` to bust the server-side Redis cache, then invalidates
+ * the React Query cache.
+ *
+ * The component is uncontrolled internally but reports every change upward via
+ * {@link onSelectionChange} (full {@link TaskSelection} snapshot, not a delta),
+ * and optionally hands back a `reset()` via {@link onResetRef}. `initialValues`
+ * are reconciled once the corresponding data loads; when the id isn't found
+ * but a name is supplied, a temporary option is synthesized so the selection
+ * still displays.
+ *
+ * @param props.onSelectionChange - Receives the full selection on each change.
+ * @param props.onResetRef        - Optional; receives a reset-all function.
+ * @param props.initialValues     - Optional preselection to reconcile against loaded data.
+ * @param props.subItemsOnly      - When `true`, only subitems are selectable leaves.
+ * @returns A vertical `Flex` of three labelled selectors (board / task / role) with skeleton loading and inline error text.
+ */
 export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues, subItemsOnly }: TaskItemSelectorProps) {
 	// State management for selections
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);

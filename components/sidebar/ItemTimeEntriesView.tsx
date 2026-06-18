@@ -16,6 +16,14 @@ import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationD
 
 import styles from "@/components/styles/features/sidebar/ItemTimeEntriesView.module.css";
 
+/**
+ * Props for {@link ItemTimeEntriesView}.
+ *
+ * @property timeEntries - Pre-fetched {@link TimeEntry} rows for the item, grouped/totalled here by user.
+ * @property itemId      - monday item id; sets the context on `useItemTimeEntriesStore` and drives the fetch effect.
+ * @property boardId     - monday board id owning the item; part of the store context.
+ * @property onEdit      - Invoked with the entry to edit (passed through to the table's edit column).
+ */
 export interface ItemTimeEntriesViewProps {
 	timeEntries: TimeEntry[];
 	itemId: string;
@@ -23,6 +31,30 @@ export interface ItemTimeEntriesViewProps {
 	onEdit: (entry: TimeEntry) => void;
 }
 
+/**
+ * Renders all time entries logged against a single monday item, inside the
+ * item sidebar.
+ *
+ * On mount/change of `itemId`/`boardId` it calls `setItemContext` +
+ * `fetchItemTimeEntries` on `useItemTimeEntriesStore` (which owns `loading`,
+ * `error`, `totalDuration`, `durationByRole`, `durationByUser`). The view shows
+ * a row of per-**role** duration cards (from `durationByRole`), then groups the
+ * passed-in `timeEntries` by `user_id` — each group is an {@link Accordion} item
+ * with an avatar, the user name, a total-duration {@link Badge}, and a
+ * {@link TimeEntryTable} using {@link getSidebarColumns}.
+ *
+ * Row selection is restricted to the current user's own entries (`currentUserId`
+ * from `useUserStore`); delete goes through `DELETE /api/time-entries/:id` with
+ * the `sessionToken` from `useMondayStore` and is confirmed via
+ * {@link DeleteConfirmationDialog}. `duration` values are **seconds** and are
+ * rendered with {@link formatDuration}.
+ *
+ * Reads from: `useItemTimeEntriesStore`, `useUserStore`, `useMondayStore`,
+ * `useToast`.
+ *
+ * @param props - Component props.
+ * @returns A flex column: role-aggregation cards, a divider, and a scrollable grouped table area.
+ */
 export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: ItemTimeEntriesViewProps) {
 	const { loading, error, totalDuration, durationByRole, durationByUser, setItemContext, fetchItemTimeEntries, refetch } = useItemTimeEntriesStore();
 

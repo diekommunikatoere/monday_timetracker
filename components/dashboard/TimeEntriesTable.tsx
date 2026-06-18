@@ -19,6 +19,18 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
+/**
+ * Props for {@link TimeEntriesTable}.
+ *
+ * **Gotcha:** only `onRefetch` is actually consumed. `timeEntries`, `loading`,
+ * and `error` are declared here but the component reads the live values from
+ * `useTimeEntriesStore()` instead — the props are effectively unused/overridden.
+ *
+ * @property timeEntries - Declared but unused; the table reads entries from `useTimeEntriesStore`.
+ * @property loading     - Declared but unused; the table reads loading state from `useTimeEntriesStore`.
+ * @property error       - Declared but unused; the table reads errors from `useTimeEntriesStore`.
+ * @property onRefetch   - Called after any mutation (edit/delete/undo/finalize) to refresh the list.
+ */
 interface TimeEntriesTableProps {
 	timeEntries?: TimeEntry[];
 	loading?: boolean;
@@ -26,6 +38,30 @@ interface TimeEntriesTableProps {
 	onRefetch: () => void;
 }
 
+/**
+ * Dashboard time-entries table with inline edit, delete (with undo), and bulk
+ * actions.
+ *
+ * Renders the shared {@link TimeEntryTable} using {@link getDashboardColumns};
+ * row selection is limited to the current user's own entries (`userId` from
+ * `useUserStore`). Editing is dispatched by entry type: **drafts**
+ * (`entry.is_draft`) open {@link SaveTimerModal} seeded from the draft row,
+ * while finalized entries open {@link EditTimeEntryModal}. Both "edit" and
+ * "finalize draft" funnel through `onEdit`.
+ *
+ * Single-row delete hits `DELETE /api/time-entries/:id` and surfaces a toast
+ * with a "Rückgängig" action that calls `POST /api/time-entries/:id/undo` using
+ * the `undoToken` returned by the delete. Bulk delete POSTs the selected ids to
+ * `/api/time-entries/bulk-delete`. Both are gated by a
+ * {@link DeleteConfirmationDialog}. {@link BulkActionButtons} is rendered
+ * alongside to drive bulk delete and selection clearing.
+ *
+ * Reads from: `useTimeEntriesStore`, `useUserStore`, `useMondayStore`
+ * (session token), `useToast`.
+ *
+ * @param props - Component props (only `onRefetch` is used; see the prop docs).
+ * @returns The table plus its modals, delete dialog, and bulk-action panel.
+ */
 export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const { timeEntries, loading, error } = useTimeEntriesStore();
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);

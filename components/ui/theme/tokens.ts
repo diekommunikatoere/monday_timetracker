@@ -1,5 +1,45 @@
+// components/ui/theme/tokens.ts
+// Design-system theme tokens mapped to CSS custom properties via Mantine's resolver.
+
 import { CSSVariablesResolver } from "@mantine/core";
 
+/**
+ * Mantine `CSSVariablesResolver` that exposes the entire design-system token
+ * palette as CSS custom properties.
+ *
+ * Wired into the app in `app/layout.tsx` through `MantineProvider`'s
+ * `cssVariablesResolver`. The returned object has three sections, mirroring
+ * Mantine's resolver contract:
+ *
+ * - **`variables`** — theme-independent tokens emitted on `:root` for both
+ *   schemes. Includes the full color ramps (`--color--primary-*`,
+ *   `--color--secondary-*`, `--color--tertiary-*`, `--color--success-*`,
+ *   `--color--error-*`, each 50→950), the font stacks (`--font--primary`,
+ *   `--font--headlines`, `--font--body`, `--font--mono`), the type scale
+ *   (`--font--size-*` paired with `--font--line-height-*` from `xs` to
+ *   `xxxl`), font weights (`--font--weight-*`), radii
+ *   (`--border-radius--*`), shadows (`--box-shadow--*`) and the global
+ *   `--transition`.
+ *
+ * - **`light`** — overrides applied under the light color scheme. Resolves
+ *   semantic tokens (selection, highlight, surface, background, button,
+ *   border, text, icon families) to ramp steps appropriate for a light
+ *   surface; e.g. `--color--background-primary` is `#ffffff` and text uses
+ *   the darker `--color--tertiary-*` steps.
+ *
+ * - **`dark`** — overrides applied under the dark color scheme. Mirrors the
+ *   `light` keys but inverts the ramp direction (e.g.
+ *   `--color--background-primary` is `#000000`, text uses the lighter
+ *   `--color--tertiary-*` steps) so contrast is preserved.
+ *
+ * Components reference these via `var(--color--...)`, `var(--font--...)`,
+ * `var(--border-radius--...)`, `var(--box-shadow--...)` and `var(--transition)`;
+ * because the semantic tokens resolve to ramp steps per scheme, the same
+ * component markup stays correct in both themes.
+ *
+ * @param theme - The active Mantine theme (unused; tokens are fully self-contained).
+ * @returns The resolver result with `variables`, `light` and `dark` token maps.
+ */
 export const themeTokens: CSSVariablesResolver = (theme) => ({
 	variables: {
 		/* PRIMARY */

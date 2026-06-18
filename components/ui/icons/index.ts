@@ -1,3 +1,6 @@
+// components/ui/icons/index.ts
+// Barrel re-exporting the dynamic {@link Icon} resolver and the full icon registry.
+
 export { Icon } from "@/components/ui/icons/Icon";
 export { default as add } from "@/components/icons/Add";
 export { default as archive } from "@/components/icons/Archive";

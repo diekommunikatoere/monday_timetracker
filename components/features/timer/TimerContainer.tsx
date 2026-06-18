@@ -7,17 +7,25 @@ import { TimerComment, TimerControls, TimerDisplay } from "@/components/features
 import styles from "@/components/styles/features/timer/TimerContainer.module.css";
 
 /**
- * Timer - Container component for the timer feature
+ * `TimerContainer` — smart container for the live timer widget.
  *
- * This is the smart container component that:
- * - Uses the useTimer hook to access all timer logic
- * - Passes data and callbacks down to presentational children
+ * This is the single "smart" component in the timer feature: it pulls all timer
+ * state and actions from the {@link useTimer} hook (exposed via the
+ * `TimerContext` through {@link useTimerContext}) and fans them out to three
+ * pure presentational children:
+ *  - {@link TimerDisplay} — elapsed time + reset button.
+ *  - {@link TimerControls} — play/pause + save buttons.
+ *  - {@link TimerComment} — comment input + save-as-draft button.
  *
- * Following Container/Presentational pattern:
- * - This component owns ALL the logic
- * - Child components are pure and receive props only
+ * Following the container/presentational split, this component owns **all** the
+ * logic (e.g. mapping `status` to the right `start`/`pause`/`resume` action in
+ * `handlePlayPause`) and the children only render props.
  *
- * Note: The SaveTimerModal is rendered in TimerDashboardHeader.tsx to avoid duplicate modals
+ * Note: the `SaveTimerModal` / `EmptyCommentConfirmationModal` are intentionally
+ * **not** rendered here — they live in `TimerDashboardHeader.tsx` so a single
+ * instance is mounted per dashboard.
+ *
+ * @returns A styled box laying out the timer display, controls, and comment field.
  */
 export function TimerContainer() {
 	// Get all timer state and actions from the unified hook

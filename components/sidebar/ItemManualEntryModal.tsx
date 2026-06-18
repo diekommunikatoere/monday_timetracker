@@ -17,6 +17,24 @@ import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
 
+/**
+ * Props for {@link ItemManualEntryModal}.
+ *
+ * The monday item context is supplied entirely by the parent — the modal does
+ * not query monday itself for the item; it only fetches the selectable billing
+ * `role`s.
+ *
+ * @property show           - Controls {@link Modal} visibility.
+ * @property onClose        - Closes the modal (cancel / after a successful save).
+ * @property itemId         - monday item (task) id the entry is logged against.
+ * @property boardId        - monday board id owning the item.
+ * @property itemName       - monday item display name (also used as `taskName`).
+ * @property boardName      - monday board display name.
+ * @property parentItemId   - Parent item id when the target is a subitem; optional.
+ * @property parentItemName - Parent item display name; optional.
+ * @property roleId         - Initial billing-role id (Supabase `role.id`).
+ * @property roleName       - Initial billing-role display name.
+ */
 export interface ItemManualEntryModalProps {
 	show: boolean;
 	onClose: () => void;
@@ -30,6 +48,30 @@ export interface ItemManualEntryModalProps {
 	roleName: string;
 }
 
+/**
+ * Modal for manually logging a time entry against a specific monday item from
+ * the item sidebar.
+ *
+ * Renders {@link TimeEntryFormFields} (date, start/end time, `HH:MM` duration,
+ * comment, lock toggle, role selector, quick-adjust buttons). The selectable
+ * roles are fetched from the Supabase `role` table via `useQuery`; the incoming
+ * `roleId` prop is adopted once and kept in local state, re-syncing only when it
+ * is unset/empty.
+ *
+ * On save it builds the payload from the form — `duration` is converted with
+ * `durationToSeconds` to **seconds**, `date` to an ISO string, and the
+ * `HH:MM` start/end times combined with the date into full **ISO 8601**
+ * timestamps — and POSTs to `/api/time-entries/manual`, attaching the monday
+ * `context` (`rawContext` from `useMondayStore`, falling back to
+ * `monday.get("context")`) and the `sessionToken` as a bearer token. On success
+ * it calls `refetch` on `useItemTimeEntriesStore`, shows a toast, and closes.
+ *
+ * Reads from: `useUserStore` (Supabase user id), `useMondayStore` (context +
+ * session token), `useItemTimeEntriesStore` (refetch), `useToast`.
+ *
+ * @param props - Component props.
+ * @returns A {@link Modal} titled "Zeit eintragen" with the form fields and save/cancel buttons.
+ */
 export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId, roleName }: ItemManualEntryModalProps) {
 	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: true });
 	const [isSaving, setIsSaving] = useState(false);

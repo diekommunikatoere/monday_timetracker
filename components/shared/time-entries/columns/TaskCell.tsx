@@ -3,6 +3,14 @@ import { Flex, Text, Badge } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { TimeEntryRowMenu } from "../TimeEntryRowMenu";
 
+/**
+ * Props for {@link TaskCell}.
+ *
+ * @property entry    - The {@link TimeEntry} to render; reads `item_name`, `task_name`, `parent_item_name`, and `is_draft`.
+ * @property onEdit   - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the edit action.
+ * @property onDelete - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the delete action.
+ * @property style    - Optional inline style for the wrapping `Flex`.
+ */
 interface TaskCellProps {
 	entry: TimeEntry;
 	onEdit?: (entry: TimeEntry) => void;
@@ -10,6 +18,18 @@ interface TaskCellProps {
 	style?: React.CSSProperties;
 }
 
+/**
+ * Table cell renderer for the **task** column in the dashboard view.
+ *
+ * Shows a `DRAFT` badge when `entry.is_draft`, then the task name preferring
+ * `entry.item_name` and falling back to `entry.task_name` (or `"-"`), followed
+ * by the italic parent-item name when present. Renders an embedded
+ * {@link TimeEntryRowMenu} on the right that gates its own edit/delete items by
+ * ownership via {@link useTimeEntryPermissions}.
+ *
+ * @param props - {@link TaskCellProps}.
+ * @returns A `Flex` row with task text and a row-actions menu.
+ */
 export function TaskCell({ entry, onEdit, onDelete, style }: TaskCellProps) {
 	return (
 		<Flex align="center" justify="space-between" gap="xs" style={style}>

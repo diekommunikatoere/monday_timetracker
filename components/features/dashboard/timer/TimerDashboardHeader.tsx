@@ -15,6 +15,28 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 import "@/public/css/components/AppHeader.css";
 
+/**
+ * `TimerDashboardHeader` — top app header for the timer dashboard widget.
+ *
+ * Composes the brand logo, the "manual time entry" trigger, the theme toggle,
+ * and the live {@link TimerContainer}. It also mounts the modal layer for this
+ * dashboard: {@link ManualTimeEntryModal}, `SaveTimerModal`, and
+ * `EmptyCommentConfirmationModal` — the latter two being driven by
+ * `useModalStore` so the save flow can be opened from `actions.openSaveModal`
+ * inside {@link useTimer}.
+ *
+ * Reads `appTheme` from `useUserStore` to pick a `brand` (light) vs `light`
+ * (dark) logo variant, and reads timer `actions`/`state` from
+ * {@link useTimerContext} to wire the empty-comment confirmation modal's
+ * `onConfirm`/`isSaving` props.
+ *
+ * Note: the function signature declares `variant` but never destructures it, so
+ * the rendered `<header>` className always appends `undefined` (a no-op class).
+ * Kept as-is; not modified.
+ *
+ * @returns A header containing the logo, manual-entry button, theme toggle, and
+ *          timer, followed by the manual-entry, save, and empty-comment modals.
+ */
 export function TimerDashboardHeader(variant?) {
 	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
 	const { showTimerSave, closeTimerSave, showEmptyCommentConfirmation, closeEmptyCommentConfirmation } = useModalStore((s) => s);
