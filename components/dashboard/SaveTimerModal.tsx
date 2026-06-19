@@ -253,20 +253,22 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 	const handleTaskSelection = (taskData: TaskSelection) => {
 		setSelectedTask(taskData);
+		console.log("Selected task:", taskData);
 	};
 
 	const handleSave = async () => {
 		// Use draftId from initialData if provided, otherwise use current timer's draftId
 		const activeDraftId = initialData?.draftId || draftId;
 
-		if (!activeDraftId || !selectedTask || !userProfile?.id) {
+		if (!activeDraftId || !selectedTask || !userProfile?.id || !selectedTask.roleId) {
 			console.error("Cannot save: missing required data", { draftId: activeDraftId, selectedTask, userId: userProfile?.id });
+			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
 		}
 
 		const durationSeconds = durationToSeconds(duration);
 		if (durationSeconds === 0) {
-			setError("Bitte geben Sie eine Dauer ein");
+			setError("Bitte gib eine Dauer an");
 			return;
 		}
 
@@ -473,7 +475,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 						<Button variant="default" onClick={onClose}>
 							Abbrechen
 						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving}>
+						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || isSaving} loading={isSaving}>
 							{isSaving ? "Speichern..." : "Speichern"}
 						</Button>
 					</Group>

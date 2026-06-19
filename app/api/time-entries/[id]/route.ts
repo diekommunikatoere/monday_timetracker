@@ -13,18 +13,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		// Validate session
 		const authHeader = request.headers.get("authorization");
 		if (!authHeader) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+			return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
 		}
 
 		const session = verifyMondayJwt(authHeader);
 		if (!session.isValid) {
-			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+			return NextResponse.json({ error: "Ungültige Sitzung" }, { status: 401 });
 		}
 
 		// Get user profile
 		const userProfile = await getUserProfileByMondayId(session.userId);
 		if (!userProfile) {
-			return NextResponse.json({ error: "User not found" }, { status: 404 });
+			return NextResponse.json({ error: "Benutzer konnte nicht gefunden werden" }, { status: 404 });
 		}
 
 		const userId = userProfile.id;
@@ -35,6 +35,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		const { expectedUpdatedAt, ...updates } = body;
 
 		console.log("[API] Updating time entry:", id, "with updates:", updates, "by user:", userId);
+
+		const { taskName, boardId, itemId, roleId } = updates;
+
+		if (!taskName || !boardId || !itemId) {
+			return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
+		}
+
+		if (!roleId) {
+			return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
+		}
 
 		// Update time entry with optimistic locking
 		try {
@@ -54,8 +64,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 			if (error.code === "CONFLICT" || error.statusCode === 409) {
 				return NextResponse.json(
 					{
-						error: "Concurrent modification detected",
-						message: "This entry was modified by another user. Please refresh and try again.",
+						error: "Konkurrenzänderung erkannt",
+						message: "Dieser Eintrag wurde von einem anderen Benutzer geändert. Bitte aktualisieren Sie die Seite und versuchen Sie es erneut.",
 					},
 					{ status: 409 },
 				);
@@ -64,7 +74,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		}
 	} catch (error: any) {
 		console.error("[API] Error updating time entry:", error);
-		return NextResponse.json({ error: error.message || "Failed to update time entry" }, { status: 500 });
+		return NextResponse.json({ error: error.message || "Fehler beim Aktualisieren des Zeiteintrags" }, { status: 500 });
 	}
 }
 
@@ -77,18 +87,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		// Validate session
 		const authHeader = request.headers.get("authorization");
 		if (!authHeader) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+			return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
 		}
 
 		const session = verifyMondayJwt(authHeader);
 		if (!session.isValid) {
-			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+			return NextResponse.json({ error: "Ungültige Sitzung" }, { status: 401 });
 		}
 
 		// Get user profile
 		const userProfile = await getUserProfileByMondayId(session.userId);
 		if (!userProfile) {
-			return NextResponse.json({ error: "User not found" }, { status: 404 });
+			return NextResponse.json({ error: "Benutzer konnte nicht gefunden werden" }, { status: 404 });
 		}
 
 		const userId = userProfile.id;
@@ -108,10 +118,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 			success: true,
 			deleted: true,
 			undoToken,
-			message: "Entry deleted successfully",
+			message: "Eintrag erfolgreich gelöscht",
 		});
 	} catch (error: any) {
 		console.error("[API] Error deleting time entry:", error);
-		return NextResponse.json({ error: error.message || "Failed to delete time entry" }, { status: 500 });
+		return NextResponse.json({ error: error.message || "Fehler beim Löschen des Zeiteintrags" }, { status: 500 });
 	}
 }

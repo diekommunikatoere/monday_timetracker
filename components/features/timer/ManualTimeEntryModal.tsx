@@ -78,14 +78,15 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	}, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleSave = async () => {
-		if (!selectedTask?.itemId || !userProfile?.id) {
+		if (!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || !userProfile?.id) {
 			console.error("Cannot save: missing required data");
+			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
 		}
 
 		const durationSeconds = durationToSeconds(values.duration);
 		if (durationSeconds === 0) {
-			setError("Bitte geben Sie eine Dauer ein");
+			setError("Bitte gib eine Dauer an");
 			return;
 		}
 
@@ -182,7 +183,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 						<Button variant="default" onClick={onClose}>
 							Abbrechen
 						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || isSaving} loading={isSaving}>
+						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || isSaving} loading={isSaving}>
 							Speichern
 						</Button>
 					</Group>

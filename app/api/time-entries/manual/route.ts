@@ -10,17 +10,17 @@ interface ManualTimeEntryRequest {
 	userId: string;
 	taskName: string;
 	comment?: string;
-	boardId?: string;
+	boardId: string;
 	boardName?: string;
-	itemId?: string;
+	itemId: string;
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	roleId?: string;
+	roleId: string;
 	duration: number; // in seconds
 	date: string; // ISO date string (fallback)
-	startTime?: string; // ISO date-time string (preferred)
-	endTime?: string; // ISO date-time string (preferred)
+	startTime: string; // ISO date-time string (preferred)
+	endTime: string; // ISO date-time string (preferred)
 }
 
 export async function POST(request: NextRequest) {
@@ -48,11 +48,15 @@ export async function POST(request: NextRequest) {
 
 		// Validate required fields
 		if (!userId || userId !== userProfile.id) {
-			return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+			return NextResponse.json({ error: "Ungültige Benutzer-ID." }, { status: 400 });
 		}
 
-		if (!taskName) {
-			return NextResponse.json({ error: "taskName is required" }, { status: 400 });
+		if (!taskName || !boardId || !itemId) {
+			return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
+		}
+
+		if (!roleId) {
+			return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
 		}
 
 		// Determine start_time, end_time, and duration values
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
 
 			// Validate dates are valid
 			if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-				return NextResponse.json({ error: "Invalid startTime or endTime format" }, { status: 400 });
+				return NextResponse.json({ error: "Ungültiges Start- oder Endzeitformat." }, { status: 400 });
 			}
 
 			// Calculate duration from provided times
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
 
 			// Validate duration is positive
 			if (finalDuration <= 0) {
-				return NextResponse.json({ error: "End time must be after start time" }, { status: 400 });
+				return NextResponse.json({ error: "Die Endzeit muss nach der Startzeit liegen." }, { status: 400 });
 			}
 
 			finalStartTime = startDate.toISOString();
@@ -84,11 +88,11 @@ export async function POST(request: NextRequest) {
 		} else {
 			// Fallback: use date + duration (legacy behavior)
 			if (!duration || duration <= 0) {
-				return NextResponse.json({ error: "Valid duration is required" }, { status: 400 });
+				return NextResponse.json({ error: "Ungültige Dauer." }, { status: 400 });
 			}
 
 			if (!date) {
-				return NextResponse.json({ error: "Date is required" }, { status: 400 });
+				return NextResponse.json({ error: "Ungültiges Datum." }, { status: 400 });
 			}
 
 			finalStartTime = new Date(date).toISOString();
@@ -101,9 +105,9 @@ export async function POST(request: NextRequest) {
 			{
 				user_id: userId,
 				comment: comment || null,
-				board_id: boardId || null,
-				item_id: itemId || null,
-				role_id: roleId || null,
+				board_id: boardId,
+				item_id: itemId,
+				role_id: roleId,
 				duration: finalDuration,
 				start_time: finalStartTime,
 				end_time: finalEndTime,
@@ -118,7 +122,7 @@ export async function POST(request: NextRequest) {
 		);
 
 		if (!timeEntry) {
-			return NextResponse.json({ error: "Failed to create time entry" }, { status: 500 });
+			return NextResponse.json({ error: "Fehler beim Erstellen des Zeiteintrags." }, { status: 500 });
 		}
 
 		// 2. Trigger column sync after successful manual entry creation
@@ -136,6 +140,6 @@ export async function POST(request: NextRequest) {
 		});
 	} catch (error) {
 		console.error("Error in manual time entry endpoint:", error);
-		return NextResponse.json({ error: error instanceof Error ? error.message : "Internal server error" }, { status: 500 });
+		return NextResponse.json({ error: error instanceof Error ? error.message : "Interner Serverfehler" }, { status: 500 });
 	}
 }

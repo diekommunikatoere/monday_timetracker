@@ -797,7 +797,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 							Rolle auswählen
 						</Text>
 					</label>
-					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" classNames={{ option: styles.selectOption }} />
+					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" classNames={{ option: styles.selectOption }} required />
 				</div>
 			)}
 		</Flex>

@@ -4,22 +4,23 @@ import { syncAfterFinalize } from "@/lib/columnSync";
 import { roundDuration } from "@/lib/utils";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { cacheHelper } from "@/lib/redis";
 
 interface FinalizeTimeEntryRequest {
 	draftId: string;
 	taskName: string;
 	comment?: string;
-	boardId?: string;
+	boardId: string;
 	boardName?: string;
-	itemId?: string;
+	itemId: string;
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	roleId?: string;
-	duration?: number; // in seconds, optional override
-	date?: string; // ISO date string, optional override
-	startTime?: string; // ISO date-time string (preferred)
-	endTime?: string; // ISO date-time string (preferred)
+	roleId: string;
+	duration: number; // in seconds, optional override
+	date: string; // ISO date string, optional override
+	startTime: string; // ISO date-time string (preferred)
+	endTime: string; // ISO date-time string (preferred)
 }
 
 export async function POST(request: NextRequest) {
@@ -50,8 +51,12 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "draftId is required" }, { status: 400 });
 		}
 
-		if (!taskName) {
-			return NextResponse.json({ error: "taskName is required" }, { status: 400 });
+		if (!taskName || !boardId || !itemId) {
+			return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
+		}
+
+		if (!roleId) {
+			return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
 		}
 
 		// If duration and date are provided, update the draft entry first
@@ -128,6 +133,10 @@ export async function POST(request: NextRequest) {
 				console.error("[ColumnSync] Background sync failed:", syncError);
 			});
 		}
+
+		// Invalidate relevant cache keys
+		await cacheHelper.del(`time_entry:${draftId}`);
+		await cacheHelper.clearPattern("time_entry:*");
 
 		return NextResponse.json({
 			success: true,
