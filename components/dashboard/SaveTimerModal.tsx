@@ -320,24 +320,27 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 			showToast("Zeiteintrag gespeichert.", "positive", 2000);
 
-			// Soft reset timer via API (keeps time entry but clears session)
-			if (sessionId) {
-				await fetch("/api/timer/soft-reset", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"monday-context": JSON.stringify(context),
-						Authorization: `Bearer ${sessionToken}`,
-					},
-					body: JSON.stringify({
-						draftId: activeDraftId,
-						sessionId,
-					}),
-				});
-			}
+			// Only reset the timer if we are saving the live session without initialData; if initialData is present we are saving from the time entries table and should not reset the timer session
+			if (!initialData) {
+				// Soft reset timer via API (keeps time entry but clears session)
+				if (sessionId) {
+					await fetch("/api/timer/soft-reset", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"monday-context": JSON.stringify(context),
+							Authorization: `Bearer ${sessionToken}`,
+						},
+						body: JSON.stringify({
+							draftId: activeDraftId,
+							sessionId,
+						}),
+					});
+				}
 
-			// Reset local timer state
-			resetTimer();
+				// Reset local timer state
+				resetTimer();
+			}
 
 			// Refetch time entries to show the new one
 			refetch(userProfile.id);
