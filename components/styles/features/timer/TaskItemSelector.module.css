@@ -52,3 +52,10 @@
 		}
 	}
 }
+
+.labelRequired {
+	color: var(--color--text-error);
+	margin-left: 4px;
+	font-size: 0.75rem;
+	line-height: 1;
+}

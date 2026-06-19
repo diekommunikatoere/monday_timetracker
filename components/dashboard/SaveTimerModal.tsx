@@ -425,7 +425,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 						</Flex>
 						<Flex gap="sm">
 							<TimeInput label="Dauer" withAsterisk value={duration} onChange={(event) => setDuration(event.currentTarget.value)} style={{ flex: 2 }} />
-							<DatePicker label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
+							<DatePicker label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
 						</Flex>
 						<Flex gap="sm">
 							<ButtonGroup flex={2}>

@@ -725,28 +725,26 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			{/* Board Selector with skeleton loading */}
 			{loadingBoards ? (
 				<div>
-					<Text size="sm" fw={500} mb={4}>
+					<Text size="sm" fw={500}>
 						Board auswählen
 					</Text>
 					<Skeleton height={36} radius="sm" />
 				</div>
 			) : (
 				<div>
-					<label htmlFor="board-selector" style={{ marginBottom: 0 }}>
-						<Text size="sm" fw={500} mb={4}>
+					<label htmlFor="board-selector">
+						<Text size="sm" fw={500} span>
 							Board auswählen
 						</Text>
 					</label>
-					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" classNames={{ option: styles.selectOption }} />
+					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" classNames={{ option: styles.selectOption }} required />
 				</div>
 			)}
 
-			{/* OPTIMIZATION: Task Selector - Always render dropdown immediately */}
-			{/* Removed skeleton blocking - dropdown is interactive from the start */}
 			<div>
-				<Flex justify="space-between" align="center" mb={4}>
-					<label htmlFor="task-selector" style={{ marginBottom: 0 }}>
-						<Text size="sm" fw={500}>
+				<Flex justify="space-between" align="center">
+					<label htmlFor="task-selector">
+						<Text size="sm" fw={500} span>
 							Aufgabe auswählen
 						</Text>
 					</label>
@@ -779,21 +777,22 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					// Show loading indicator for initial load or background refetch
 					rightSection={isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? <Loader size={14} /> : undefined}
 					classNames={{ option: styles.selectOption }}
+					required
 				/>
 			</div>
 
 			{/* Role Selector with skeleton loading */}
 			{loadingRoles ? (
 				<div>
-					<Text size="sm" fw={500} mb={4}>
+					<Text size="sm" fw={500}>
 						Rolle auswählen
 					</Text>
 					<Skeleton height={36} radius="sm" />
 				</div>
 			) : (
 				<div>
-					<label htmlFor="role-selector" style={{ marginBottom: 0 }}>
-						<Text size="sm" fw={500} mb={4}>
+					<label htmlFor="role-selector">
+						<Text size="sm" fw={500} span>
 							Rolle auswählen
 						</Text>
 					</label>

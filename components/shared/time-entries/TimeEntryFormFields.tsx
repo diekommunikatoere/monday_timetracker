@@ -166,7 +166,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						if (newDate) onDateChange(new Date(newDate));
 					}}
 					valueFormat="DD.MM.YYYY"
-					leftSection={<Icon name="calendar" size={16} color="var(--color--tertiary)" />}
+					leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />}
 					leftSectionPointerEvents="none"
 					style={{ flex: 1 }}
 				/>

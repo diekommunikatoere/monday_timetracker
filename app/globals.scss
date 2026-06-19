@@ -73,7 +73,10 @@ p {
 label {
 	display: block;
 	width: 100%;
+	color: var(--color--text-primary);
 	margin-bottom: 0.5rem;
+	font-size: var(--input-label-size, var(--mantine-font-size-sm));
+	line-height: var(--mantine-line-height);
 }
 
 .dropdown {

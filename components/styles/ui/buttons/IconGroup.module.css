@@ -3,7 +3,7 @@
 
 	&:disabled {
 		cursor: not-allowed;
-		background-color: var(--color--tertiary-light);
+		background-color: var(--color--background-disabled);
 	}
 
 	&[data-variant="filled"] {
