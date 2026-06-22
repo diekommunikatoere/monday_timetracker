@@ -18,6 +18,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { cacheHelper } from "@/lib/redis";
+import { SELF_EDITABLE_TIME_ENTRY_FIELDS } from "@/lib/permissions";
 import type { Database, FinalizeSegmentResult } from "@/types/database";
 import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
 import { roundDuration } from "./utils";
@@ -913,11 +914,20 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 		cleanUpdates.duration = roundDuration(cleanUpdates.duration);
 	}
 
+	// Whitelist the columns a user may change. cleanUpdates still holds whatever
+	// the client sent (minus dimension fields); copying only allowed keys keeps
+	// system columns (user_id, is_draft, deleted_*, synced_to_monday, created_at)
+	// unreachable from the request body. Runs last so the board/duration fixes above are included.
+	const updatePayload: TimeEntryUpdate = {};
+	for (const field of SELF_EDITABLE_TIME_ENTRY_FIELDS) {
+		if (field in cleanUpdates) (updatePayload as any)[field] = (cleanUpdates as any)[field];
+	}
+
 	// Update entry
 	const { data, error } = await supabaseAdmin
 		.from("time_entry")
 		.update({
-			...cleanUpdates,
+			...updatePayload,
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", id)

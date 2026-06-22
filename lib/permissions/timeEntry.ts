@@ -4,6 +4,9 @@
 // the internal Supabase `user_profiles.id`, not the monday user id.
 
 import { TimeEntry } from "@/types/time-entry";
+import { Database } from "@/types/database";
+
+type TimeEntryColumn = keyof Database["public"]["Tables"]["time_entry"]["Update"];
 
 /**
  * Fine-grained permission flags for a single {@link TimeEntry}, evaluated
@@ -52,3 +55,13 @@ export function getTimeEntryPermissions(entry: TimeEntry, currentUserId: string 
 		canBulkSelect: !!isOwner,
 	};
 }
+
+/**
+ * Columns a user may change on their OWN time entry. System-managed columns
+ * (user_id, is_draft, deleted_*, synced_to_monday, created_at, updated_at, id,
+ * timer_session) are intentionally excluded — see updateTimeEntry in lib/database.ts.
+ *
+ * Future: a PRIVILEGED_EDITABLE_TIME_ENTRY_FIELDS superset (adds "user_id" for
+ * reassignment) will be selected here based on group permissions.
+ */
+export const SELF_EDITABLE_TIME_ENTRY_FIELDS = ["board_id", "item_id", "role_id", "comment", "duration", "start_time", "end_time"] as const satisfies readonly TimeEntryColumn[];
