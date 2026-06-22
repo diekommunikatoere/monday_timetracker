@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { Logo } from "@/components/Logo";
 import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
-
-console.log("DashboardPage component loaded");
 
 export default function DashboardPage() {
 	// Get user and time entries state
@@ -21,13 +18,7 @@ export default function DashboardPage() {
 
 	// Initialize Monday context on mount
 	useEffect(() => {
-		console.log("Initializing Monday context...");
 		initializeMondayContext()
-			.then(() => {
-				console.log("Monday user initialized: ", useUserStore.getState().mondayUser);
-				console.log("Supabase user initialized: ", useUserStore.getState().supabaseUser);
-				console.log("Monday context initialization complete.");
-			})
 			.catch((err) => console.error("Error initializing Monday context:", err));
 	}, [initializeMondayContext]);
 

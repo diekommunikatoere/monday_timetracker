@@ -1,5 +1,5 @@
 // components/shared/hooks/useTimer.ts
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
 import { useModalStore } from "@/stores/modalStore";

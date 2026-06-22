@@ -1,7 +1,7 @@
 // components/shared/time-entries/TimeEntryTable.tsx
 "use client";
 
-import { Table, Checkbox, Center, Loader, ScrollArea, Text } from "@mantine/core";
+import { Table, Center, Loader, Text } from "@mantine/core";
 import { TimeEntry } from "@/types/time-entry";
 import { useMemo } from "react";
 import { ColumnDef } from "@/components/ui/tables/types";

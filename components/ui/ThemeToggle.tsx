@@ -5,7 +5,7 @@
 
 import { Tooltip } from "@mantine/core";
 import { useUserStore } from "@/stores/userStore";
-import { Icon, IconButton } from "@/components";
+import { IconButton } from "@/components";
 import LightIcon from "@/components/icons/Light";
 import DarkIcon from "@/components/icons/Dark";
 

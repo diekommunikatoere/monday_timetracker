@@ -1,7 +1,7 @@
 // components/sidebar/ItemTimeEntriesView.tsx
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accordion, Avatar } from "@mantine/core";
 import { Icon } from "@/components";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";

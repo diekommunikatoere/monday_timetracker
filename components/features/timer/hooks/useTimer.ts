@@ -483,8 +483,6 @@ export function useTimer(): UseTimerReturn {
 			reset: async () => {
 				if (!userProfile?.id || !draftId || !sessionId) return;
 
-				console.log("Resetting timer with sessionId:", sessionId, "and draftId:", draftId);
-
 				try {
 					store.setError(null);
 

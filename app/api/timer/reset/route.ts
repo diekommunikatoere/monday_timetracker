@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 	try {
 		// Validate session
 		const authHeader = request.headers.get("authorization");
-		console.log("Received reset request with auth header:", authHeader);
+		console.log("Received reset request.");
 		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}

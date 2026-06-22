@@ -20,7 +20,7 @@
 
 import { ApiClient, ClientError } from "@mondaydotcomorg/api";
 import { cacheHelper } from "../redis";
-import { SyncColumnType, SyncPurpose, TimeFormat } from "@/types/database";
+import { SyncPurpose, TimeFormat } from "@/types/database";
 import { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose } from "./utils";
 
 // Re-export shared utilities for convenience
@@ -130,11 +130,8 @@ export async function getBoardColumns(boardId: string): Promise<MondayColumnOpti
 	// Try cache first
 	const cached = await cacheHelper.get<MondayColumnOption[]>(cacheKey);
 	if (cached) {
-		console.log(`[getBoardColumns] Cache HIT for board ${boardId} - ${Date.now() - startTime}ms`);
 		return cached;
 	}
-
-	console.log(`[getBoardColumns] Cache MISS for board ${boardId} - fetching from API`);
 
 	const query = `
 		query GetBoardColumns($boardId: ID!) {

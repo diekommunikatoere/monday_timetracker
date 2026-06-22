@@ -116,12 +116,9 @@ export const useUserStore = create<UserState>()(
 					theme: mondayTheme,
 					appTheme,
 				});
-
-				console.log(`[setMondayUser] Theme initialized: ${mondayTheme} -> ${appTheme}`);
 			},
 			/** Derive `supabaseUser` from the already-loaded monday user; no-op until authenticated. */
 			setSupabaseUser: () => {
-				console.log("Setting Supabase user...");
 				if (!useUserStore.getState().mondayUser || !useUserStore.getState().authenticated) return;
 
 				const user = {
@@ -129,7 +126,6 @@ export const useUserStore = create<UserState>()(
 					email: useUserStore.getState().mondayUser!.email || "",
 				};
 				set({ supabaseUser: user });
-				console.log("Supabase user set:", user);
 			},
 			toggleTheme: async () => {
 				const currentTheme = get().theme;

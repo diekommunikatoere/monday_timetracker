@@ -1,7 +1,7 @@
 // components/dashboard/TimeEntriesTable.tsx
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Flex } from "@mantine/core";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";

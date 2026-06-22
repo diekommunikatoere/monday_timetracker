@@ -48,8 +48,6 @@ export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAcc
 
 	// If user exists, update them with latest info (including teams) and return
 	if (existingUser && !findError) {
-		console.log(`✅ Found existing user: ${existingUser.id}, updating profile...`);
-
 		const updates: any = {
 			updated_at: new Date().toISOString(),
 		};
@@ -78,8 +76,6 @@ export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAcc
 	}
 
 	// User doesn't exist - create new one
-	console.log(`📝 Creating new user for Monday ID: ${mondayUserId}`);
-
 	const newUser: UserProfileInsert = {
 		id: crypto.randomUUID(), // Generate Supabase user ID
 		monday_user_id: mondayUserId,
@@ -98,7 +94,6 @@ export async function findOrCreateUserByMondayId(mondayUserId: string, mondayAcc
 		throw createError;
 	}
 
-	console.log(`✅ Created new user: ${createdUser.id}`);
 	return createdUser;
 }
 

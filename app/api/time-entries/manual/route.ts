@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
 import { syncAfterFinalize } from "@/lib/columnSync";
 import { insertTimeEntry } from "@/lib/database";
 import { roundDuration } from "@/lib/utils";

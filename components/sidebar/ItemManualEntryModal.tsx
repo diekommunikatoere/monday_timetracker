@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Group, Flex, Text } from "@mantine/core";
-import { Button, Modal, Select } from "@/components";
+import { Button, Modal } from "@/components";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";

@@ -10,8 +10,6 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
 import { APP_VERSION } from "@/lib/version";
 
-console.log("DashboardPage component loaded");
-
 export default function DashboardPage() {
 	// Get user and time entries state
 	const userId = useUserStore((state) => state.supabaseUser?.id);
@@ -22,13 +20,7 @@ export default function DashboardPage() {
 
 	// Initialize Monday context on mount
 	useEffect(() => {
-		console.log("Initializing Monday context...");
 		initializeMondayContext()
-			.then(() => {
-				console.log("Monday user initialized: ", useUserStore.getState().mondayUser);
-				console.log("Supabase user initialized: ", useUserStore.getState().supabaseUser);
-				console.log("Monday context initialization complete.");
-			})
 			.catch((err) => console.error("Error initializing Monday context:", err));
 	}, [initializeMondayContext]);
 

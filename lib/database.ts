@@ -330,7 +330,6 @@ export async function getAllTimeEntries(): Promise<TimeEntry[]> {
 	// Try cache first
 	const cached = await cacheHelper.get<TimeEntry[]>(cacheKey);
 	if (cached) {
-		console.log("✅ Cache hit: getAllTimeEntries");
 		return cached;
 	}
 
@@ -344,7 +343,6 @@ export async function getAllTimeEntries(): Promise<TimeEntry[]> {
 
 	// Cache the result
 	await cacheHelper.set(cacheKey, result.data, CACHE_TTL);
-	console.log(`💾 Cached: getAllTimeEntries (${result.count} entries in ${result.batches} batches)`);
 
 	return result.data;
 }
@@ -365,7 +363,6 @@ export async function getTimeEntryById(id: string): Promise<TimeEntry | null> {
 	// Try cache first
 	const cached = await cacheHelper.get<TimeEntry>(cacheKey);
 	if (cached) {
-		console.log(`✅ Cache hit: getTimeEntryById(${id})`);
 		return cached;
 	}
 
@@ -576,8 +573,6 @@ export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert
 	if (!sessionData.user_id) {
 		throw new Error("user_id is required");
 	}
-
-	console.log("Upserting timer session with data:", sessionData);
 
 	// Ensure required fields for insert
 	// NOTE: Do NOT pass start_time - let database use DEFAULT NOW() for timestamp consistency

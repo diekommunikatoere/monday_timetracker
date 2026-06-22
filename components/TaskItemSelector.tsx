@@ -309,7 +309,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 								queryFn: () => fetchTasks(board.value),
 								staleTime: 5 * 60 * 1000, // 5 minutes
 							});
-							console.log(`[TaskItemSelector] Prefetched tasks for board ${board.value}`);
 						} catch (err) {
 							console.warn(`[TaskItemSelector] Failed to prefetch board ${board.value}:`, err);
 							// Continue with next board even if one fails
@@ -373,8 +372,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	useEffect(() => {
 		if (!selectedBoard?.value) return;
 
-		console.log(`[TaskItemSelector] Subscribing to realtime changes for board ${selectedBoard.value}`);
-
 		const itemChannel = supabase
 			.channel(`tasks-${selectedBoard.value}`)
 			.on(
@@ -386,7 +383,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					filter: `board_id=eq.${selectedBoard.value}`,
 				},
 				(payload) => {
-					console.log("[TaskItemSelector] Task change detected via Realtime:", payload.eventType);
 					// Invalidate React Query cache to trigger refetch from fast DB-backed API
 					queryClient.invalidateQueries({
 						queryKey: ["tasks", selectedBoard.value],
@@ -406,7 +402,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					filter: `board_id=eq.${selectedBoard.value}`,
 				},
 				(payload) => {
-					console.log("[TaskItemSelector] Group change detected via Realtime:", payload.eventType);
 					// Invalidate React Query cache to trigger refetch
 					queryClient.invalidateQueries({
 						queryKey: ["tasks", selectedBoard.value],
@@ -416,7 +411,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			.subscribe();
 
 		return () => {
-			console.log(`[TaskItemSelector] Unsubscribing from realtime changes for board ${selectedBoard.value}`);
 			supabase.removeChannel(itemChannel);
 			supabase.removeChannel(groupChannel);
 		};

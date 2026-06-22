@@ -1,8 +1,5 @@
 import { IconComponentProps } from "@/components/ui/icons/types";
 
-import AddIcon from "@material-symbols/svg-400/rounded/add.svg";
-import AddIconBold from "@material-symbols/svg-700/rounded/add.svg";
-
 export default function Add({ size = 24, color = "#282616", weight = "default", className }: IconComponentProps) {
 	switch (weight) {
 		case "bold":

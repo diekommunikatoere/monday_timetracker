@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserTimeEntries } from "@/lib/database";
-import { findOrCreateUserByMondayId, getUserProfileByMondayId } from "@/lib/database/users";
+import { getUserProfileByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 
 export async function GET(request: NextRequest) {

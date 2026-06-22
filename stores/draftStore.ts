@@ -83,8 +83,6 @@ export const useDraftStore = create<DraftState>()(
 						const sessionToken = useMondayStore.getState().sessionToken;
 						if (!sessionToken) return;
 
-						console.log("Auto-saving draft via API:", { comment, sessionId });
-
 						const response = await fetch("/api/timer/draft", {
 							method: "PATCH",
 							headers: {
@@ -142,7 +140,6 @@ export const useDraftStore = create<DraftState>()(
 					}
 
 					const data = await response.json();
-					console.log("Draft finalized:", data);
 
 					if (onSaved) {
 						onSaved();

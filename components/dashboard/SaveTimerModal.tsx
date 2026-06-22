@@ -253,7 +253,6 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 	const handleTaskSelection = (taskData: TaskSelection) => {
 		setSelectedTask(taskData);
-		console.log("Selected task:", taskData);
 	};
 
 	const handleSave = async () => {
