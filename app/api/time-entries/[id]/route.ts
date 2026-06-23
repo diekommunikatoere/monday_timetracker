@@ -36,13 +36,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 		console.log("[API] Updating time entry:", id, "with updates:", updates, "by user:", userId);
 
-		const { taskName, boardId, itemId, roleId } = updates;
+		const { board_id, item_id, role_id } = updates;
 
-		if (!taskName || !boardId || !itemId) {
+		if (!board_id || !item_id) {
 			return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
 		}
 
-		if (!roleId) {
+		if (!role_id) {
 			return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
 		}
 
