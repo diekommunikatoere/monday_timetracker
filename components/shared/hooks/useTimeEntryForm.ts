@@ -29,96 +29,103 @@ export interface TimeEntryFormValues {
 }
 
 /**
+ * Mutually-exclusive time anchor for the form.
+ *
+ * - `"none"` — free state: editing a time recomputes the duration; editing the
+ *   duration moves the end time. Matches the historical "unlocked" behavior.
+ * - `"start"` — the start time is the fixed reference; editing the duration
+ *   pushes the end into the future.
+ * - `"end"` — the end time is the fixed reference; editing the duration pushes
+ *   the start into the past.
+ *
+ * `durationLocked` may only be `true` when the anchor is `"start"` or `"end"`.
+ */
+export type TimeAnchor = "none" | "start" | "end";
+
+/**
  * Options accepted by {@link useTimeEntryForm}.
  *
- * @property initialValues    - Partial overrides for any {@link TimeEntryFormValues} field; omitted fields fall back to sensible defaults (`new Date()`, `"00:00"`, the current local time).
- * @property onValuesChange    - Optional listener fired whenever the composed `values` object changes; receives the full {@link TimeEntryFormValues}.
- * @property isEnabled         - Master kill-switch; when `false`, the live end-time auto-tick effect is disabled. Defaults to `true`.
- * @property initialIsLocked   - Whether the end time starts in live-tracking mode (see `isLocked` on the hook's return). Defaults to `true`.
+ * @property initialValues         - Partial overrides for any {@link TimeEntryFormValues} field; omitted fields fall back to sensible defaults (`new Date()`, `"00:00"`, the current local time).
+ * @property onValuesChange        - Optional listener fired whenever the composed `values` object changes; receives the full {@link TimeEntryFormValues}.
+ * @property initialAnchor         - Initial {@link TimeAnchor}. Defaults to `"none"` (free).
+ * @property initialDurationLocked - Whether the duration starts locked. Ignored (forced to `false`) when `initialAnchor === "none"`. Defaults to `false`.
  */
 export interface UseTimeEntryFormOptions {
 	initialValues?: Partial<TimeEntryFormValues>;
 	onValuesChange?: (values: TimeEntryFormValues) => void;
-	isEnabled?: boolean;
-	initialIsLocked?: boolean;
+	initialAnchor?: TimeAnchor;
+	initialDurationLocked?: boolean;
 }
 
 /**
  * Controlled-state hook backing the time-entry edit form.
  *
  * Holds `date`, `duration`, `startTime`, `endTime`, and `comment` and keeps
- * them **mutually consistent** as the user edits any one of them:
+ * them **mutually consistent** (`endTime = startTime + duration`, clamped at 0)
+ * as the user edits any one of them. Consistency is driven by two pieces of
+ * lock state:
  *
- * - When **locked** (the default), `endTime` ticks forward automatically every
- *   10 seconds to the current local time, and `duration` is held constant
- *   while `startTime` is shifted backwards to match. This emulates a live
- *   running timer.
- * - When **unlocked**, editing `duration` recomputes `endTime` from
- *   `startTime + duration`; editing either time recomputes `duration`.
- * - Any manual edit of a time field **unlocks** the end time (live tracking
- *   stops) so the user's explicit value wins.
+ * - A mutually-exclusive **anchor** ({@link TimeAnchor}) pins one boundary as
+ *   the fixed reference. Editing the duration moves the *other* boundary
+ *   (`"end"` → start moves into the past; `"start"`/`"none"` → end moves into
+ *   the future). The anchored time field is rendered read-only by
+ *   {@link TimeEntryFormFields}; its "now" button is the explicit escape hatch.
+ * - **`durationLocked`** freezes the duration (only allowed when an anchor is
+ *   set) so the start/end window slides as a unit: editing either time moves
+ *   the other to keep the duration constant.
+ *
+ * Locks **pin the current value** — they do not advance it to "now". "Now" is
+ * produced only by the open-time default the caller passes to {@link reset} and
+ * by the per-field "now" buttons; there is no live tick.
  *
  * All arithmetic uses the helpers from `lib/time` (e.g.
  * `calculateDurationBetweenTimes`, `addSecondsToTimeString`), which work on
  * `"HH:MM"` strings and **seconds** and wrap around midnight — a multi-day
  * interval is therefore **not** representable here (max ~24h).
  *
- * A `useRef<"duration" | "times" | "lock" | "reset" | null>` ("`updateSource`")
- * guards against feedback loops so internal state-machine updates don't double
- * back and overwrite the field the user is editing.
+ * A `useRef<"duration" | "times" | "reset" | null>` ("`updateSource`") guards
+ * against feedback loops so internal state-machine updates don't double back
+ * and overwrite the field the user is editing.
  *
  * Consumed by {@link TimeEntryFormFields}; cross-link it for the rendered UI.
  *
  * @param options - {@link UseTimeEntryFormOptions}; defaults to an empty object.
  * @returns An object with:
  *   - `values` — memoized {@link TimeEntryFormValues} snapshot (`date`, `duration`, `startTime`, `endTime`, `comment`);
- *   - `isLocked` — boolean, whether `endTime` is live-tracking now;
+ *   - `anchor` — the current {@link TimeAnchor};
+ *   - `durationLocked` — whether the duration is frozen;
  *   - `handlers` — memoized action set: `setDate`, `setComment`,
  *     `handleStartTimeChange`, `handleEndTimeChange`, `handleDurationChange`
  *     (all accept `"HH:MM"` strings), `adjustDuration(minutes)` (adds/subtracts
  *     whole **minutes**, clamped at 0), `handleStartTimeNow` /
- *     `handleEndTimeNow` (snap to current local time), `toggleLock`, and
- *     `reset(newValues, newIsLocked?)` which replaces the whole form and
- *     bypasses the sync effects for one cycle.
+ *     `handleEndTimeNow` (snap to current local time), `toggleStartLock` /
+ *     `toggleEndLock` / `toggleDurationLock`, and
+ *     `reset(newValues, newAnchor?, newDurationLocked?)` which replaces the
+ *     whole form and bypasses the sync effect for one cycle.
  */
 export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
-	const { isEnabled = true, initialIsLocked = true } = options;
+	const { initialAnchor = "none", initialDurationLocked = false } = options;
 	const [date, setDate] = useState<Date>(options.initialValues?.date || new Date());
 	const [duration, setDuration] = useState(options.initialValues?.duration || "00:00");
 	const [startTime, setStartTime] = useState(options.initialValues?.startTime || getCurrentTimeString());
 	const [endTime, setEndTime] = useState(options.initialValues?.endTime || getCurrentTimeString());
 	const [comment, setComment] = useState(options.initialValues?.comment || "");
-	const [isLocked, setIsLocked] = useState(initialIsLocked);
+	const [anchor, setAnchor] = useState<TimeAnchor>(initialAnchor);
+	const [durationLocked, setDurationLocked] = useState<boolean>(initialAnchor === "none" ? false : initialDurationLocked);
 
-	const updateSource = useRef<"duration" | "times" | "lock" | "reset" | null>(null);
+	const updateSource = useRef<"duration" | "times" | "reset" | null>(null);
 
-	// Live update for locked end time
+	// Sync: when the duration changes (input or quick-adjust), move the boundary
+	// opposite the anchor — end-anchored moves the start, start/none moves the end.
+	// Editing a time field sets the "times" source so this effect skips that cycle.
 	useEffect(() => {
-		if (!isLocked || !isEnabled) return;
-
-		const interval = setInterval(() => {
-			const currentTime = getCurrentTimeString();
-			if (currentTime !== endTime) {
-				updateSource.current = "lock";
-				setEndTime(currentTime);
-				// When end time updates automatically, we need to update start time based on duration
-				const durationSeconds = durationToSeconds(duration);
-				setStartTime(subtractSecondsFromTimeString(currentTime, durationSeconds));
-			}
-		}, 10000); // Check every 10 seconds
-
-		return () => clearInterval(interval);
-	}, [isLocked, endTime, duration, isEnabled]);
-
-	// Sync: When duration changes (from input or buttons), update start_time (if locked) or end_time (if unlocked)
-	useEffect(() => {
-		if (updateSource.current === "times" || updateSource.current === "lock" || updateSource.current === "reset") {
+		if (updateSource.current === "times" || updateSource.current === "reset") {
 			if (updateSource.current !== "reset") updateSource.current = null;
 			return;
 		}
 
 		const durationSeconds = durationToSeconds(duration);
-		if (isLocked) {
+		if (anchor === "end") {
 			const newStartTime = subtractSecondsFromTimeString(endTime, durationSeconds);
 			updateSource.current = "duration";
 			setStartTime(newStartTime);
@@ -127,30 +134,40 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 			updateSource.current = "duration";
 			setEndTime(newEndTime);
 		}
-	}, [duration, isLocked, endTime, startTime]);
+	}, [duration, anchor, endTime, startTime]);
 
 	const handleStartTimeChange = useCallback(
 		(val: string) => {
-			setStartTime(val);
 			updateSource.current = "times";
-			const newDurationSeconds = calculateDurationBetweenTimes(val, endTime);
-			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
-			// Manual edit unlocks the end time
-			if (isLocked) setIsLocked(false);
+			setStartTime(val);
+			if (durationLocked) {
+				// Window slides: keep duration, move the end with the start.
+				const durationSeconds = durationToSeconds(duration);
+				setEndTime(addSecondsToTimeString(val, durationSeconds));
+			} else {
+				// Recompute the duration; the end stays put.
+				const newDurationSeconds = calculateDurationBetweenTimes(val, endTime);
+				setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
+			}
 		},
-		[endTime, isLocked],
+		[endTime, duration, durationLocked],
 	);
 
 	const handleEndTimeChange = useCallback(
 		(val: string) => {
-			setEndTime(val);
 			updateSource.current = "times";
-			const newDurationSeconds = calculateDurationBetweenTimes(startTime, val);
-			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
-			// Manual edit unlocks the end time
-			if (isLocked) setIsLocked(false);
+			setEndTime(val);
+			if (durationLocked) {
+				// Window slides: keep duration, move the start with the end.
+				const durationSeconds = durationToSeconds(duration);
+				setStartTime(subtractSecondsFromTimeString(val, durationSeconds));
+			} else {
+				// Recompute the duration; the start stays put.
+				const newDurationSeconds = calculateDurationBetweenTimes(startTime, val);
+				setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
+			}
 		},
-		[startTime, isLocked],
+		[startTime, duration, durationLocked],
 	);
 
 	const handleDurationChange = useCallback((val: string) => {
@@ -168,6 +185,8 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 		[duration],
 	);
 
+	// "Now" buttons override the read-only anchor field without clearing the lock.
+	// Functionally identical to a manual edit, which already preserves the anchor.
 	const handleStartTimeNow = useCallback(() => {
 		handleStartTimeChange(getCurrentTimeString());
 	}, [handleStartTimeChange]);
@@ -176,19 +195,38 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 		handleEndTimeChange(getCurrentTimeString());
 	}, [handleEndTimeChange]);
 
-	const toggleLock = useCallback(() => {
-		setIsLocked(!isLocked);
-	}, [isLocked]);
+	const toggleStartLock = useCallback(() => {
+		if (durationLocked) {
+			return; // can't toggle anchor when duration is locked
+		}
+		setAnchor((prev) => (prev === "start" ? "none" : "start"));
+	}, [durationLocked]);
 
-	const reset = useCallback((newValues: TimeEntryFormValues, newIsLocked?: boolean) => {
+	const toggleEndLock = useCallback(() => {
+		if (durationLocked) {
+			return; // can't toggle anchor when duration is locked
+		}
+		setAnchor((prev) => (prev === "end" ? "none" : "end"));
+	}, [durationLocked]);
+
+	const toggleDurationLock = useCallback(() => {
+		anchor === "end" ? toggleEndLock() : anchor === "start" ? toggleStartLock() : null;
+		setDurationLocked((prev) => !prev);
+	}, [anchor, durationLocked]);
+
+	const reset = useCallback((newValues: TimeEntryFormValues, newAnchor?: TimeAnchor, newDurationLocked?: boolean) => {
 		updateSource.current = "reset";
 		setDate(newValues.date);
 		setDuration(newValues.duration);
 		setStartTime(newValues.startTime);
 		setEndTime(newValues.endTime);
 		setComment(newValues.comment);
-		if (newIsLocked !== undefined) {
-			setIsLocked(newIsLocked);
+		if (newAnchor !== undefined) {
+			setAnchor(newAnchor);
+			// Duration-lock requires an anchor; clear it when resetting to free.
+			setDurationLocked(newAnchor === "none" ? false : (newDurationLocked ?? false));
+		} else if (newDurationLocked !== undefined) {
+			setDurationLocked(newDurationLocked);
 		}
 		// Clear the reset flag after a short delay to allow effects to skip
 		setTimeout(() => {
@@ -219,15 +257,18 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 			adjustDuration,
 			handleStartTimeNow,
 			handleEndTimeNow,
-			toggleLock,
+			toggleStartLock,
+			toggleEndLock,
+			toggleDurationLock,
 			reset,
 		}),
-		[setDate, setComment, handleStartTimeChange, handleEndTimeChange, handleDurationChange, adjustDuration, handleStartTimeNow, handleEndTimeNow, toggleLock, reset],
+		[setDate, setComment, handleStartTimeChange, handleEndTimeChange, handleDurationChange, adjustDuration, handleStartTimeNow, handleEndTimeNow, toggleStartLock, toggleEndLock, toggleDurationLock, reset],
 	);
 
 	return {
 		values,
-		isLocked,
+		anchor,
+		durationLocked,
 		handlers: handlersObject,
 	};
 }

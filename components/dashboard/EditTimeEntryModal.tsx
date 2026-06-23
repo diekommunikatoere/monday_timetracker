@@ -59,7 +59,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
+	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "none" });
 
 	const { refetch } = useTimeEntriesStore();
 	const { showToast } = useToast();
@@ -80,6 +80,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 					duration: secondsToDuration(entry.duration),
 					comment: entry.comment || "",
 				},
+				"none",
 				false,
 			);
 
@@ -180,8 +181,12 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 						onEndTimeChange={handlers.handleEndTimeChange}
 						comment={values.comment}
 						onCommentChange={handlers.setComment}
-						isLocked={isLocked}
-						onLockToggle={handlers.toggleLock}
+						startLocked={anchor === "start"}
+						endLocked={anchor === "end"}
+						durationLocked={durationLocked}
+						onStartLockToggle={handlers.toggleStartLock}
+						onEndLockToggle={handlers.toggleEndLock}
+						onDurationLockToggle={handlers.toggleDurationLock}
 						onStartTimeNowClick={handlers.handleStartTimeNow}
 						onEndTimeNowClick={handlers.handleEndTimeNow}
 						quickAdjustments={{

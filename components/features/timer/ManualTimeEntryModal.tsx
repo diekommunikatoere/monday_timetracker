@@ -9,7 +9,7 @@ import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
-import { combineDateAndTime, durationToSeconds } from "@/lib/utils";
+import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
 import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../../shared/hooks/useTimeEntryForm";
 import mondaySdk from "monday-sdk-js";
@@ -59,19 +59,18 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: false });
+	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
 
 	const { refetch } = useTimeEntriesStore();
 	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
-	// Reset form when modal opens
+	// Reset form when modal opens: default end-locked at "now" with zero duration.
 	useEffect(() => {
 		if (show) {
-			handlers.setDate(new Date());
-			handlers.handleDurationChange("00:00");
-			handlers.setComment("");
+			const now = getCurrentTimeString();
+			handlers.reset({ date: new Date(), duration: "00:00", startTime: now, endTime: now, comment: "" }, "end", false);
 			setSelectedTask(null);
 			setError(null);
 		}
@@ -156,8 +155,12 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 						onEndTimeChange={handlers.handleEndTimeChange}
 						comment={values.comment}
 						onCommentChange={handlers.setComment}
-						isLocked={isLocked}
-						onLockToggle={handlers.toggleLock}
+						startLocked={anchor === "start"}
+						endLocked={anchor === "end"}
+						durationLocked={durationLocked}
+						onStartLockToggle={handlers.toggleStartLock}
+						onEndLockToggle={handlers.toggleEndLock}
+						onDurationLockToggle={handlers.toggleDurationLock}
 						onStartTimeNowClick={handlers.handleStartTimeNow}
 						onEndTimeNowClick={handlers.handleEndTimeNow}
 						quickAdjustments={{

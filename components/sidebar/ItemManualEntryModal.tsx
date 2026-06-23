@@ -10,7 +10,7 @@ import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
-import { combineDateAndTime, durationToSeconds } from "@/lib/utils";
+import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import mondaySdk from "monday-sdk-js";
@@ -73,7 +73,7 @@ export interface ItemManualEntryModalProps {
  * @returns A {@link Modal} titled "Zeit eintragen" with the form fields and save/cancel buttons.
  */
 export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId, roleName }: ItemManualEntryModalProps) {
-	const { values, isLocked, handlers } = useTimeEntryForm({ isEnabled: show, initialIsLocked: true });
+	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRoleId, setSelectedRoleId] = useState<string>(roleId);
@@ -98,6 +98,15 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 			setSelectedRoleId(roleId);
 		}
 	}, [roleId]);
+
+	// Reset form when modal opens: default end-locked at "now" with zero duration.
+	useEffect(() => {
+		if (show) {
+			const now = getCurrentTimeString();
+			handlers.reset({ date: new Date(), duration: "00:00", startTime: now, endTime: now, comment: "" }, "end", false);
+			setError(null);
+		}
+	}, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const { refetch } = useItemTimeEntriesStore();
 	const { showToast } = useToast();
@@ -188,8 +197,12 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 						onEndTimeChange={handlers.handleEndTimeChange}
 						comment={values.comment}
 						onCommentChange={handlers.setComment}
-						isLocked={isLocked}
-						onLockToggle={handlers.toggleLock}
+						startLocked={anchor === "start"}
+						endLocked={anchor === "end"}
+						durationLocked={durationLocked}
+						onStartLockToggle={handlers.toggleStartLock}
+						onEndLockToggle={handlers.toggleEndLock}
+						onDurationLockToggle={handlers.toggleDurationLock}
 						onStartTimeNowClick={handlers.handleStartTimeNow}
 						onEndTimeNowClick={handlers.handleEndTimeNow}
 						roleSelector={{

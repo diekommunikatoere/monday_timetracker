@@ -1,20 +1,19 @@
 // components/dashboard/SaveTimerModal.tsx
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Flex, Text, TextInput, Group, Tooltip } from "@mantine/core";
-import { Button, ButtonGroup, IconButton, Modal } from "@/components";
-import { DatePicker, TimePicker } from "@/components";
-import { TimeInput } from "@mantine/dates";
+import { useState, useEffect } from "react";
+import { Flex, Text, Group } from "@mantine/core";
+import { Button, Modal } from "@/components";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
+import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
+import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { roundDuration, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
 import mondaySdk from "monday-sdk-js";
-import { Icon } from "@/components";
-import { roundDuration, combineDateAndTime } from "@/lib/utils";
 
 import "@mantine/dates/styles.css";
 import "@/public/css/components/SaveTimerModal.css";
@@ -48,28 +47,26 @@ interface SaveTimerModalProps {
 	};
 }
 
-import { getCurrentTimeString, addSecondsToTimeString, subtractSecondsFromTimeString, calculateDurationBetweenTimes } from "@/lib/utils";
-
 /**
  * Modal that finalizes a running timer (or a saved draft) into a persisted time
  * entry.
  *
- * Manages its own date / `HH:MM` duration / `HH:MM` start & end time fields with
- * a lock toggle that pins the end time to "now". The three fields are kept
- * mutually consistent via a `updateSource` ref that breaks feedback loops:
- * editing duration recomputes the opposite time boundary (start when locked,
- * end when unlocked); editing a time recomputes the duration and unlocks the end
- * time. Quick-adjust buttons nudge the duration in whole minutes.
+ * Time/duration/lock state is driven by the shared {@link useTimeEntryForm} hook
+ * and rendered via {@link TimeEntryFormFields} (start/end/duration locks, "now"
+ * buttons, quick-adjust). The comment is **not** taken from the hook: it stays
+ * special so the live-timer path stays bound to `useTimerStore.comment` (with
+ * its auto-save) while the reopened-draft path uses local state.
  *
- * **Two modes:**
- * - With `initialData` (reopening a draft from {@link TimeEntriesTable}): the
- *   supplied values — including stored start/end times — are shown and kept
- *   fixed (unlocked), and the draft is finalized via `POST /api/time-entries/finalize`.
- * - Without `initialData` (live timer): duration is snapshotted once from the
- *   paused timer's elapsed milliseconds (`useTimerStore.elapsedTime`, converted
- *   to seconds and rounded), the end time defaults to "now", and after a
- *   successful finalize it also calls `POST /api/timer/soft-reset` to clear the
- *   session and `resetTimer()` to clear local state.
+ * **Two modes (set on open via `handlers.reset`):**
+ * - With `initialData` (reopening a draft from the entries table): if the draft
+ *   has stored start/end times they are shown free (`anchor = "none"`) so the
+ *   historical window is preserved; without stored times it opens end-locked at
+ *   "now". The draft is finalized via `POST /api/time-entries/finalize`.
+ * - Without `initialData` (live timer): the duration is snapshotted once from
+ *   the paused timer's elapsed milliseconds (`useTimerStore.elapsedTime`, to
+ *   seconds and rounded), the end defaults to "now" (`anchor = "end"`), and after
+ *   a successful finalize it also calls `POST /api/timer/soft-reset` and
+ *   `resetTimer()` to clear the session and local state.
  *
  * On save the end time is *derived* from `start + duration` (in **seconds**) to
  * guarantee it never inverts and crosses midnight correctly; `duration` is sent
@@ -81,23 +78,17 @@ import { getCurrentTimeString, addSecondsToTimeString, subtractSecondsFromTimeSt
  * `useMondayStore`, `useToast`.
  *
  * @param props - Component props.
- * @returns A {@link Modal} titled "Zeiteintrag speichern" with time/duration inputs, quick-adjust buttons, a {@link TaskItemSelector}, a comment field, and save/cancel buttons.
+ * @returns A {@link Modal} titled "Zeiteintrag speichern" with the shared time-entry form, a {@link TaskItemSelector}, and save/cancel buttons.
  */
 export default function SaveTimerModal({ show, onClose, initialData }: SaveTimerModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [date, setDate] = useState<Date>(new Date());
-	const [duration, setDuration] = useState("00:00");
-	const [startTime, setStartTime] = useState(getCurrentTimeString());
-	const [endTime, setEndTime] = useState(getCurrentTimeString());
-	const [isLocked, setIsLocked] = useState(true);
-
-	// Ref to track which field triggered the update to prevent loops
-	const updateSource = useRef<"duration" | "times" | "lock" | null>(null);
 
 	// Local comment state - used when modal is opened with initialData
 	const [localComment, setLocalComment] = useState<string>("");
+
+	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
 
 	// Store selectors
 	const { refetch } = useTimeEntriesStore();
@@ -113,147 +104,41 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	// Store actions
 	const { setComment: setGlobalComment, reset: resetTimer } = useTimerStore.getState();
 
-	// Use local comment when initialData is provided, otherwise use global comment
+	// Use local comment when initialData is provided, otherwise use global comment (with its auto-save)
 	const comment = initialData ? localComment : globalComment;
 	const setComment = initialData ? setLocalComment : setGlobalComment;
 
-	// Convert HH:MM to seconds
-	const durationToSeconds = useCallback((timeStr: string): number => {
-		const [hours, minutes] = timeStr.split(":").map(Number);
-		return (hours || 0) * 3600 + (minutes || 0) * 60;
-	}, []);
-
-	// Convert seconds to HH:MM
-	const secondsToDuration = useCallback((seconds: number): string => {
-		const hours = Math.floor(seconds / 3600);
-		const minutes = Math.floor((seconds % 3600) / 60);
-		return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-	}, []);
-
-	// Adjust duration by minutes
-	const adjustDuration = (minutesToAdd: number) => {
-		const currentSeconds = durationToSeconds(duration);
-		const newSeconds = Math.max(0, currentSeconds + minutesToAdd * 60);
-		setDuration(secondsToDuration(newSeconds));
-	};
-
-	// Clear error state and selection when modal opens, sync duration with elapsed time or initial data
+	// Initialize the form when the modal opens (live timer vs reopened draft).
 	useEffect(() => {
-		if (show) {
-			setError(null);
-			updateSource.current = null;
+		if (!show) return;
+		setError(null);
 
-			// If initialData is provided, use it; otherwise use current timer state
-			if (initialData) {
-				setSelectedTask(initialData.taskSelection || null);
-				setDate(initialData.date || new Date());
-				setDuration(initialData.duration || "00:00");
-				setLocalComment(initialData.comment || "");
+		if (initialData) {
+			setSelectedTask(initialData.taskSelection || null);
+			setLocalComment(initialData.comment || "");
+			const date = initialData.date || new Date();
+			const draftComment = initialData.comment || "";
 
-				// Reopened draft with stored times: show them and keep them fixed
-				if (initialData.startTime && initialData.endTime) {
-					setStartTime(initialData.startTime);
-					setEndTime(initialData.endTime);
-					setIsLocked(false);
-					// Prevent the duration-sync effect from recomputing the historical times
-					updateSource.current = "times";
-					return;
-				}
+			if (initialData.startTime && initialData.endTime) {
+				// Reopened draft with stored times: preserve them, open free (no anchor, no tick).
+				handlers.reset({ date, duration: initialData.duration || "00:00", startTime: initialData.startTime, endTime: initialData.endTime, comment: draftComment }, "none", false);
 			} else {
-				setSelectedTask(null);
-				setDate(new Date());
-				// Snapshot the timer's elapsed time at open (timer is paused here); read
-				// imperatively so this effect does not re-run on every timer tick.
-				const elapsedTime = useTimerStore.getState().elapsedTime;
-				const roundedSeconds = roundDuration(Math.floor(elapsedTime / 1000));
-				setDuration(secondsToDuration(roundedSeconds));
-				setLocalComment(""); // Clear local comment when not using initialData
+				// Reopened draft without stored times: end at "now", end-locked.
+				const now = getCurrentTimeString();
+				const durationStr = initialData.duration || "00:00";
+				const start = subtractSecondsFromTimeString(now, durationToSeconds(durationStr));
+				handlers.reset({ date, duration: durationStr, startTime: start, endTime: now, comment: draftComment }, "end", false);
 			}
-
-			// Default: lock the end time to "now" (running timer, or a draft without stored times)
-			setIsLocked(true);
-			setEndTime(getCurrentTimeString());
-		}
-	}, [show, initialData, secondsToDuration]);
-
-	// Sync: When duration changes (from input or buttons), update start_time (if locked) or end_time (if unlocked)
-	useEffect(() => {
-		if (updateSource.current === "times" || updateSource.current === "lock") {
-			updateSource.current = null;
-			return;
-		}
-
-		const durationSeconds = durationToSeconds(duration);
-		if (isLocked) {
-			const newStartTime = subtractSecondsFromTimeString(endTime, durationSeconds);
-			updateSource.current = "duration";
-			setStartTime(newStartTime);
 		} else {
-			const newEndTime = addSecondsToTimeString(startTime, durationSeconds);
-			updateSource.current = "duration";
-			setEndTime(newEndTime);
+			// Live timer: snapshot the (paused) elapsed time, end at "now", end-locked.
+			setSelectedTask(null);
+			setLocalComment("");
+			const roundedSeconds = roundDuration(Math.floor(useTimerStore.getState().elapsedTime / 1000));
+			const now = getCurrentTimeString();
+			const start = subtractSecondsFromTimeString(now, roundedSeconds);
+			handlers.reset({ date: new Date(), duration: secondsToDuration(roundedSeconds), startTime: start, endTime: now, comment: "" }, "end", false);
 		}
-	}, [duration, durationToSeconds, isLocked, endTime, startTime]);
-
-	// Sync: When start_time changes (user input), recalculate duration = end_time - new_start_time
-	const handleStartTimeChange = useCallback(
-		(newStartTime: string) => {
-			setStartTime(newStartTime);
-			updateSource.current = "times";
-			const newDurationSeconds = calculateDurationBetweenTimes(newStartTime, endTime);
-			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
-			// Manual edit unlocks the end time
-			if (isLocked) setIsLocked(false);
-		},
-		[endTime, secondsToDuration, isLocked],
-	);
-
-	// Sync: When end_time changes (user input), recalculate duration = new_end_time - start_time
-	const handleEndTimeChange = useCallback(
-		(newEndTime: string) => {
-			setEndTime(newEndTime);
-			updateSource.current = "times";
-			const newDurationSeconds = calculateDurationBetweenTimes(startTime, newEndTime);
-			setDuration(secondsToDuration(Math.max(0, newDurationSeconds)));
-			// Manual edit unlocks the end time
-			if (isLocked) setIsLocked(false);
-		},
-		[startTime, secondsToDuration, isLocked],
-	);
-
-	// Handle setting start time to now with duration consistency
-	const handleStartTimeNowClick = useCallback(() => {
-		const now = getCurrentTimeString();
-		const currentDurationSeconds = calculateDurationBetweenTimes(startTime, endTime);
-		updateSource.current = "times";
-
-		// Update Start Time to Now and shift End Time to maintain duration
-		setStartTime(now);
-		const newEndTime = addSecondsToTimeString(now, currentDurationSeconds);
-		setEndTime(newEndTime);
-
-		// Manual adjustment via "Now" button unlocks the end time
-		if (isLocked) setIsLocked(false);
-	}, [startTime, endTime, isLocked]);
-
-	// Handle setting end time to now with duration consistency
-	const handleEndTimeNowClick = useCallback(() => {
-		const now = getCurrentTimeString();
-		const currentDurationSeconds = calculateDurationBetweenTimes(startTime, endTime);
-		updateSource.current = "times";
-
-		// Update End Time to Now and shift Start Time to maintain duration
-		setEndTime(now);
-		const newStartTime = subtractSecondsFromTimeString(now, currentDurationSeconds);
-		setStartTime(newStartTime);
-
-		// Manual adjustment via "Now" button unlocks the end time
-		if (isLocked) setIsLocked(false);
-	}, [startTime, endTime, isLocked]);
-
-	const handleTaskSelection = (taskData: TaskSelection) => {
-		setSelectedTask(taskData);
-	};
+	}, [show, initialData]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleSave = async () => {
 		// Use draftId from initialData if provided, otherwise use current timer's draftId
@@ -265,7 +150,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			return;
 		}
 
-		const durationSeconds = durationToSeconds(duration);
+		const durationSeconds = durationToSeconds(values.duration);
 		if (durationSeconds === 0) {
 			setError("Bitte gib eine Dauer an");
 			return;
@@ -280,7 +165,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 			// Build full ISO date-time strings from date + time inputs.
 			// Derive the end from start + duration so it can never invert and crosses midnight correctly.
-			const startTimeIso = combineDateAndTime(date, startTime);
+			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = new Date(new Date(startTimeIso).getTime() + durationSeconds * 1000).toISOString();
 
 			// Get fresh context for the API call
@@ -306,7 +191,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 					parentItemName: selectedTask.parentItemName || null,
 					roleId: selectedTask.roleId,
 					duration: durationSeconds,
-					date: date.toISOString(),
+					date: values.date.toISOString(),
 					startTime: startTimeIso,
 					endTime: endTimeIso,
 				}),
@@ -354,23 +239,6 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 		}
 	};
 
-	const handleCommentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-		setComment(event.currentTarget.value);
-	};
-
-	const handleDateChange = (val: Date | string | null) => {
-		if (!val) return;
-		if (val instanceof Date) {
-			setDate(val);
-		} else if (typeof val === "string") {
-			// Parse DD.MM.YYYY
-			const [day, month, year] = val.split(".").map(Number);
-			if (day && month && year) {
-				setDate(new Date(year, month - 1, day));
-			}
-		}
-	};
-
 	return (
 		<Modal show={show} onClose={onClose} size={"lg"}>
 			<Modal.Header>Zeiteintrag speichern</Modal.Header>
@@ -378,100 +246,59 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 				<Flex direction="column" gap="md">
 					{error && <Text c="dki-error">{error}</Text>}
 
-					<Flex gap="md" direction="column">
-						<Flex gap="sm">
-							<TimeInput
-								label="Startzeit"
-								value={startTime}
-								onChange={(event) => handleStartTimeChange(event.currentTarget.value)}
-								leftSection={
-									<Tooltip label="Jetzt" position="top" withArrow>
-										<IconButton variant="filled" color="var(--color--background-secondary)" onClick={handleStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
-											<Icon name="today" size={16} color="var(--color--text-secondary)" />
-										</IconButton>
-									</Tooltip>
-								}
-								style={{ flex: 1 }}
-							/>
-							<TimeInput
-								label="Endzeit"
-								value={endTime}
-								onChange={(event) => handleEndTimeChange(event.currentTarget.value)}
-								style={{ flex: 1 }}
-								disabled={isLocked}
-								leftSection={
-									<Tooltip label="Jetzt" position="top" withArrow>
-										<IconButton variant="filled" color="var(--color--background-secondary)" onClick={handleEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
-											<Icon name="today" size={16} color="var(--color--text-secondary)" />
-										</IconButton>
-									</Tooltip>
-								}
-								rightSection={
-									<Tooltip label={isLocked ? "Endzeit fixiert" : "Endzeit fixieren"} position="top" withArrow>
-										<IconButton variant="filled" color={isLocked ? "var(--color--primary)" : "var(--color--background-secondary)"} onClick={() => setIsLocked(!isLocked)} aria-label="Endzeit fixieren">
-											<Icon name={isLocked ? "lock" : "unlock"} size={16} color={isLocked ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
-										</IconButton>
-									</Tooltip>
-								}
-								styles={{
-									input: isLocked
-										? {
-												color: "var(--color--text-primary)",
-												borderColor: "transparent",
-												backgroundColor: "var(--color--background-secondary)",
-												transition: "all 0.2s ease",
-											}
-										: {},
-								}}
-							/>
-						</Flex>
-						<Flex gap="sm">
-							<TimeInput label="Dauer" withAsterisk value={duration} onChange={(event) => setDuration(event.currentTarget.value)} style={{ flex: 2 }} />
-							<DatePicker label="Datum" placeholder="Datum auswählen" value={date} onChange={handleDateChange} valueFormat="DD.MM.YYYY" leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" style={{ flex: 1 }} />
-						</Flex>
-						<Flex gap="sm">
-							<ButtonGroup flex={2}>
-								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(15)}>
-									+15m
-								</Button>
-								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(30)}>
-									+30m
-								</Button>
-								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0" }} onClick={() => adjustDuration(60)}>
-									+1h
-								</Button>
-								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(120)}>
-									+2h
-								</Button>
-							</ButtonGroup>
-							<ButtonGroup flex={1}>
-								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "5px 0 0 5px" }} onClick={() => adjustDuration(-15)}>
-									-15m
-								</Button>
-								<Button size="sm" variant="default" style={{ flex: 1, borderRadius: "0 5px 5px 0" }} onClick={() => adjustDuration(-60)}>
-									-1h
-								</Button>
-							</ButtonGroup>
-						</Flex>
-					</Flex>
-
-					<TaskItemSelector
-						onSelectionChange={handleTaskSelection}
-						initialValues={
-							selectedTask
-								? {
-										boardId: selectedTask.boardId,
-										boardName: selectedTask.boardName,
-										itemId: selectedTask.itemId,
-										itemName: selectedTask.itemName,
-										roleId: selectedTask.roleId,
-										roleName: selectedTask.roleName,
+					<TimeEntryFormFields
+						date={values.date}
+						onDateChange={handlers.setDate}
+						duration={values.duration}
+						onDurationChange={handlers.handleDurationChange}
+						startTime={values.startTime}
+						onStartTimeChange={handlers.handleStartTimeChange}
+						endTime={values.endTime}
+						onEndTimeChange={handlers.handleEndTimeChange}
+						comment={comment}
+						onCommentChange={setComment}
+						startLocked={anchor === "start"}
+						endLocked={anchor === "end"}
+						durationLocked={durationLocked}
+						onStartLockToggle={handlers.toggleStartLock}
+						onEndLockToggle={handlers.toggleEndLock}
+						onDurationLockToggle={handlers.toggleDurationLock}
+						onStartTimeNowClick={handlers.handleStartTimeNow}
+						onEndTimeNowClick={handlers.handleEndTimeNow}
+						quickAdjustments={{
+							add: [
+								{ label: "+15m", minutes: 15 },
+								{ label: "+30m", minutes: 30 },
+								{ label: "+1h", minutes: 60 },
+								{ label: "+2h", minutes: 120 },
+							],
+							subtract: [
+								{ label: "-15m", minutes: -15 },
+								{ label: "-1h", minutes: -60 },
+							],
+							onAdjust: handlers.adjustDuration,
+						}}
+						taskSelector={{
+							show: true,
+							node: (
+								<TaskItemSelector
+									onSelectionChange={setSelectedTask}
+									initialValues={
+										selectedTask
+											? {
+													boardId: selectedTask.boardId,
+													boardName: selectedTask.boardName,
+													itemId: selectedTask.itemId,
+													itemName: selectedTask.itemName,
+													roleId: selectedTask.roleId,
+													roleName: selectedTask.roleName,
+												}
+											: undefined
 									}
-								: undefined
-						}
+								/>
+							),
+						}}
 					/>
-
-					<TextInput aria-label="Kommentar hinzufügen..." value={comment} onChange={handleCommentChange} placeholder="Kommentar hinzufügen..." label="Kommentar" />
 
 					<Group justify="flex-end" mt="md">
 						<Button variant="default" onClick={onClose}>
