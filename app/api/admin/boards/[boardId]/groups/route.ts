@@ -3,13 +3,18 @@ import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { MondayGroupInsert } from "@/types/database";
 import { registerBoardWebhooks } from "@/lib/monday/webhooks";
+import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/boards/[boardId]/groups
  * Fetch groups for a specific board from monday API, upsert into DB, return with sync status
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 		const token = process.env.MONDAY_API_TOKEN;
 		if (!token) {
@@ -126,9 +131,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 /**
  * PATCH /api/admin/boards/[boardId]/groups
  * Update sync_enabled for a specific group
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 		const body = await request.json();
 		const { groupId, sync_enabled } = body;

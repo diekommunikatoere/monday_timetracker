@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiClient } from "@mondaydotcomorg/api";
+import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/monday/boards
  * Fetch all accessible boards from Monday.com API for the admin dropdowns.
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function GET(request: NextRequest) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const token = process.env.MONDAY_API_TOKEN;
 		if (!token) {
 			return NextResponse.json({ error: "MONDAY_API_TOKEN is not set" }, { status: 500 });

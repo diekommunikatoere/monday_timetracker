@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/monday/boards/[boardId]/columns
  * Fetch columns for a specific board, using DB cache (monday_column) if available.
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 		const token = process.env.MONDAY_API_TOKEN;
 		if (!token) {

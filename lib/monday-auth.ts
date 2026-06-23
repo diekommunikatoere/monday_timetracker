@@ -1,6 +1,7 @@
 // lib/monday-auth.ts — Verifies monday.com session-token JWTs for server-side auth.
 
 import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Decoded identity extracted from a monday.com session-token JWT.
@@ -76,4 +77,24 @@ export function verifyMondayJwt(token: string): MondaySession {
 		console.error("[JWT] Verification failed:", err instanceof Error ? err.message : err);
 		return { userId: "", accountId: "", isAdmin: false, isValid: false };
 	}
+}
+
+/**
+ * Verifies the monday session JWT on a request and requires admin rights.
+ * On success returns the decoded {@link MondaySession}; on failure returns a
+ * NextResponse (401 missing/invalid, 403 not admin) the caller returns as-is:
+ *
+ *   const auth = requireAdmin(request);
+ *   if (auth instanceof NextResponse) return auth;
+ *   // auth is MondaySession here
+ */
+export function requireAdmin(request: NextRequest): MondaySession | NextResponse {
+	const authHeader = request.headers.get("authorization");
+	if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+	const session = verifyMondayJwt(authHeader);
+	if (!session.isValid) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+	if (!session.isAdmin) return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+
+	return session;
 }

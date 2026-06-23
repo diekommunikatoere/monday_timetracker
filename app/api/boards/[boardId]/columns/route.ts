@@ -3,15 +3,19 @@
  *
  * Fetches all columns for a specific monday.com board.
  * Returns columns with compatibility information for time tracking sync.
- * Note: Authentication is handled client-side via monday SDK
+ * Note: Authentication is handled server-side via requireAdmin
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getBoardColumns, getColumnsForPurpose, MondayColumnOption } from "@/lib/monday/columnSync";
 import { SyncPurpose } from "@/types/database";
+import { requireAdmin } from "@/lib/monday-auth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 
 		// Validate boardId

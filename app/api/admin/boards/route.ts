@@ -1,28 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+import { requireAdmin } from "@/lib/monday-auth";
 import type { BoardConfigInsert, BoardConfigUpdate } from "@/types/database";
 
 /**
  * GET /api/admin/boards
  * Fetch all board configurations
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function GET(request: NextRequest) {
 	try {
-		// Validate session
-		const authHeader = request.headers.get("authorization");
-		if (!authHeader) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
-		const session = verifyMondayJwt(authHeader);
-		if (!session.isValid) {
-			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-		}
-
-		if (!session.isAdmin) {
-			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-		}
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
 
 		const { searchParams } = new URL(request.url);
 		const boardId = searchParams.get("boardId");
@@ -99,23 +88,12 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/admin/boards
  * Create or update a board configuration (upsert)
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function POST(request: NextRequest) {
 	try {
-		// Validate session and admin status
-		const authHeader = request.headers.get("authorization");
-		if (!authHeader) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
-		const session = verifyMondayJwt(authHeader);
-		if (!session.isValid) {
-			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-		}
-
-		if (!session.isAdmin) {
-			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-		}
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
 
 		const body = await request.json();
 		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, sync_on_finalize, sync_budget_used, linked_board_id, sync_linked_items } = body;
@@ -164,20 +142,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
 	try {
-		// Validate session and admin status
-		const authHeader = request.headers.get("authorization");
-		if (!authHeader) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
-		const session = verifyMondayJwt(authHeader);
-		if (!session.isValid) {
-			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-		}
-
-		if (!session.isAdmin) {
-			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-		}
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
 
 		const body = await request.json();
 		const { board_id, sync_enabled, budget_column_id, budget_column_type, sync_on_finalize, sync_budget_used, linked_board_id, sync_linked_items } = body;
@@ -219,23 +185,12 @@ export async function PATCH(request: NextRequest) {
 /**
  * DELETE /api/admin/boards
  * Delete a board configuration
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function DELETE(request: NextRequest) {
 	try {
-		// Validate session and admin status
-		const authHeader = request.headers.get("authorization");
-		if (!authHeader) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
-		const session = verifyMondayJwt(authHeader);
-		if (!session.isValid) {
-			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-		}
-
-		if (!session.isAdmin) {
-			return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-		}
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
 
 		const { searchParams } = new URL(request.url);
 		const boardId = searchParams.get("boardId");

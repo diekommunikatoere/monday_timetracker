@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isPurposeCompatible, isTimePurpose } from "@/lib/monday/utils";
 import type { ColumnSyncConfigInsert, ColumnSyncConfigUpdate, SyncPurpose } from "@/types/database";
+import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/boards/[boardId]/columns
  * Fetch all column sync configurations for a specific board
- * Note: Admin access is validated client-side via monday SDK
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 
 		const { data: columns, error } = await supabaseAdmin.from("column_sync_config").select("*").eq("board_id", boardId).order("created_at", { ascending: true });
@@ -34,9 +38,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 /**
  * POST /api/admin/boards/[boardId]/columns
  * Create a new column sync configuration
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 		const body = await request.json();
 		const { column_id, column_name, column_type, sync_purpose, time_format, include_breakdown, sync_enabled } = body;
@@ -115,9 +123,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 /**
  * PATCH /api/admin/boards/[boardId]/columns
  * Update an existing column sync configuration
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 		const body = await request.json();
 		const { column_id, column_name, time_format, include_breakdown, sync_enabled } = body;
@@ -160,9 +172,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 /**
  * DELETE /api/admin/boards/[boardId]/columns
  * Delete a column sync configuration
+ * Note: Authentication is handled server-side via requireAdmin
  */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
+		const auth = requireAdmin(request);
+		if (auth instanceof NextResponse) return auth;
+
 		const { boardId } = await params;
 		const { searchParams } = new URL(request.url);
 		const columnId = searchParams.get("columnId");
