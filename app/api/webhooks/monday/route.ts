@@ -74,10 +74,10 @@ async function resolveParentInfo(parentItemId: string, eventData?: { parentItemB
  */
 export async function POST(request: NextRequest) {
 	try {
-		// TEMP DEBUG — remove after confirming Monday's auth header shape
-		console.log("[webhook] request:", JSON.stringify(request));
-
 		const body = await request.json();
+
+		// TEMP DEBUG — remove after confirming Monday's auth header shape
+		console.log("[webhook] request:", JSON.stringify(body));
 
 		// 1. Handle monday.com verification challenge
 		if (body.challenge) {
