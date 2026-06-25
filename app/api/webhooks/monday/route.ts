@@ -75,7 +75,7 @@ async function resolveParentInfo(parentItemId: string, eventData?: { parentItemB
 export async function POST(request: NextRequest) {
 	try {
 		// TEMP DEBUG — remove after confirming Monday's auth header shape
-		console.log("[webhook] headers:", JSON.stringify(Object.fromEntries(request.headers)));
+		console.log("[webhook] request:", JSON.stringify(request));
 
 		const body = await request.json();
 
