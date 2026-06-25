@@ -1,0 +1,17 @@
+.inputTime {
+	input {
+		&[data-disabled="true"] {
+			color: var(--color--text-disabled);
+			opacity: 1;
+		}
+	}
+}
+
+.inputDuration {
+	input {
+		&[data-disabled="true"] {
+			color: var(--color--text-disabled);
+			opacity: 1;
+		}
+	}
+}
