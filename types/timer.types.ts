@@ -1,14 +1,23 @@
 // types/timer.types.ts
-// Timer domain types for the refactored architecture
+// Timer domain types for the 2-table model (time_entry + timer_segment).
+//
+// A live timer IS a non-finalized `time_entry`; its id is the `entryId`. There is
+// no longer a `timer_session` table or a `sessionId` — see docs/timer-redesign.md.
 
 /**
- * Timer session status - clearer semantics than boolean isPaused
+ * Timer lifecycle as surfaced by the live widget.
+ *
+ * The DB `timer_state` enum has four values (running / paused / parked /
+ * finalized); the widget only ever tracks a `running` or `paused` timer, so
+ * `parked` (saved-as-draft) and `finalized` entries live in the entries table,
+ * not here. `idle` means there is no active timer for the user.
  */
 export type TimerStatus = "idle" | "running" | "paused";
 
 /**
- * Server sync reference for calculating elapsed time locally
- * while maintaining accuracy with server timestamps
+ * Server sync reference for calculating elapsed time locally between server
+ * syncs. `baseElapsedTime` is in **milliseconds**; the local tick adds
+ * `Date.now() - syncedAt`.
  */
 export interface ServerSyncRef {
 	baseElapsedTime: number;
@@ -16,41 +25,36 @@ export interface ServerSyncRef {
 }
 
 /**
- * Timer session as used by the client (store / hooks / API responses).
- *
- * NOTE: this collides by name with the DB-row `TimerSession` exported from
- * `@/types/database` (the generated `timer_session` Row). They are different
- * shapes — this one nests an optional `time_entry` and is what the realtime
- * subscription and timer API routes hand back. Import from `@/types/timer.types`
- * when you mean this client shape, and from `@/types/database` when you mean the
- * raw row.
+ * One active (non-finalized) timer as returned by the `get_active_timers` RPC
+ * (and `GET /api/timer`). `elapsed_seconds` is server-computed from the entry's
+ * segments (the open segment counted up to now); the client ticks the live
+ * second locally between updates.
  */
-export interface TimerSession {
+export interface ActiveTimer {
 	id: string;
 	user_id: string;
-	draft_id: string | null;
+	timer_state: "running" | "paused" | "parked" | "finalized";
+	board_id: string | null;
+	item_id: string | null;
+	role_id: string | null;
+	comment: string | null;
 	start_time: string;
-	elapsed_time: number;
-	is_paused: boolean;
 	created_at: string;
-	time_entry?: {
-		id: string;
-		comment: string | null;
-	} | null;
+	updated_at: string;
+	elapsed_seconds: number;
 }
 
 /**
- * Timer state shape - unified state interface
+ * Unified timer state shape consumed by the UI.
  */
 export interface TimerState {
-	// Session data
-	sessionId: string | null;
-	draftId: string | null;
-	elapsedTime: number;
+	// Active timer (a non-finalized time_entry)
+	entryId: string | null;
+	elapsedTime: number; // milliseconds
 	startTime: string | null;
 	status: TimerStatus;
 
-	// Comment
+	// Comment (auto-saved to the active entry, debounced; also set on park/finalize)
 	comment: string;
 
 	// UI state
@@ -63,8 +67,8 @@ export interface TimerState {
 }
 
 /**
- * Actions interface for timer operations
- * Used by presentational components via callbacks
+ * Actions interface for timer operations.
+ * Used by presentational components via callbacks.
  */
 export interface TimerActions {
 	start: () => Promise<void>;
@@ -78,7 +82,7 @@ export interface TimerActions {
 }
 
 /**
- * Complete timer hook return type
+ * Complete timer hook return type.
  */
 export interface UseTimerReturn {
 	// State
@@ -86,7 +90,7 @@ export interface UseTimerReturn {
 
 	// Computed properties
 	isActive: boolean; // status === 'running'
-	hasSession: boolean; // sessionId !== null
+	hasSession: boolean; // entryId !== null
 	canSave: boolean; // hasSession && !isSaving
 
 	// Actions
@@ -136,31 +140,11 @@ export interface TimerCommentFieldProps {
 // ============================================
 
 /**
- * Response from /api/timer/start
+ * Response from `GET /api/timer` — the user's active (non-finalized) timers,
+ * each with server-computed `elapsed_seconds`.
  */
-export interface TimerStartResponse {
-	session: TimerSession;
-	draft?: { id: string };
-	elapsedTime: number;
-	resumed?: boolean;
-	created?: boolean;
-}
-
-/**
- * Response from /api/timer/pause
- */
-export interface TimerPauseResponse {
-	success: boolean;
-	paused: boolean;
-	elapsedTime: number;
-}
-
-/**
- * Response from /api/timer/session
- */
-export interface TimerSessionResponse {
-	session: (TimerSession & { calculatedElapsedTime: number }) | null;
-	serverTime: string;
+export interface ActiveTimersResponse {
+	timers: ActiveTimer[];
 }
 
 // ============================================
@@ -171,9 +155,7 @@ export interface TimerSessionResponse {
  * Timer store state (internal)
  */
 export interface TimerStoreState {
-	// Session data
-	sessionId: string | null;
-	draftId: string | null;
+	entryId: string | null;
 	elapsedTime: number;
 	startTime: string | null;
 	status: TimerStatus;
@@ -191,11 +173,22 @@ export interface TimerStoreState {
 }
 
 /**
+ * Minimal active-timer shape the store needs to bind a timer. Accepts any source
+ * (the `get_active_timers` row or a `time_entry` row returned by a transition
+ * RPC), so `timer_state` is typed permissively.
+ */
+export type ActiveTimerInput = {
+	id: string;
+	start_time?: string | null;
+	timer_state?: string | null;
+};
+
+/**
  * Timer store actions
  */
 export interface TimerStoreActions {
-	// Session management
-	setSession: (session: Partial<TimerSession> | null) => void;
+	// Active timer
+	setActiveTimer: (timer: ActiveTimerInput | null) => void;
 	setStatus: (status: TimerStatus) => void;
 	setElapsedTime: (time: number) => void;
 
@@ -220,33 +213,3 @@ export interface TimerStoreActions {
  * Complete timer store type
  */
 export type TimerStore = TimerStoreState & TimerStoreActions;
-
-// ============================================
-// Utility Types
-// ============================================
-
-/**
- * Derive the {@link TimerStatus} string from the DB's boolean `is_paused` flag.
- *
- * `is_paused` alone is ambiguous (a missing session also reads as "not paused"),
- * so the presence of a session is required to distinguish `idle` from `running`.
- *
- * @param isPaused   - The session's `is_paused` flag.
- * @param hasSession - Whether an active `timer_session` exists for the user.
- * @returns `"idle"` when no session, else `"paused"` / `"running"`.
- */
-export function toTimerStatus(isPaused: boolean, hasSession: boolean): TimerStatus {
-	if (!hasSession) return "idle";
-	return isPaused ? "paused" : "running";
-}
-
-/**
- * Inverse of {@link toTimerStatus}: collapse a {@link TimerStatus} back to the
- * DB's boolean `is_paused` flag (both `idle` and `running` map to `false`).
- *
- * @param status - The UI timer status.
- * @returns `true` only when `status === "paused"`.
- */
-export function fromTimerStatus(status: TimerStatus): boolean {
-	return status === "paused";
-}
