@@ -203,12 +203,12 @@ Ordered so nothing is dropped while a live object still references it, and group
 
 | File | Purpose | Key statements |
 |---|---|---|
-| `023_timer_state_enum_and_columns.sql` | additive only | `CREATE TYPE timer_state`; `ALTER TABLE time_entry ADD COLUMN timer_state` (nullable); `ALTER TABLE timer_segment ADD COLUMN entry_id` (nullable, FK→time_entry). |
-| `024_timer_backfill.sql` | data only | Backfill `timer_state` from `is_draft`/session, re-parent segments, dedup invariants — §6. Still reads `is_draft` here (dropped later). |
-| `025_timer_functions.sql` | new RPCs | Create `timer_start/pause/resume/park/finalize/reset`, `get_active_timers` (§4). |
-| `026_recreate_dependents.sql` | de-reference old cols | Recreate views `007`/`020` and column-sync funcs `018` to use `timer_state` and **not** select `time_entry.timer_session`; `DROP FUNCTION` the dead ones (`soft_reset_timer`, `finalize_segment`, `get_timer_session_with_elapsed`, `finalize_draft`, old `finalize_time_entry`). |
-| `027_timer_constraints_and_drops.sql` | lock down | `SET NOT NULL` on `timer_state` & `entry_id`; create `time_entry_with_elapsed` view; add unique indexes + the finalized-complete CHECK; **then** `DROP COLUMN` `is_draft`, `time_entry.timer_session`, `timer_segment.session_id`, `timer_segment.duration`, `DROP INDEX idx_time_entry_is_draft`. (Safe now — no object references them.) |
-| `028_timer_rls_realtime_drop_session.sql` | finish | Rewrite `timer_segment` RLS to `entry_id`; `REPLICA IDENTITY` + publication changes (§2.4); `DROP TABLE public.timer_session CASCADE`. |
+| `023_timer_state_enum_and_columns.sql` | additive only | `CREATE TYPE timer_state`; `ALTER TABLE time_entry ADD COLUMN timer_state` (nullable); `ALTER TABLE timer_segment ADD COLUMN entry_id` (nullable, FK→time_entry); `ALTER timer_segment.session_id DROP NOT NULL` (new segments use `entry_id`; column dropped in 027). |
+| `024_timer_backfill.sql` | data only | Drained-state backfill: guard that `timer_session` is empty, then map `is_draft`→`timer_state` (`false`→`finalized`, `true`→`parked`), preserving parked entries — §6. Reads `is_draft` here (dropped later). |
+| `025_timer_functions.sql` | new RPCs (additive) | Create `timer_start/pause/resume/park/finalize/reset`, `get_active_timers` (§4). Segments use `entry_id`. `timer_finalize` bootstraps missing monday dimension rows with `ON CONFLICT DO NOTHING` (FK-safe, never clobbers webhook-maintained names). Transitional: these also keep `is_draft` consistent (running/paused/parked → default `true`; finalize → `false`) so the legacy `is_draft` filter stays correct until 027. |
+| `026_recreate_dependents.sql` | read API forward-compat (live-safe) | Recreate **only** `get_user_time_entries`: add a `timer_state` output (so the new app styles draft rows off `timer_state`) and drop the `time_entry.timer_session` jsonb from the output (O4). **Keeps** the `is_draft` output and changes no `is_draft` filter, so the still-deployed old app keeps working. The filter swap and the dead-function drops can't run while the old app is live → moved to 027/028. |
+| `027_timer_constraints_and_drops.sql` | swap + lock down | Final backfill `UPDATE … WHERE timer_state IS NULL` (catches rows the old app wrote during the window); recreate the 5 `is_draft`-filtered read/aggregate funcs (`get_user_time_entries`, `get_item_time_entries`, `get_item_total_time`, `get_item_time_by_role`, `calculate_remaining_budget`) to filter on `timer_state = 'finalized'`; dedup to one running timer/user; `SET NOT NULL` on `timer_state` & `entry_id`; create `time_entry_with_elapsed` view; add unique indexes + the finalized-complete CHECK; **then** `DROP COLUMN` `is_draft`, `time_entry.timer_session`, `timer_segment.session_id`, `timer_segment.duration`, `DROP INDEX idx_time_entry_is_draft`. |
+| `028_timer_rls_realtime_drop_session.sql` | finish | Rewrite `timer_segment` RLS to `entry_id`; `REPLICA IDENTITY` + publication changes (§2.4); `DROP FUNCTION` the now-unreferenced legacy timer machinery (`get_timer_session_with_elapsed`, `get_current_elapsed_time`, `finalize_segment`, `soft_reset_timer`, `finalize_draft`, `finalize_time_entry`); `DROP TABLE public.timer_session CASCADE`. |
 
 **Rollout waves (Option 1 — drain window, applied to production).** Precondition: the team has stopped starting timers and `timer_session` is empty (§6).
 
@@ -232,6 +232,8 @@ UPDATE public.time_entry SET timer_state = 'parked'    WHERE is_draft = true;  -
 ```
 
 Do **not** clean-slate with `DELETE FROM time_entry WHERE is_draft = true` — that deletes the team's saved-as-draft (`parked`) entries.
+
+Rows the old app writes *after* `024` (manual entries/edits during the Wave 1 window) land with `is_draft` set but `timer_state` still NULL. That's fine while Wave 1 runs — the read/aggregate funcs still filter on `is_draft`, and `026`'s `get_user_time_entries` derives `timer_state` for display. `027` runs a final `UPDATE … WHERE timer_state IS NULL` (with entry edits paused) to map those before it swaps the filters to `timer_state` and drops `is_draft`.
 
 ### Fallback — only if a timer slipped through the drain (counts above ≠ 0): preserve it
 
@@ -270,10 +272,20 @@ UPDATE public.timer_segment s SET end_time = now() FROM ranked r WHERE s.id=r.id
 
 ## 8. Client & route changes (follow-up)
 
-- **Routes** → one-call wrappers: `POST /api/timer/{start,pause,resume,finalize,park,reset}`, `GET /api/timer/active`. Remove `/soft-reset` and the `draft` link-creation branch.
-- **`useTimer`** ([useTimer.ts](../components/features/timer/hooks/useTimer.ts)): one fetch per action; remove the silent-return guard at [:484](../components/features/timer/hooks/useTimer.ts#L484) (surface errors); subscribe to the entry set + segments. Add the **O2 confirm dialog** before `timer_start` when a running timer exists.
-- **Stores** ([timerStore.ts](../stores/timerStore.ts)): persist at most the active `entryId` (no `sessionId`/`draftId` — kills the stale-localStorage "wrong id" deletes); read the tray from `get_active_timers`.
-- **`is_draft` removal** across the 11 TS files in §2.1.
+### Done
+
+- **Routes** → one-call wrappers: `POST /api/timer/{start,pause,resume,finalize,park,reset}` and `GET /api/timer` (the active-timer tray, backed by `get_active_timers` — replaces `GET /api/timer/session`; named `/api/timer` rather than the proposed `/active`). `/soft-reset` and the `draft` link-creation route are removed.
+- **Comment auto-save retained** via a new **`PATCH /api/timer/comment`** (`{ entryId, comment }`). This replaces the removed `draft` branch: since a live timer *is* a non-finalized `time_entry`, the comment is a direct, ownership-guarded `UPDATE time_entry SET comment` (guarded `timer_state <> 'finalized'`) — **not** a state transition, so no RPC/migration is needed. `useTimer` debounces it 500 ms; realtime on `time_entry` propagates it cross-device. The client treats the server comment as authoritative (clears propagate) unless the local value has unsaved edits (tracked via a last-persisted ref, so an active typer is never clobbered).
+- **`useTimer`** ([useTimer.ts](../components/features/timer/hooks/useTimer.ts)): one fetch per action; silent-return guard removed (errors surface); subscribes to the user's `time_entry` rows and re-fetches authoritative state. "Save as draft" = **park** (`/api/timer/park`). The save modal finalizes both the live timer and a reopened draft through `/api/timer/finalize` (no separate soft-reset).
+- **Stores** ([timerStore.ts](../stores/timerStore.ts)): persists only the active `entryId` (+ `comment`); no `sessionId`/`draftId` (kills the stale-localStorage "wrong id" deletes). The obsolete `draftStore` and the dead `components/shared/hooks/useTimer.ts` stub were deleted.
+
+### Remaining
+
+- **O2 confirm dialog** before `timer_start` when a running timer already exists. Deferred: the single-timer widget only reaches "start" from idle, and `timer_start` already pauses any running timer atomically — so this only matters once multi-timer / sidebar-start UI lands (needs a `modalStore` flag + modal component).
+- **`is_draft` removal** across the ~11 TS files in §2.1 — do this only **after** mig 027 drops the column (it still exists and these files still read it correctly).
+- **Realtime publication** — cross-device sync (incl. comment auto-save propagation) needs mig 028 to add `time_entry` to `supabase_realtime`. Until then the subscription is a harmless no-op; same-device persistence works today.
+- **Remove the superseded `/api/time-entries/finalize`** route once confirmed unused (already has no callers).
+- **Regenerate `types/database/`** after 027 lands.
 
 ## 9. Verification
 

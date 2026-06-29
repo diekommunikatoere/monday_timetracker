@@ -1,20 +1,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
-import type { TimerStore, TimerStatus, ServerSyncRef } from "@/types/timer.types";
+import type { TimerStore } from "@/types/timer.types";
 
 /** Initial state, also re-applied by `reset()`. */
 const initialState = {
-	/** Active `timer_session` id, or null when idle. */
-	sessionId: null as string | null,
-	/** Draft `time_entry` id backing the running timer. */
-	draftId: null as string | null,
+	/** Active (non-finalized) `time_entry` id backing the live timer, or null when idle. */
+	entryId: null as string | null,
 	/** Elapsed run time in milliseconds (server-derived). */
 	elapsedTime: 0,
-	/** ISO start time of the current run segment. */
+	/** ISO start time of the active timer. */
 	startTime: null as string | null,
 	/** Timer lifecycle: idle / running / paused. */
-	status: "idle" as TimerStatus,
+	status: "idle" as TimerStore["status"],
 
 	comment: "",
 
@@ -23,28 +21,36 @@ const initialState = {
 	error: null as string | null,
 
 	/** Baseline for computing elapsed time locally between server syncs. */
-	_serverSync: null as ServerSyncRef | null,
+	_serverSync: null as TimerStore["_serverSync"],
 };
 
 /**
- * Timer state for the active session: ids, elapsed time, status, and the
+ * Timer state for the active timer: the entry id, elapsed time, status, and the
  * in-progress comment. A pure state container with simple setters — no API calls
  * live here; the orchestration that drives them is in the `useTimer` hook
- * (`components/features/timer/hooks/useTimer.ts`). Only the data needed to recover
- * a session across reloads (`comment`, `draftId`, `sessionId`) is persisted to
- * localStorage.
+ * (`components/features/timer/hooks/useTimer.ts`).
+ *
+ * In the 2-table model a live timer **is** a non-finalized `time_entry`, so the
+ * only id we track is `entryId` (no more `sessionId`). Only what is needed to
+ * recover the active timer across reloads is persisted to localStorage:
+ * `entryId` and `comment`. The comment is also auto-saved to the DB (debounced,
+ * via `PATCH /api/timer/comment` from `useTimer`); localStorage just covers fast
+ * reloads before that round-trips.
  */
 export const useTimerStore = create<TimerStore>()(
 	persist(
 		(set, get) => ({
 			...initialState,
 
-			/** Apply session data from an API response; pass `null` to clear the session. */
-			setSession: (session) => {
-				if (session === null) {
+			/**
+			 * Bind the active timer from an API/RPC payload; pass `null` to clear it.
+			 * Maps the DB `timer_state` to the widget status (`running` stays
+			 * running; anything else the widget tracks is shown as `paused`).
+			 */
+			setActiveTimer: (timer) => {
+				if (timer === null) {
 					set({
-						sessionId: null,
-						draftId: null,
+						entryId: null,
 						startTime: null,
 						status: "idle",
 					});
@@ -52,10 +58,9 @@ export const useTimerStore = create<TimerStore>()(
 				}
 
 				set({
-					sessionId: session.id ?? get().sessionId,
-					draftId: session.draft_id ?? get().draftId,
-					startTime: session.start_time ?? get().startTime,
-					status: session.is_paused !== undefined ? (session.is_paused ? "paused" : "running") : get().status,
+					entryId: timer.id ?? get().entryId,
+					startTime: timer.start_time ?? get().startTime,
+					status: timer.timer_state === "running" ? "running" : "paused",
 				});
 			},
 
@@ -120,27 +125,25 @@ export const useTimerStore = create<TimerStore>()(
 			name: "timer-store",
 			skipHydration: true, // Important for Next.js SSR
 			partialize: (state) => ({
-				// Only persist essential data for session recovery
+				// Only persist what is needed to recover the active timer across reloads.
 				comment: state.comment,
-				draftId: state.draftId,
-				sessionId: state.sessionId,
+				entryId: state.entryId,
 				// Don't persist: elapsedTime (fetched from server), status, UI states, _serverSync
 			}),
-		}
-	)
+		},
+	),
 );
 
 // Selector hooks — narrow slices using useShallow to avoid re-render loops on object results.
 
-/** Session-related slice (id, draft, start, status). Shallow-compared. */
+/** Active-timer slice (entry id, start, status). Shallow-compared. */
 export function useTimerSession() {
 	return useTimerStore(
 		useShallow((state) => ({
-			sessionId: state.sessionId,
-			draftId: state.draftId,
+			entryId: state.entryId,
 			startTime: state.startTime,
 			status: state.status,
-		}))
+		})),
 	);
 }
 
@@ -161,7 +164,7 @@ export function useTimerUIState() {
 			isSaving: state.isSaving,
 			isLoading: state.isLoading,
 			error: state.error,
-		}))
+		})),
 	);
 }
 
@@ -170,9 +173,9 @@ export function useTimerComputed() {
 	return useTimerStore(
 		useShallow((state) => ({
 			isActive: state.status === "running",
-			hasSession: state.sessionId !== null,
-			canSave: state.sessionId !== null && !state.isSaving,
+			hasSession: state.entryId !== null,
+			canSave: state.entryId !== null && !state.isSaving,
 			isPaused: state.status === "paused",
-		}))
+		})),
 	);
 }

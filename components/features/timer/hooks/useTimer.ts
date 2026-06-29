@@ -1,70 +1,66 @@
 // components/features/timer/hooks/useTimer.ts
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import mondaySdk from "monday-sdk-js";
-import type { Database, GetCurrentElapsedTimeResult } from "@/types/database";
-import type { UseTimerReturn, TimerActions, TimerState, TimerStatus } from "@/types/timer.types";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import type { Database } from "@/types/database";
+import type { UseTimerReturn, TimerActions, TimerState, ActiveTimer, ActiveTimersResponse } from "@/types/timer.types";
 import { supabase } from "@/lib/supabase/client";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
-import { useDraftStore } from "@/stores/draftStore";
 import { useModalStore } from "@/stores/modalStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useHydration } from "@/lib/store-utils";
 
-const monday = mondaySdk();
+type TimeEntryRow = Database["public"]["Tables"]["time_entry"]["Row"];
 
-type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
-
-interface RealTimeTimerSessionPayload {
-	schema: "public";
-	table: "timer_session";
-	commit_timestamp: string;
-	eventType: "INSERT" | "UPDATE" | "DELETE";
-	new: TimerSession | null;
-	old: TimerSession | null;
-	errors: string[] | null;
-	latency: number;
+/**
+ * Pick the timer the live widget should track from the user's active set.
+ *
+ * `get_active_timers` returns every non-finalized entry (running / paused /
+ * parked). The single-timer widget tracks the `running` one if present, else the
+ * most recently updated `paused` one (the RPC orders by `updated_at DESC`).
+ * `parked` ("saved as draft") entries are surfaced in the entries table, not here.
+ */
+function pickActiveTimer(timers: ActiveTimer[]): ActiveTimer | null {
+	return timers.find((t) => t.timer_state === "running") ?? timers.find((t) => t.timer_state === "paused") ?? null;
 }
 
 /**
  * `useTimer` — unified hook that owns **all** timer logic for the feature.
  *
- * Centralises everything the timer UI needs so components never touch the
- * underlying stores directly:
- *  - Loads the user's active session on mount (via `/api/timer/session`).
- *  - Subscribes to Supabase realtime on the `timer_session` table for
- *    cross-device sync, filtering to the current user and debouncing updates by
- *    200 ms. While running it re-fetches authoritative elapsed time through the
- *    `get_current_elapsed_time` RPC to avoid clock drift.
- *  - Runs a 1-second `setInterval` tick that recomputes elapsed time locally as
- *    `baseElapsedTime + (Date.now() - syncedAt)` (all values in **milliseconds**).
- *  - Debounces comment auto-save (500 ms) via `useDraftStore.autoSaveDraft`.
- *  - Wraps all timer API calls (`start`/`pause`/`resume`/`reset`/`soft-reset`)
- *    with monday `rawContext` + `Bearer sessionToken` auth headers.
+ * 2-table model (see docs/timer-redesign.md): a live timer **is** a non-finalized
+ * `time_entry`, identified by `entryId` (there is no `timer_session`/`sessionId`).
+ * Each transition is a single atomic RPC behind a thin route. This hook:
+ *  - Loads the user's active timer on mount via `GET /api/timer`
+ *    (`get_active_timers`), choosing one with {@link pickActiveTimer}.
+ *  - Subscribes to Supabase realtime on the `time_entry` table (filtered to the
+ *    current user) and re-fetches authoritative state on any change, for
+ *    cross-device sync. NOTE: this lights up once migration 028 adds `time_entry`
+ *    to the `supabase_realtime` publication; until then it is a harmless no-op and
+ *    the per-action refetch keeps the acting device correct.
+ *  - Runs a 1-second tick that recomputes elapsed time locally as
+ *    `baseElapsedTime + (Date.now() - syncedAt)` (all values in **milliseconds**;
+ *    the RPC reports `elapsed_seconds`, converted to ms here).
+ *  - Wraps every timer API call (`start`/`pause`/`resume`/`park`/`reset`) with a
+ *    `Bearer sessionToken` auth header and a JSON body.
+ *  - Auto-saves the comment (debounced 500 ms) onto the active entry via
+ *    `PATCH /api/timer/comment`.
  *
- * While the store has not hydrated yet it returns a safe loading placeholder
- * (`isLoading: true`, `sessionId: null`, no actions wired). Reads from
- * `useTimerStore` (reactive state + `getState()` actions), `useUserStore`,
- * `useMondayStore`, `useDraftStore`, `useModalStore`, and `useTimeEntriesStore`.
+ * The comment is also persisted to localStorage by the store (fast reloads) and is
+ * written on **park** (save as draft → `/api/timer/park`) and **finalize** (the
+ * Save modal); the debounced auto-save covers durability + cross-device sync in
+ * between.
  *
- * Exposed to the tree by {@link TimerProvider} and consumed via
- * `useTimerContext` ({@link TimerContainer} etc.).
+ * While the store has not hydrated yet it returns a safe loading placeholder.
  *
- * @returns A {@link UseTimerReturn}: `{ state, isActive, hasSession, canSave, actions }`
- *          where `state` is the {@link TimerState} snapshot and `actions` is the
- *          memoised {@link TimerActions} bundle (`start`, `pause`, `resume`,
- *          `reset`, `saveAsDraft`, `confirmSaveAsDraft`, `openSaveModal`,
- *          `updateComment`).
+ * @returns A {@link UseTimerReturn}: `{ state, isActive, hasSession, canSave, actions }`.
  */
 export function useTimer(): UseTimerReturn {
 	const hydrated = useHydration();
 
 	// Store selectors (reactive)
-	const sessionId = useTimerStore((s) => s.sessionId);
-	const draftId = useTimerStore((s) => s.draftId);
+	const entryId = useTimerStore((s) => s.entryId);
 	const elapsedTime = useTimerStore((s) => s.elapsedTime);
 	const startTime = useTimerStore((s) => s.startTime);
 	const status = useTimerStore((s) => s.status);
@@ -74,41 +70,34 @@ export function useTimer(): UseTimerReturn {
 	const error = useTimerStore((s) => s.error);
 	const _serverSync = useTimerStore((s) => s._serverSync);
 
-	// Store actions
+	// Store actions (stable references)
 	const store = useTimerStore.getState();
 
 	// User profile
 	const userProfile = useUserStore((s) => s.supabaseUser);
 
-	// Draft store for auto-save
-	const { autoSaveDraft } = useDraftStore();
-
-	// Modal store for save modal
+	// Modal store for save / empty-comment flows
 	const { openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation } = useModalStore();
 
-	// Time entries for refetch after save
+	// Time entries for refetch after park
 	const { refetch: refetchTimeEntries } = useTimeEntriesStore();
 
 	// Local error state for hook-level errors
 	const [hookError, setHookError] = useState<string | null>(null);
 
-	// Monday context
-	const { rawContext, sessionToken } = useMondayStore();
+	// The comment value we last know to be persisted (via our own auto-save PATCH or
+	// adopted from a server fetch). The local comment is "dirty" — has unsaved edits we
+	// must not clobber on a realtime refetch — when it differs from this.
+	const lastSavedCommentRef = useRef<string | null>(null);
+
+	// Monday session token (the JWT the server verifies)
+	const { sessionToken } = useMondayStore();
 
 	// ============================================
 	// Helper Functions
 	// ============================================
 
-	/**
-	 * Get Monday context for API calls
-	 */
-	const getMondayContext = useCallback(async () => {
-		return rawContext;
-	}, [rawContext]);
-
-	/**
-	 * Make API call with Monday context and Authorization header
-	 */
+	/** JSON API call with the bearer session token. */
 	const apiCall = useCallback(
 		async <T>(url: string, options: RequestInit = {}): Promise<T> => {
 			if (!sessionToken) {
@@ -116,12 +105,10 @@ export function useTimer(): UseTimerReturn {
 				throw new Error("Session token not available. Please wait for initialization.");
 			}
 
-			const context = await getMondayContext();
 			const response = await fetch(url, {
 				...options,
 				headers: {
 					"Content-Type": "application/json",
-					"monday-context": JSON.stringify(context),
 					Authorization: `Bearer ${sessionToken}`,
 					...options.headers,
 				},
@@ -132,13 +119,42 @@ export function useTimer(): UseTimerReturn {
 				throw new Error(errorData.error || `API call failed: ${response.status}`);
 			}
 
-			return response.json();
+			return response.json().catch(() => ({}) as T);
 		},
-		[getMondayContext],
+		[sessionToken],
 	);
 
+	/** Fetch the authoritative active timer and sync the store to it. */
+	const loadActiveTimer = useCallback(async () => {
+		const data = await apiCall<ActiveTimersResponse>("/api/timer");
+		const active = pickActiveTimer(data.timers ?? []);
+
+		if (!active) {
+			store.reset();
+			return;
+		}
+
+		store.setActiveTimer(active);
+
+		const elapsedMs = active.elapsed_seconds * 1000;
+		store.setElapsedTime(elapsedMs);
+		store.updateServerSync(elapsedMs);
+
+		// Adopt the server comment as the source of truth — including an empty value, so
+		// a clear made on another device propagates here — UNLESS the local comment has
+		// unsaved edits (differs from what we last persisted), which we must not clobber
+		// while the user is mid-typing.
+		const serverComment = active.comment ?? "";
+		const localComment = useTimerStore.getState().comment;
+		const hasUnsavedEdits = lastSavedCommentRef.current !== null && localComment !== lastSavedCommentRef.current;
+		if (!hasUnsavedEdits) {
+			if (serverComment !== localComment) store.setComment(serverComment);
+			lastSavedCommentRef.current = serverComment;
+		}
+	}, [apiCall]);
+
 	// ============================================
-	// Session Loading
+	// Initial Load
 	// ============================================
 
 	useEffect(() => {
@@ -147,235 +163,142 @@ export function useTimer(): UseTimerReturn {
 			return;
 		}
 
-		const loadSession = async () => {
+		let cancelled = false;
+
+		const run = async () => {
 			try {
 				store.setLoading(true);
 				store.setError(null);
-
-				const data = await apiCall<{ session: any; serverTime: string }>("/api/timer/session");
-
-				const session = data.session;
-
-				if (session) {
-					// Update store with session data
-					store.setSession({
-						id: session.id,
-						draft_id: session.time_entry?.id || session.draft_id || null,
-						start_time: session.start_time,
-						is_paused: session.is_paused,
-					});
-
-					// Set elapsed time from server
-					store.setElapsedTime(session.calculatedElapsedTime);
-					store.updateServerSync(session.calculatedElapsedTime);
-
-					// Set comment if exists
-					if (session.time_entry?.comment) {
-						store.setComment(session.time_entry.comment);
-					}
-				} else {
-					store.reset();
-				}
+				await loadActiveTimer();
 			} catch (err: any) {
-				console.error("Failed to load timer session:", err);
-				store.setError(err.message || "Failed to load timer session");
+				if (cancelled) return;
+				console.error("Failed to load active timer:", err);
+				store.setError(err.message || "Failed to load timer");
 				setHookError(err.message);
 			} finally {
-				store.setLoading(false);
+				if (!cancelled) store.setLoading(false);
 			}
 		};
 
-		loadSession();
-	}, [hydrated, userProfile, apiCall]);
+		run();
+		return () => {
+			cancelled = true;
+		};
+	}, [hydrated, userProfile, loadActiveTimer]);
 
 	// ============================================
-	// Real-time Subscription
+	// Real-time Subscription (cross-device sync)
 	// ============================================
 
 	useEffect(() => {
 		if (!hydrated || !userProfile) return;
 
 		let debounceTimeout: NodeJS.Timeout | null = null;
-		let lastProcessedTimestamp: string | null = null;
-		let pendingUpdate: RealTimeTimerSessionPayload | null = null;
 
 		const channel = supabase
-			.channel("timer-updates")
+			.channel("timer-entry-updates")
 			.on(
 				"postgres_changes",
 				{
 					event: "*",
 					schema: "public",
-					table: "timer_session",
+					table: "time_entry",
+					filter: `user_id=eq.${userProfile.id}`,
 				},
-				async (payload: RealTimeTimerSessionPayload) => {
-					// Filter out events from other users
-					const shouldProcess = (() => {
-						switch (payload.eventType) {
-							case "INSERT":
-							case "UPDATE":
-								return payload.new?.user_id === userProfile.id;
-							case "DELETE":
-								return payload.old?.id === sessionId;
-							default:
-								return false;
-						}
-					})();
-
-					if (!shouldProcess) return;
-
-					// Keep only the latest update
-					if (payload.eventType === "UPDATE" || payload.eventType === "INSERT") {
-						if (!pendingUpdate || payload.commit_timestamp > pendingUpdate.commit_timestamp) {
-							pendingUpdate = payload;
-						}
-					} else {
-						pendingUpdate = payload;
-					}
-
-					if (debounceTimeout) {
-						clearTimeout(debounceTimeout);
-					}
-
-					// Debounce updates by 200ms
-					debounceTimeout = setTimeout(async () => {
-						if (!pendingUpdate) return;
-
-						const finalPayload = pendingUpdate;
-						pendingUpdate = null;
-
-						// Skip old events
-						if (lastProcessedTimestamp && finalPayload.commit_timestamp <= lastProcessedTimestamp) {
-							return;
-						}
-
-						lastProcessedTimestamp = finalPayload.commit_timestamp;
-
-						if (finalPayload.eventType === "INSERT" || finalPayload.eventType === "UPDATE") {
-							const newData = finalPayload.new!;
-
-							// Get elapsed time from the server to avoid clock drift
-							let calculatedElapsedTime = newData.elapsed_time || 0;
-
-							if (!newData.is_paused && newData.id) {
-								try {
-									// Use RPC to get server-calculated elapsed time
-									const { data: rpcResult, error: rpcError } = await supabase.rpc("get_current_elapsed_time", { p_session_id: newData.id });
-
-									if (!rpcError && rpcResult) {
-										const typedResult = rpcResult as unknown as GetCurrentElapsedTimeResult;
-										calculatedElapsedTime = typedResult.elapsed_time_ms;
-									}
-								} catch (error) {
-									console.error("Error getting elapsed time from server:", error);
-									calculatedElapsedTime = newData.elapsed_time || 0;
-								}
-							}
-
-							// Update store
-							store.setSession({
-								id: newData.id,
-								draft_id: newData.draft_id,
-								start_time: newData.start_time,
-								is_paused: newData.is_paused,
-							});
-							store.setElapsedTime(calculatedElapsedTime);
-							store.updateServerSync(calculatedElapsedTime);
-						} else if (finalPayload.eventType === "DELETE") {
-							store.reset();
-						}
-					}, 200);
+				() => {
+					// Any change to the user's entries → re-fetch the authoritative active timer.
+					if (debounceTimeout) clearTimeout(debounceTimeout);
+					debounceTimeout = setTimeout(() => {
+						loadActiveTimer().catch((err) => console.error("Realtime timer reload failed:", err));
+					}, 250);
 				},
 			)
 			.subscribe();
 
 		return () => {
-			if (debounceTimeout) {
-				clearTimeout(debounceTimeout);
-			}
+			if (debounceTimeout) clearTimeout(debounceTimeout);
 			supabase.removeChannel(channel);
 		};
-	}, [hydrated, userProfile, sessionId]);
+	}, [hydrated, userProfile, loadActiveTimer]);
 
 	// ============================================
-	// Timer Interval
+	// Timer Interval (local tick while running)
 	// ============================================
 
 	useEffect(() => {
 		if (!hydrated) return;
 
-		let interval: NodeJS.Timeout;
+		let interval: NodeJS.Timeout | undefined;
 		const sync = _serverSync;
 
-		if (sessionId && status === "running" && sync) {
+		if (entryId && status === "running" && sync) {
 			interval = setInterval(() => {
-				// Calculate elapsed time based on server base + local time since sync
 				const localTimeSinceSync = Date.now() - sync.syncedAt;
-				const newElapsedTime = sync.baseElapsedTime + localTimeSinceSync;
-				store.setElapsedTime(newElapsedTime);
+				store.setElapsedTime(sync.baseElapsedTime + localTimeSinceSync);
 			}, 1000);
 		}
 
-		return () => clearInterval(interval);
-	}, [hydrated, sessionId, status, _serverSync]);
+		return () => {
+			if (interval) clearInterval(interval);
+		};
+	}, [hydrated, entryId, status, _serverSync]);
 
 	// ============================================
-	// Auto-save Comment
+	// Comment Auto-save (debounced)
 	// ============================================
 
 	useEffect(() => {
-		if (!sessionId || !userProfile?.id || !comment) return;
+		// A live timer is a non-finalized time_entry, so the comment auto-saves
+		// straight onto it (PATCH /api/timer/comment), debounced 500 ms. localStorage
+		// (via the store) covers fast reloads; this covers durability + cross-device.
+		if (!hydrated || !entryId) return;
+		// Nothing to do if the comment already matches what we last persisted (avoids a
+		// redundant write right after adopting the server value on load).
+		if (comment === lastSavedCommentRef.current) return;
 
-		const timer = setTimeout(async () => {
-			await autoSaveDraft({
-				comment,
-				sessionId,
-			});
+		const handle = setTimeout(() => {
+			const sent = comment;
+			apiCall("/api/timer/comment", {
+				method: "PATCH",
+				body: JSON.stringify({ entryId, comment: sent }),
+			})
+				.then(() => {
+					lastSavedCommentRef.current = sent;
+				})
+				.catch((err) => console.error("Failed to auto-save comment:", err));
 		}, 500);
 
-		return () => clearTimeout(timer);
-	}, [comment, sessionId, userProfile?.id, autoSaveDraft]);
+		return () => clearTimeout(handle);
+	}, [hydrated, entryId, comment, apiCall]);
 
 	// ============================================
 	// Core Actions (Internal)
 	// ============================================
 
-	/**
-	 * Internal function to perform the actual save as draft logic
-	 */
-	const performSaveAsDraft = useCallback(async () => {
-		if (!userProfile?.id || !draftId || !sessionId) return;
+	/** Park the active timer ("save as draft") and clear local timer state. */
+	const performPark = useCallback(async () => {
+		if (!entryId) return;
 
 		try {
+			store.setSaving(true);
 			store.setError(null);
 
-			// Use draft store's saveDraft for the actual save
-			const { saveDraft } = useDraftStore.getState();
-			await saveDraft({
-				draftId,
-				comment,
-			});
-
-			// Soft reset
-			await apiCall("/api/timer/soft-reset", {
+			await apiCall("/api/timer/park", {
 				method: "POST",
-				body: JSON.stringify({
-					draftId,
-					sessionId,
-				}),
+				body: JSON.stringify({ entryId, entryComment: comment }),
 			});
 
-			// Reset local state
 			store.reset();
 
-			// Refetch time entries
-			refetchTimeEntries(userProfile.id);
+			if (userProfile?.id) refetchTimeEntries(userProfile.id);
 		} catch (err: any) {
-			console.error("Failed to save as draft:", err);
+			console.error("Failed to save timer as draft:", err);
 			store.setError(err.message || "Failed to save as draft");
 			setHookError(err.message);
+		} finally {
+			store.setSaving(false);
 		}
-	}, [userProfile?.id, draftId, sessionId, comment, getMondayContext, refetchTimeEntries]);
+	}, [entryId, comment, userProfile?.id, apiCall, refetchTimeEntries]);
 
 	// ============================================
 	// Timer Actions
@@ -383,37 +306,21 @@ export function useTimer(): UseTimerReturn {
 
 	const actions: TimerActions = useMemo(
 		() => ({
-			/**
-			 * Start or resume timer
-			 */
+			/** Start a brand-new running timer. */
 			start: async () => {
 				try {
 					store.setError(null);
 
-					const data = await apiCall<any>("/api/timer/start", {
+					const data = await apiCall<{ entry: TimeEntryRow }>("/api/timer/start", {
 						method: "POST",
 						body: JSON.stringify({}),
 					});
 
-					if (data.resumed) {
-						store.setSession({
-							id: data.session.id,
-							draft_id: data.session.draft_id,
-							start_time: data.session.start_time,
-							is_paused: false,
-						});
-						store.setElapsedTime(data.elapsedTime);
-						store.updateServerSync(data.elapsedTime);
-					} else {
-						store.setSession({
-							id: data.session.id,
-							draft_id: data.draft.id,
-							start_time: data.session.start_time,
-							is_paused: false,
-						});
-						store.setElapsedTime(0);
-						store.updateServerSync(0);
-					}
+					// Fresh timer: clear any stale comment, bind the new entry, reset elapsed.
+					store.setComment("");
+					store.setActiveTimer(data.entry);
+					store.setElapsedTime(0);
+					store.updateServerSync(0);
 				} catch (err: any) {
 					console.error("Failed to start timer:", err);
 					store.setError(err.message || "Failed to start timer");
@@ -421,27 +328,25 @@ export function useTimer(): UseTimerReturn {
 				}
 			},
 
-			/**
-			 * Pause running timer
-			 */
+			/** Pause the running timer. */
 			pause: async () => {
-				if (!sessionId) return;
+				if (!entryId) return;
 
 				try {
 					store.setError(null);
 
-					const data = await apiCall<any>("/api/timer/pause", {
+					// Freeze elapsed precisely at the pause instant, then stop the tick.
+					const sync = useTimerStore.getState()._serverSync;
+					const frozen = sync ? sync.baseElapsedTime + (Date.now() - sync.syncedAt) : useTimerStore.getState().elapsedTime;
+
+					await apiCall("/api/timer/pause", {
 						method: "POST",
-						body: JSON.stringify({
-							sessionId,
-							elapsedTime,
-							isPausing: true,
-						}),
+						body: JSON.stringify({ entryId }),
 					});
 
+					store.setElapsedTime(frozen);
+					store.updateServerSync(frozen);
 					store.setStatus("paused");
-					store.setElapsedTime(data.elapsedTime);
-					store.updateServerSync(data.elapsedTime);
 				} catch (err: any) {
 					console.error("Failed to pause timer:", err);
 					store.setError(err.message || "Failed to pause timer");
@@ -449,27 +354,21 @@ export function useTimer(): UseTimerReturn {
 				}
 			},
 
-			/**
-			 * Resume paused timer
-			 */
+			/** Resume a paused timer. */
 			resume: async () => {
-				if (!sessionId) return;
+				if (!entryId) return;
 
 				try {
 					store.setError(null);
 
-					const data = await apiCall<any>("/api/timer/pause", {
+					await apiCall("/api/timer/resume", {
 						method: "POST",
-						body: JSON.stringify({
-							sessionId,
-							elapsedTime,
-							isPausing: false,
-						}),
+						body: JSON.stringify({ entryId }),
 					});
 
+					// A new segment starts now; continue ticking from the current elapsed.
+					store.updateServerSync(useTimerStore.getState().elapsedTime);
 					store.setStatus("running");
-					store.setElapsedTime(data.elapsedTime);
-					store.updateServerSync(data.elapsedTime);
 				} catch (err: any) {
 					console.error("Failed to resume timer:", err);
 					store.setError(err.message || "Failed to resume timer");
@@ -477,24 +376,18 @@ export function useTimer(): UseTimerReturn {
 				}
 			},
 
-			/**
-			 * Reset timer completely (deletes draft)
-			 */
+			/** Reset (discard) the active timer; deletes the entry and its segments. */
 			reset: async () => {
-				if (!userProfile?.id || !draftId || !sessionId) return;
+				if (!entryId) return;
+
+				const id = entryId;
+				// Clear local state first for immediate feedback.
+				store.reset();
 
 				try {
-					store.setError(null);
-
-					// Reset local state first for immediate feedback
-					store.reset();
-
 					await apiCall("/api/timer/reset", {
 						method: "POST",
-						headers: {
-							"session-id": sessionId,
-							"draft-id": draftId,
-						},
+						body: JSON.stringify({ entryId: id }),
 					});
 				} catch (err: any) {
 					console.error("Failed to reset timer:", err);
@@ -503,44 +396,35 @@ export function useTimer(): UseTimerReturn {
 				}
 			},
 
-			/**
-			 * Save as draft (soft reset - keeps entry but clears session)
-			 */
+			/** Save as draft (park). Prompts first when the comment is empty. */
 			saveAsDraft: async () => {
 				if (!comment || comment.trim() === "") {
 					openEmptyCommentConfirmation();
 					return;
 				}
-				await performSaveAsDraft();
+				await performPark();
 			},
 
-			/**
-			 * Confirm save as draft (bypasses empty comment check)
-			 */
+			/** Confirm save as draft (bypasses the empty-comment prompt). */
 			confirmSaveAsDraft: async () => {
 				closeEmptyCommentConfirmation();
-				await performSaveAsDraft();
+				await performPark();
 			},
 
-			/**
-			 * Open save modal
-			 */
+			/** Open the save modal (pause first if running). */
 			openSaveModal: () => {
-				// Pause timer first if running
 				if (status === "running") {
 					actions.pause();
 				}
 				openTimerSave();
 			},
 
-			/**
-			 * Update comment
-			 */
+			/** Update the in-progress comment. */
 			updateComment: (newComment: string) => {
 				store.setComment(newComment);
 			},
 		}),
-		[sessionId, draftId, elapsedTime, status, comment, userProfile?.id, apiCall, getMondayContext, openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation, refetchTimeEntries, performSaveAsDraft],
+		[entryId, comment, status, apiCall, openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation, performPark],
 	);
 
 	// ============================================
@@ -549,8 +433,7 @@ export function useTimer(): UseTimerReturn {
 
 	const state: TimerState = useMemo(
 		() => ({
-			sessionId,
-			draftId,
+			entryId,
 			elapsedTime,
 			startTime,
 			status,
@@ -560,7 +443,7 @@ export function useTimer(): UseTimerReturn {
 			error: error || hookError,
 			_serverSync,
 		}),
-		[sessionId, draftId, elapsedTime, startTime, status, comment, isSaving, isLoading, error, hookError, _serverSync],
+		[entryId, elapsedTime, startTime, status, comment, isSaving, isLoading, error, hookError, _serverSync],
 	);
 
 	// ============================================
@@ -568,15 +451,14 @@ export function useTimer(): UseTimerReturn {
 	// ============================================
 
 	const isActive = status === "running";
-	const hasSession = sessionId !== null;
+	const hasSession = entryId !== null;
 	const canSave = hasSession && !isSaving;
 
 	// Return loading state if not hydrated
 	if (!hydrated) {
 		return {
 			state: {
-				sessionId: null,
-				draftId: null,
+				entryId: null,
 				elapsedTime: 0,
 				startTime: null,
 				status: "idle",

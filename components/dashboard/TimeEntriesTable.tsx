@@ -246,7 +246,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 				initialData={
 					selectedDraft
 						? {
-								draftId: selectedDraft.id,
+								entryId: selectedDraft.id,
 								taskSelection: {
 									boardId: selectedDraft.board_id || "",
 									boardName: selectedDraft.board_name || "",

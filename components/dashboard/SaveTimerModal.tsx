@@ -13,19 +13,16 @@ import { useToast } from "@/components/ToastProvider";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { roundDuration, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
-import mondaySdk from "monday-sdk-js";
 
 import "@mantine/dates/styles.css";
 import "@/public/css/components/SaveTimerModal.css";
-
-const monday = mondaySdk();
 
 /**
  * Optional seed data for {@link SaveTimerModal} when reopening a saved draft.
  *
  * When omitted the modal reads live state from `useTimerStore` instead.
  *
- * @property draftId       - Draft row id to finalize (falls back to the store's `draftId`).
+ * @property entryId       - Entry id to finalize (falls back to the live timer's `entryId`).
  * @property taskSelection - Pre-selected board/item/role ({@link TaskSelection}).
  * @property comment       - Pre-filled comment.
  * @property date          - Entry date.
@@ -37,7 +34,7 @@ interface SaveTimerModalProps {
 	show: boolean;
 	onClose: () => void;
 	initialData?: {
-		draftId?: string;
+		entryId?: string;
 		taskSelection?: TaskSelection;
 		comment?: string;
 		date?: Date;
@@ -54,25 +51,28 @@ interface SaveTimerModalProps {
  * Time/duration/lock state is driven by the shared {@link useTimeEntryForm} hook
  * and rendered via {@link TimeEntryFormFields} (start/end/duration locks, "now"
  * buttons, quick-adjust). The comment is **not** taken from the hook: it stays
- * special so the live-timer path stays bound to `useTimerStore.comment` (with
- * its auto-save) while the reopened-draft path uses local state.
+ * special so the live-timer path stays bound to `useTimerStore.comment` while the
+ * reopened-draft path uses local state.
  *
  * **Two modes (set on open via `handlers.reset`):**
  * - With `initialData` (reopening a draft from the entries table): if the draft
  *   has stored start/end times they are shown free (`anchor = "none"`) so the
  *   historical window is preserved; without stored times it opens end-locked at
- *   "now". The draft is finalized via `POST /api/time-entries/finalize`.
+ *   "now".
  * - Without `initialData` (live timer): the duration is snapshotted once from
  *   the paused timer's elapsed milliseconds (`useTimerStore.elapsedTime`, to
  *   seconds and rounded), the end defaults to "now" (`anchor = "end"`), and after
- *   a successful finalize it also calls `POST /api/timer/soft-reset` and
- *   `resetTimer()` to clear the session and local state.
+ *   a successful finalize it calls `resetTimer()` to clear the live timer's local
+ *   state.
+ *
+ * Both modes finalize through `POST /api/timer/finalize` (the atomic
+ * `timer_finalize` RPC) — it closes the open segment and flips `timer_state` to
+ * `finalized` in one transaction, so there is no separate soft-reset call.
  *
  * On save the end time is *derived* from `start + duration` (in **seconds**) to
  * guarantee it never inverts and crosses midnight correctly; `duration` is sent
- * to the API in **seconds**, `date` as an ISO string, and start/end as full
- * **ISO 8601** timestamps. Reads the monday `context` from `useMondayStore`
- * (falling back to `monday.get("context")`) and the bearer `sessionToken`.
+ * to the API in **seconds** and start/end as full **ISO 8601** timestamps.
+ * Authenticates with the bearer `sessionToken` from `useMondayStore`.
  *
  * Reads from: `useTimerStore`, `useUserStore`, `useTimeEntriesStore` (refetch),
  * `useMondayStore`, `useToast`.
@@ -92,14 +92,13 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 	// Store selectors
 	const { refetch } = useTimeEntriesStore();
-	const { rawContext, sessionToken } = useMondayStore();
+	const { sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
-	// Timer store - using new API
+	// Timer store — a live timer is a non-finalized time_entry, tracked by entryId.
 	const globalComment = useTimerStore((state) => state.comment);
-	const draftId = useTimerStore((state) => state.draftId);
-	const sessionId = useTimerStore((state) => state.sessionId);
+	const entryId = useTimerStore((state) => state.entryId);
 
 	// Store actions
 	const { setComment: setGlobalComment, reset: resetTimer } = useTimerStore.getState();
@@ -141,11 +140,11 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	}, [show, initialData]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleSave = async () => {
-		// Use draftId from initialData if provided, otherwise use current timer's draftId
-		const activeDraftId = initialData?.draftId || draftId;
+		// Reopening a draft (initialData) finalizes that entry; otherwise finalize the live timer.
+		const activeEntryId = initialData?.entryId || entryId;
 
-		if (!activeDraftId || !selectedTask || !userProfile?.id || !selectedTask.roleId) {
-			console.error("Cannot save: missing required data", { draftId: activeDraftId, selectedTask, userId: userProfile?.id });
+		if (!activeEntryId || !selectedTask || !userProfile?.id || !selectedTask.roleId) {
+			console.error("Cannot save: missing required data", { entryId: activeEntryId, selectedTask, userId: userProfile?.id });
 			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
 		}
@@ -168,19 +167,17 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = new Date(new Date(startTimeIso).getTime() + durationSeconds * 1000).toISOString();
 
-			// Get fresh context for the API call
-			const context = rawContext || (await monday.get("context"));
-
-			// Call API route to finalize time entry
-			const response = await fetch("/api/time-entries/finalize", {
+			// Finalize via the atomic timer_finalize RPC. It closes the open segment, sets
+			// duration/start/end + assignment columns, and flips timer_state to 'finalized'
+			// in one transaction — no separate soft-reset/session cleanup needed.
+			const response = await fetch("/api/timer/finalize", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"monday-context": JSON.stringify(context),
 					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
-					draftId: activeDraftId,
+					entryId: activeEntryId,
 					taskName,
 					comment,
 					boardId: selectedTask.boardId,
@@ -191,7 +188,6 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 					parentItemName: selectedTask.parentItemName || null,
 					roleId: selectedTask.roleId,
 					duration: durationSeconds,
-					date: values.date.toISOString(),
 					startTime: startTimeIso,
 					endTime: endTimeIso,
 				}),
@@ -204,25 +200,9 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 			showToast("Zeiteintrag gespeichert.", "positive", 2000);
 
-			// Only reset the timer if we are saving the live session without initialData; if initialData is present we are saving from the time entries table and should not reset the timer session
+			// Only clear the live timer when saving it directly (no initialData). When initialData
+			// is present we are finalizing a draft row from the entries table, not the live timer.
 			if (!initialData) {
-				// Soft reset timer via API (keeps time entry but clears session)
-				if (sessionId) {
-					await fetch("/api/timer/soft-reset", {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							"monday-context": JSON.stringify(context),
-							Authorization: `Bearer ${sessionToken}`,
-						},
-						body: JSON.stringify({
-							draftId: activeDraftId,
-							sessionId,
-						}),
-					});
-				}
-
-				// Reset local timer state
 				resetTimer();
 			}
 
