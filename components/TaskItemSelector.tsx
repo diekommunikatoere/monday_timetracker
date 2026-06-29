@@ -561,6 +561,15 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	}, [tasksData, subItemsOnly, selectedBoard, tasksError]);
 
 	// Set initial task if provided and expand the path to reveal it.
+	//
+	// Important: do NOT seed the value from a name-only fallback while the task
+	// tree is still loading. Mantine's searchable single TreeSelect derives the
+	// text it shows in the input from `data` (via getNodeLabel) and only re-syncs
+	// it when `value` changes — not when `data` later arrives. If we set `value`
+	// to the item id before the tree contains that node, the input renders the raw
+	// id and never recovers until the user interacts (blur re-runs getNodeLabel).
+	// So wait until the node is present (preferred) or the query has resolved
+	// without it (genuine archived/deleted fallback) before setting the value.
 	useEffect(() => {
 		if (!initialValues?.itemId || selectedTask?.value === initialValues.itemId) return;
 
@@ -577,15 +586,17 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			if (path) {
 				setExpandedValues((prev) => Array.from(new Set([...prev, ...path])));
 			}
-		} else if (initialValues.itemName) {
-			// If not found but we have a name, create a temporary option
+		} else if ((tasksData || tasksError) && initialValues.itemName) {
+			// Tasks have loaded (or errored) but this item isn't among them (e.g.
+			// archived or deleted) — fall back to a name-only option so the
+			// selection still displays something.
 			setSelectedTask({
 				value: initialValues.itemId,
 				label: initialValues.itemName,
 				name: initialValues.itemName,
 			});
 		}
-	}, [initialValues?.itemId, initialValues?.itemName, valueMeta, expansionMap, selectedTask?.value]);
+	}, [initialValues?.itemId, initialValues?.itemName, valueMeta, expansionMap, selectedTask?.value, tasksData, tasksError]);
 
 	// Handle tasks error
 	useEffect(() => {
