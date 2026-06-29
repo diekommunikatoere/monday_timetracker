@@ -6,7 +6,7 @@ export { default as add } from "@/components/icons/Add";
 export { default as archive } from "@/components/icons/Archive";
 export { default as arrowBack } from "@/components/icons/ArrowBack";
 export { default as calendar } from "@/components/icons/Calendar";
-export { default as calendarClock } from "@/components/icons/CalendarClock";
+export { default as clock } from "@/components/icons/Clock";
 export { default as cancel } from "@/components/icons/Cancel";
 export { default as check } from "@/components/icons/Check";
 export { default as checkbox } from "@/components/icons/Checkbox";
