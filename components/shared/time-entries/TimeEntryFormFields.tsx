@@ -151,7 +151,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						onStartTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
 								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
-									<Icon name="today" size={16} color="var(--color--text-secondary)" />
+									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
@@ -170,7 +170,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						onEndTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
 								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
-									<Icon name="today" size={16} color="var(--color--text-secondary)" />
+									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
