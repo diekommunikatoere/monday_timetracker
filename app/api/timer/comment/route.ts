@@ -1,14 +1,17 @@
-// POST /api/timer/pause — hold a running timer.
-// timer_pause closes the open segment (the gap until resume is the pause) and sets
-// the entry to 'paused'. Idempotent if it's already paused. Resuming is /api/timer/resume.
+// PATCH /api/timer/comment — debounced auto-save of the live timer's comment.
+//
+// A live timer IS a non-finalized time_entry, so saving the comment is a direct,
+// ownership-guarded UPDATE of time_entry.comment — not a state transition, so it
+// needs no RPC. Guarded to non-finalized rows so a finalized entry can't be edited
+// through this path (those use the edit modal). Realtime on time_entry then
+// propagates the new comment to the user's other devices.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 import { getUserProfileByMondayId } from "@/lib/database/users";
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
 	try {
-		console.log("[API /timer/pause] Received pause timer request");
 		// Validate session
 		const authHeader = request.headers.get("authorization");
 		if (!authHeader) {
@@ -27,24 +30,24 @@ export async function POST(request: NextRequest) {
 		}
 
 		const requestBody = await request.json().catch(() => ({}));
-		const { entryId } = requestBody;
+		const { entryId, comment } = requestBody;
 
 		if (!entryId) {
 			return NextResponse.json({ error: "Missing entryId in request body" }, { status: 400 });
 		}
 
-		console.log("[API /timer/pause] Pausing timer for user:", userProfile.id, "entry:", entryId);
-
-		const { data: entry, error } = await supabaseAdmin.rpc("timer_pause", {
-			p_user_id: userProfile.id,
-			p_entry_id: entryId,
-		});
+		const { error } = await supabaseAdmin
+			.from("time_entry")
+			.update({ comment: comment ?? "", updated_at: new Date().toISOString() })
+			.eq("id", entryId)
+			.eq("user_id", userProfile.id)
+			.neq("timer_state", "finalized");
 
 		if (error) throw error;
 
-		return NextResponse.json({ entry });
+		return NextResponse.json({ success: true });
 	} catch (error) {
-		console.error("[API /timer/pause] Error pausing timer:", error);
-		return NextResponse.json({ error: "Failed to pause timer" }, { status: 500 });
+		console.error("[API /timer/comment] Error saving comment:", error);
+		return NextResponse.json({ error: "Failed to save comment" }, { status: 500 });
 	}
 }

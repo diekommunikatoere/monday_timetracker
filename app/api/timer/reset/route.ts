@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 	try {
 		// Validate session
 		const authHeader = request.headers.get("authorization");
-		console.log("Received reset request.");
+		console.log("[API /timer/reset] Received reset request.");
 		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
@@ -25,31 +25,26 @@ export async function POST(request: NextRequest) {
 
 		const userId = userProfile.id;
 
-		const draftIdHeader = request.headers.get("draft-id");
-		if (!draftIdHeader) {
-			return NextResponse.json({ error: "Missing draft-id header" }, { status: 400 });
+		const requestBody = await request.json().catch(() => ({}));
+
+		const entryId = requestBody.entryId;
+		if (!entryId) {
+			return NextResponse.json({ error: "Missing entryId in request body" }, { status: 400 });
 		}
 
-		const sessionIdHeader = request.headers.get("session-id");
-		if (!sessionIdHeader) {
-			return NextResponse.json({ error: "Missing session-id header" }, { status: 400 });
-		}
+		console.log("[API /timer/reset] Resetting timer for user:", userId, "entry:", entryId);
 
-		console.log("Resetting timer for user:", userId, "draft:", draftIdHeader, "session:", sessionIdHeader);
+		// Call the Supabase RPC function to reset the timer
+		const { error: resetError } = await supabaseAdmin.rpc("timer_reset", {
+			p_user_id: userId,
+			p_entry_id: entryId,
+		});
 
-		// Delete timer_session first (cascades to timer_segments)
-		const { error: sessionError } = await supabaseAdmin.from("timer_session").delete().eq("id", sessionIdHeader).eq("user_id", userId);
-
-		if (sessionError) throw sessionError;
-
-		// Then delete draft time_entry
-		const { error: draftError } = await supabaseAdmin.from("time_entry").delete().eq("id", draftIdHeader).eq("user_id", userId);
-
-		if (draftError) throw draftError;
+		if (resetError) throw resetError;
 
 		return NextResponse.json({ success: true });
 	} catch (error) {
-		console.error("Error resetting timer:", error);
+		console.error("[API /timer/reset] Error resetting timer:", error);
 		return NextResponse.json({ error: "Failed to reset timer" }, { status: 500 });
 	}
 }

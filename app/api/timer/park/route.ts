@@ -1,3 +1,4 @@
+// Route to park a timer. This saves a timer as a draft time-entry.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyMondayJwt } from "@/lib/monday-auth";
@@ -7,6 +8,7 @@ export async function POST(request: NextRequest) {
 	try {
 		// Validate session
 		const authHeader = request.headers.get("authorization");
+		console.log("[API /timer/park] Received time-entry park request.");
 		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
@@ -24,21 +26,29 @@ export async function POST(request: NextRequest) {
 
 		const userId = userProfile.id;
 
-		const body = await request.json();
-		const { draftId, sessionId } = body;
+		const requestBody = await request.json().catch(() => ({}));
 
-		if (!draftId || !sessionId) {
-			return NextResponse.json({ error: "draftId and sessionId are required" }, { status: 400 });
+		const entryId = requestBody.entryId;
+		if (!entryId) {
+			return NextResponse.json({ error: "Missing entryId in request body" }, { status: 400 });
 		}
 
-		// Delete timer_session (cascades to timer_segments)
-		const { error: sessionError } = await supabaseAdmin.from("timer_session").delete().eq("id", sessionId).eq("user_id", userId);
+		const entryComment = requestBody.entryComment; // Optional comment for the parked entry
 
-		if (sessionError) throw sessionError;
+		console.log("[API /timer/park] Parking timer for user:", userId, "entry:", entryId, "comment:", entryComment);
+
+		// Call the Supabase RPC function to park the timer
+		const { error: parkError } = await supabaseAdmin.rpc("timer_park", {
+			p_user_id: userId,
+			p_entry_id: entryId,
+			p_comment: entryComment || undefined,
+		});
+
+		if (parkError) throw parkError;
 
 		return NextResponse.json({ success: true });
 	} catch (error) {
-		console.error("Error resetting timer:", error);
-		return NextResponse.json({ error: "Failed to reset timer" }, { status: 500 });
+		console.error("Error parking timer:", error);
+		return NextResponse.json({ error: "Failed to park timer" }, { status: 500 });
 	}
 }

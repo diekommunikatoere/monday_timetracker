@@ -1,6 +1,4 @@
-// POST /api/timer/pause — hold a running timer.
-// timer_pause closes the open segment (the gap until resume is the pause) and sets
-// the entry to 'paused'. Idempotent if it's already paused. Resuming is /api/timer/resume.
+// Resumes a timer session
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyMondayJwt } from "@/lib/monday-auth";
@@ -8,9 +6,9 @@ import { getUserProfileByMondayId } from "@/lib/database/users";
 
 export async function POST(request: NextRequest) {
 	try {
-		console.log("[API /timer/pause] Received pause timer request");
 		// Validate session
 		const authHeader = request.headers.get("authorization");
+		console.log("[API /timer/resume] Received resume request.");
 		if (!authHeader) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
@@ -26,25 +24,28 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "User profile not found" }, { status: 404 });
 		}
 
-		const requestBody = await request.json().catch(() => ({}));
-		const { entryId } = requestBody;
+		const userId = userProfile.id;
 
+		const requestBody = await request.json().catch(() => ({}));
+
+		const entryId = requestBody.entryId;
 		if (!entryId) {
 			return NextResponse.json({ error: "Missing entryId in request body" }, { status: 400 });
 		}
 
-		console.log("[API /timer/pause] Pausing timer for user:", userProfile.id, "entry:", entryId);
+		console.log("[API /timer/resume] Resuming timer for user:", userId, "entry:", entryId);
 
-		const { data: entry, error } = await supabaseAdmin.rpc("timer_pause", {
-			p_user_id: userProfile.id,
+		// Call the Supabase RPC function to resume the timer
+		const { error: resumeError } = await supabaseAdmin.rpc("timer_resume", {
+			p_user_id: userId,
 			p_entry_id: entryId,
 		});
 
-		if (error) throw error;
+		if (resumeError) throw resumeError;
 
-		return NextResponse.json({ entry });
+		return NextResponse.json({ success: true });
 	} catch (error) {
-		console.error("[API /timer/pause] Error pausing timer:", error);
-		return NextResponse.json({ error: "Failed to pause timer" }, { status: 500 });
+		console.error("[API /timer/resume] Error resuming timer:", error);
+		return NextResponse.json({ error: "Failed to resume timer" }, { status: 500 });
 	}
 }
