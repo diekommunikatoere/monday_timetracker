@@ -325,6 +325,12 @@ export function useTimer(): UseTimerReturn {
 					console.error("Failed to start timer:", err);
 					store.setError(err.message || "Failed to start timer");
 					setHookError(err.message);
+
+					// The interim single-timer guard (migration 027) refuses to start a second
+					// timer and returns 409 with a German message (already captured above). Re-sync
+					// to whatever timer actually exists server-side so the UI adopts it instead of
+					// staying idle/out of sync.
+					loadActiveTimer().catch(() => {});
 				}
 			},
 
@@ -381,18 +387,27 @@ export function useTimer(): UseTimerReturn {
 				if (!entryId) return;
 
 				const id = entryId;
-				// Clear local state first for immediate feedback.
-				store.reset();
 
 				try {
+					// setSaving guards against a rapid double-click firing a second reset for the
+					// same entry (timer_reset is non-idempotent — it raises on 0 rows deleted). It
+					// also disables the button via the existing `disabled={!hasSession || isSaving}`
+					// wiring for the whole in-flight window.
+					store.setSaving(true);
+					store.setError(null);
+
 					await apiCall("/api/timer/reset", {
 						method: "POST",
 						body: JSON.stringify({ entryId: id }),
 					});
+
+					store.reset();
 				} catch (err: any) {
 					console.error("Failed to reset timer:", err);
 					store.setError(err.message || "Failed to reset timer");
 					setHookError(err.message);
+				} finally {
+					store.setSaving(false);
 				}
 			},
 
@@ -424,7 +439,7 @@ export function useTimer(): UseTimerReturn {
 				store.setComment(newComment);
 			},
 		}),
-		[entryId, comment, status, apiCall, openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation, performPark],
+		[entryId, comment, status, apiCall, loadActiveTimer, openTimerSave, openEmptyCommentConfirmation, closeEmptyCommentConfirmation, performPark],
 	);
 
 	// ============================================

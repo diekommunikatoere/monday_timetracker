@@ -1,8 +1,14 @@
 // POST /api/timer/start — begin a new running timer.
-// timer_start atomically pauses any timer the user already has running (the client
-// gates this behind the O2 confirm dialog) and opens a fresh running timer with its
-// first segment. Resuming a paused/parked timer is a separate route (/api/timer/resume).
-// Optional board/item/role pre-assign the entry (e.g. when started from the item sidebar).
+// timer_start opens a fresh running timer with its first segment. Resuming a paused/parked
+// timer is a separate route (/api/timer/resume). Optional board/item/role pre-assign the entry
+// (e.g. when started from the item sidebar).
+//
+// INTERIM single-timer guard (see supabase/migrations/027_timer_start_single_timer_guard.sql):
+// the RPC refuses to start when the user already has an active (running/paused) timer and
+// raises 'ACTIVE_TIMER_EXISTS'. That maps to HTTP 409 here so the client can re-sync to the
+// existing timer instead of creating a new one. This supersedes the "pause any running timer
+// and start a new one" behavior 025 originally shipped, which is meant to return once the
+// multi-timer O2 confirm dialog exists.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { verifyMondayJwt } from "@/lib/monday-auth";
@@ -38,7 +44,12 @@ export async function POST(request: NextRequest) {
 			p_role_id: roleId || undefined,
 		});
 
-		if (error) throw error;
+		if (error) {
+			if (error.message?.includes("ACTIVE_TIMER_EXISTS")) {
+				return NextResponse.json({ error: "Es läuft bereits ein Timer." }, { status: 409 });
+			}
+			throw error;
+		}
 
 		return NextResponse.json({ entry });
 	} catch (error) {
