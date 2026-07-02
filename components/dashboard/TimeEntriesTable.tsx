@@ -258,10 +258,10 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 									roleName: selectedDraft.role_name || "",
 								},
 								comment: selectedDraft.comment || "",
-								date: new Date(selectedDraft.start_time),
-								duration: secondsToDuration(selectedDraft.duration),
-								startTime: formatTimeString(new Date(selectedDraft.start_time)),
-								endTime: formatTimeString(new Date(selectedDraft.end_time)),
+								date: selectedDraft.start_time ? new Date(selectedDraft.start_time) : new Date(),
+								duration: secondsToDuration(selectedDraft.duration ?? 0),
+								startTime: selectedDraft.start_time ? formatTimeString(new Date(selectedDraft.start_time)) : undefined,
+								endTime: selectedDraft.end_time ? formatTimeString(new Date(selectedDraft.end_time)) : undefined,
 							}
 						: undefined
 				}
