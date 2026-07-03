@@ -435,6 +435,11 @@ ALTER TABLE public.time_entry
     DROP COLUMN IF EXISTS is_draft,
     DROP COLUMN IF EXISTS timer_session;
 
+-- The legacy timer_segment RLS policy (mig 006) references session_id, so it must
+-- be dropped before the column. Migration 030 recreates it keyed on entry_id
+-- (idempotent DROP POLICY IF EXISTS there), so applying 029 + 030 together is safe.
+DROP POLICY IF EXISTS "Users can manage their timer_segments" ON public.timer_segment;
+
 ALTER TABLE public.timer_segment
     DROP COLUMN IF EXISTS session_id,
     DROP COLUMN IF EXISTS duration;
