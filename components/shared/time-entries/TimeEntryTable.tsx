@@ -41,7 +41,7 @@ export interface TimeEntryTableProps {
  * (`checked` / `indeterminate`), the visible column list, and a `minWidth`
  * either taken from props or summed from visible columns. Renders distinct
  * empty states for loading, error, and "no rows". Draft rows
- * (`entry.is_draft`) are highlighted, and selected rows get a stronger
+ * (`entry.timer_state !== "finalized"`) are highlighted, and selected rows get a stronger
  * highlight via the `TimeEntryTable.module.css` styles.
  *
  * @param props - {@link TimeEntryTableProps}.
@@ -107,7 +107,7 @@ export function TimeEntryTable({ timeEntries, columns, loading, error, selectedI
 			</Table.Thead>
 			<Table.Tbody>
 				{timeEntries.map((entry, rowIndex) => (
-					<Table.Tr key={entry.id} className={selectedIds.includes(entry.id) ? styles.selectedPrimary : entry.is_draft ? styles.highlightPrimary : undefined}>
+					<Table.Tr key={entry.id} className={selectedIds.includes(entry.id) ? styles.selectedPrimary : entry.timer_state !== "finalized" ? styles.highlightPrimary : undefined}>
 						{visibleColumns.map((col) => (
 							<Table.Td key={col.id} ta={col.align || "left"} style={{ lineHeight: 1, width: col.width, maxWidth: col.maxWidth, minWidth: col.minWidth }}>
 								{col.cell({ row: entry, index: rowIndex })}

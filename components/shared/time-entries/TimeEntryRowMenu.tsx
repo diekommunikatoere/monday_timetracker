@@ -10,9 +10,9 @@ import { TimeEntry } from "@/types/time-entry";
  * Props for {@link TimeEntryRowMenu}.
  *
  * Generic over the row type `T` so the menu can be reused with any shape that
- * carries the fields the permission check needs (`id`, `user_id`, `is_draft`).
+ * carries the fields the permission check needs (`id`, `user_id`, `timer_state`).
  *
- * @typeParam T - Row shape; must expose `id`, `user_id`, and optional `is_draft`.
+ * @typeParam T - Row shape; must expose `id`, `user_id`, and optional `timer_state`.
  * @property entry    - The row to render the menu for.
  * @property onEdit   - Optional edit handler; only shown when the user has `canEdit`. For draft entries it acts as a save action and is labelled "Speichern".
  * @property onDelete - Optional delete handler; only shown when the user has `canDelete`.
@@ -31,22 +31,22 @@ export interface TimeEntryRowMenuProps<T> {
  * Reads the current user's Supabase id from {@link useUserStore} and derives
  * `canEdit` / `canDelete` via {@link useTimeEntryPermissions}. Renders
  * **nothing** (`null`) when the current user has neither permission — i.e. for
- * rows owned by other users. For draft entries (`is_draft: true`) the edit item
- * is relabelled to a save ("Speichern") action. Styled with CSS vars
+ * rows owned by other users. For non-finalized entries (`timer_state !== "finalized"`)
+ * the edit item is relabelled to a save ("Speichern") action. Styled with CSS vars
  * (`--color--border-ui`, `--color--background-primary`, `--box-shadow--md`).
  *
- * @typeParam T - Row shape with at least `{ id, user_id, is_draft?, style? }`.
+ * @typeParam T - Row shape with at least `{ id, user_id, timer_state?, style? }`.
  * @param props - {@link TimeEntryRowMenuProps}.
  * @returns A Mantine `Menu` with the applicable items, or `null` if the user can neither edit nor delete.
  */
-export function TimeEntryRowMenu<T extends { id: string; user_id: string; is_draft?: boolean; style?: React.CSSProperties }>({ entry, onEdit, onDelete, style }: TimeEntryRowMenuProps<T>) {
+export function TimeEntryRowMenu<T extends { id: string; user_id: string; timer_state?: string; style?: React.CSSProperties }>({ entry, onEdit, onDelete, style }: TimeEntryRowMenuProps<T>) {
 	const currentUserId = useUserStore((s) => s.supabaseUser?.id);
 	const { canEdit, canDelete } = useTimeEntryPermissions({
 		entry: entry as unknown as TimeEntry,
 		currentUserId,
 	});
 
-	const isDraft = entry.is_draft;
+	const isDraft = entry.timer_state !== undefined && entry.timer_state !== "finalized";
 
 	if (!canEdit && !canDelete) {
 		return null;

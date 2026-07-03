@@ -39,7 +39,7 @@ CSS lives in a **separate mirror tree** under [styles/](styles/) (`styles/ui/...
 
 ## The table system
 
-Time-entry tables are data-driven. The presentational [shared/time-entries/TimeEntryTable.tsx](shared/time-entries/TimeEntryTable.tsx) renders whatever `ColumnDef<TimeEntry>[]` it's given (it defines no columns itself); column sets come from `getDashboardColumns` / `getSidebarColumns` in `TimeEntryTableConfigs`, with cell renderers in `columns/`. It handles loading/error/empty states, draft-row highlight (`entry.is_draft`), and select-all checkbox state. To change what a table shows, edit the config/columns, not the table. Note `duration` on a `TimeEntry` is in **seconds**; form hooks work in `"HH:MM"` local-time strings (see `useTimeEntryForm`).
+Time-entry tables are data-driven. The presentational [shared/time-entries/TimeEntryTable.tsx](shared/time-entries/TimeEntryTable.tsx) renders whatever `ColumnDef<TimeEntry>[]` it's given (it defines no columns itself); column sets come from `getDashboardColumns` / `getSidebarColumns` in `TimeEntryTableConfigs`, with cell renderers in `columns/`. It handles loading/error/empty states, draft-row highlight (`entry.timer_state !== "finalized"`), and select-all checkbox state. To change what a table shows, edit the config/columns, not the table. Note `duration` on a `TimeEntry` is in **seconds**; form hooks work in `"HH:MM"` local-time strings (see `useTimeEntryForm`).
 
 ## State, data, and side effects
 

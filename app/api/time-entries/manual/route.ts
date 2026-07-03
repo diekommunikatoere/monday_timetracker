@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
 				start_time: finalStartTime,
 				end_time: finalEndTime,
 				timer_state: "finalized",
-				is_draft: false,
 				// Dimension metadata for UPSERTing monday_item
 				board_name: boardName,
 				item_name: itemName,

@@ -1,14 +1,13 @@
 // lib/database.ts
-// Core data-access layer for time entries, timer sessions/segments, and the
+// Core data-access layer for time entries, timer segments, and the
 // monday.com dimension tables (monday_board, monday_item).
 //
 // Architecture notes:
 //   - All DB access uses `supabaseAdmin` (service-role key, RLS-bypassing).
 //     Never import this module into client code.
-//   - Time math and timer lifecycle (pause, finalize, soft-reset) execute in
-//     Postgres RPC functions (`finalize_segment`, `finalize_time_entry`,
-//     `get_timer_session_with_elapsed`, etc.) defined in `003_functions.sql`.
-//     TypeScript only drives the control flow.
+//   - Time math and timer lifecycle (start, pause, resume, park, finalize, reset)
+//     execute in the atomic `timer_*` Postgres RPC functions defined in
+//     `025_timer_functions.sql`. TypeScript only drives the control flow.
 //   - Time entries are cached in Redis under the `time_entry:` prefix with a
 //     300 s TTL. Every write must invalidate via `cacheHelper.clearPattern("time_entry:*")`.
 //   - Soft-delete is a real workflow: `softDeleteTimeEntry` marks a row with
@@ -19,7 +18,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { cacheHelper } from "@/lib/redis";
 import { SELF_EDITABLE_TIME_ENTRY_FIELDS } from "@/lib/permissions";
-import type { Database, FinalizeSegmentResult } from "@/types/database";
+import type { Database } from "@/types/database";
 import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
 import { roundDuration } from "./utils";
 import { fetchAllWithRange, fetchAllWithKeyset } from "./supabase/pagination";
@@ -32,10 +31,6 @@ type TimeEntryWithRole = FrontendTimeEntry;
 type TimeEntryInsert = Database["public"]["Tables"]["time_entry"]["Insert"];
 /** Update shape for `time_entry`. */
 type TimeEntryUpdate = Database["public"]["Tables"]["time_entry"]["Update"];
-/** Raw `timer_session` table row from the generated DB types. */
-type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
-/** Insert shape for `timer_session`. */
-type TimerSessionInsert = Database["public"]["Tables"]["timer_session"]["Insert"];
 /** Insert shape for `timer_segment`. */
 type TimerSegmentInsert = Database["public"]["Tables"]["timer_segment"]["Insert"];
 
@@ -504,18 +499,19 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 }
 
 /**
- * Fetch finalized time entries for a single user in display-ready shape.
+ * Fetch time entries for a single user in display-ready shape.
  *
  * Delegates to the `get_user_time_entries` Postgres RPC, which JOINs dimension
  * tables and returns the flattened {@link FrontendTimeEntry} shape (with
  * `board_name`, `item_name`, `role_name`, etc.) — not raw DB rows.
  * Results are **not** cached here.
  *
- * The RPC returns at most 100 rows (hard-coded `p_limit`). Draft entries
- * (`is_draft = true`) are excluded by the RPC.
+ * The RPC returns at most 100 rows (hard-coded `p_limit`) and includes
+ * non-finalized entries too (`timer_state !== "finalized"`) — the entries
+ * table uses `timer_state` to render draft-row styling.
  *
  * @param userId - Internal `user_profiles.id` UUID; passed as `p_user_id` to the RPC.
- * @returns Up to 100 finalized time entries for the user, sorted by the RPC's default order.
+ * @returns Up to 100 time entries for the user, sorted by the RPC's default order.
  */
 export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithRole[]> {
 	// Fetch from database using RPC to get joined names
@@ -530,300 +526,6 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithR
 	}
 
 	return data as any;
-}
-
-/**
- * Fetch the active `timer_session` row for a user, if one exists.
- *
- * There is at most one session per user (unique constraint on `user_id`).
- * Returns `null` when no session exists (Supabase `PGRST116`) or on other
- * DB errors (which are logged but swallowed). This function returns raw
- * session data — for elapsed time that includes the current running segment,
- * use the `get_timer_session_with_elapsed` RPC instead.
- *
- * @param userId - Internal `user_profiles.id` UUID.
- * @returns The active `timer_session` row, or `null` if none exists.
- */
-export async function getCurrentTimerSession(userId: string): Promise<TimerSession | null> {
-	const { data, error } = await supabaseAdmin.from("timer_session").select("*").eq("user_id", userId).single();
-
-	if (error && error.code !== "PGRST116") {
-		console.error("Error fetching timer session:", error);
-		return null;
-	}
-
-	return data || null;
-}
-
-/**
- * Insert or update a `timer_session` row (conflict target: `user_id`).
- *
- * `start_time` is **never passed** — the DB column defaults to `NOW()`, which
- * ensures timestamp consistency with the server clock and avoids client/server
- * clock-drift issues. Similarly, all `timer_segment` timestamps are DB-generated.
- *
- * In practice, {@link startTimer} handles the normal timer start path. Call
- * this directly only when you need to patch an existing session's fields (e.g.
- * `elapsed_time`, `is_paused`) without going through the full start flow.
- *
- * @param sessionData - Partial insert payload; `user_id` is required.
- * @param userId      - Internal `user_profiles.id` UUID; must equal `sessionData.user_id`.
- * @returns The upserted `timer_session` row.
- */
-export async function upsertTimerSession(sessionData: Partial<TimerSessionInsert>, userId: string): Promise<TimerSession> {
-	if (!sessionData.user_id) {
-		throw new Error("user_id is required");
-	}
-
-	// Ensure required fields for insert
-	// NOTE: Do NOT pass start_time - let database use DEFAULT NOW() for timestamp consistency
-	const insertData = {
-		user_id: sessionData.user_id,
-		elapsed_time: sessionData.elapsed_time || 0,
-		is_paused: sessionData.is_paused ?? false,
-		draft_id: sessionData.draft_id,
-	} as TimerSessionInsert;
-
-	const { data, error } = await supabaseAdmin.from("timer_session").upsert(insertData, { onConflict: "user_id" }).select().single();
-
-	if (error) {
-		console.error("Error upserting timer session:", error);
-		throw error;
-	}
-
-	return data;
-}
-
-/**
- * Discard the active timer for a user by deleting its draft `time_entry`.
- *
- * Deletion of the draft cascades to `timer_session` and `timer_segment` rows
- * (enforced by FK `ON DELETE CASCADE` in the schema). After deletion, the
- * `time_entry:*` cache pattern is invalidated. This is equivalent to the
- * `/api/timer/reset` route behaviour — the draft is gone, nothing is saved.
- *
- * If no draft exists the function returns silently.
- *
- * @param userId - Internal `user_profiles.id` UUID; used to locate the draft row.
- */
-export async function clearTimerSession(userId: string): Promise<void> {
-	const { data: draft } = await supabaseAdmin.from("time_entry").select("id").eq("user_id", userId).eq("is_draft", true).order("created_at", { ascending: false }).limit(1).single();
-
-	if (draft) {
-		// Delete the draft (this cascades to timer_session and timer_segments)
-		const { error } = await supabaseAdmin.from("time_entry").delete().eq("id", draft.id);
-
-		if (error) {
-			console.error(`Error clearing timer session for user ${userId}:`, error);
-			throw error;
-		}
-
-		// Invalidate cache
-		await cacheHelper.clearPattern(`${CACHE_PREFIX}*`);
-	}
-}
-
-/**
- * Start a new timer for a user — the full 3-table initialisation.
- *
- * Creates three rows in sequence:
- * 1. A draft `time_entry` (`is_draft = true`) with no `start_time` (DB default).
- * 2. A `timer_session` linked to the draft via `draft_id`, `elapsed_time = 0`.
- * 3. An initial running `timer_segment` with `end_time IS NULL` (running state).
- *
- * **All timestamp columns** (`start_time` on all three tables) are left for the
- * DB to fill with `DEFAULT NOW()`. This prevents clock-drift between the app
- * server and the Postgres server — never pass `start_time` from TypeScript.
- *
- * If an active session already exists for the user, it is cleared first via
- * {@link clearTimerSession}.
- *
- * @param userId - Internal `user_profiles.id` UUID.
- * @returns Object with `draftId`, `sessionId`, and the full `session` row.
- */
-export async function startTimer(userId: string) {
-	if (!userId) {
-		throw new Error("user_id is required");
-	}
-
-	try {
-		// Check for existing active session and clear if needed
-		const existingSession = await getCurrentTimerSession(userId);
-		if (existingSession) {
-			await clearTimerSession(userId);
-		}
-
-		// Create draft time_entry - start_time will be set by database DEFAULT NOW()
-		const { data: draft, error: draftError } = await supabaseAdmin
-			.from("time_entry")
-			.insert({
-				user_id: userId,
-				is_draft: true,
-				// Do NOT pass start_time - database will use DEFAULT NOW()
-			})
-			.select()
-			.single();
-
-		if (draftError) throw draftError;
-
-		// Create timer_session - start_time will be set by database DEFAULT NOW()
-		const { data: session, error: sessionError } = await supabaseAdmin
-			.from("timer_session")
-			.insert({
-				user_id: userId,
-				draft_id: draft.id,
-				elapsed_time: 0,
-				// Do NOT pass start_time - database will use DEFAULT NOW()
-			})
-			.select()
-			.single();
-
-		if (sessionError) throw sessionError;
-
-		// Create initial running timer_segment - start_time will be set by database DEFAULT NOW()
-		const { error: segmentError } = await supabaseAdmin.from("timer_segment").insert({
-			session_id: session.id,
-			// Do NOT pass start_time - database will use DEFAULT NOW()
-			// end_time/duration null implicit
-		});
-
-		if (segmentError) throw segmentError;
-
-		return { draftId: draft.id, sessionId: session.id, session };
-	} catch (error) {
-		console.error("Error starting timer:", error);
-		throw error;
-	}
-}
-
-/**
- * Insert a new running `timer_segment` for an existing session (resume path).
- *
- * A running segment is defined by `end_time IS NULL`. `start_time` is left
- * for the DB default (`NOW()`). Verifies session ownership before inserting.
- *
- * This is called by {@link resumeTimer}; you rarely need to call it directly.
- *
- * @param sessionId - The `timer_session.id` UUID to attach the segment to.
- * @param userId    - Internal `user_profiles.id` UUID; verified against `timer_session.user_id`.
- * @returns The inserted `timer_segment` row (only `id` selected).
- */
-export async function startRunningSegment(sessionId: string, userId: string) {
-	console.log("Starting running segment for session:", sessionId);
-	// Verify session ownership
-	const { data: session, error: sessionError } = await supabaseAdmin.from("timer_session").select("id").eq("id", sessionId).eq("user_id", userId).single();
-
-	if (sessionError || !session) {
-		throw new Error("Timer session not found or access denied");
-	}
-
-	// Create segment - start_time will be set by database DEFAULT NOW()
-	const { data, error } = await supabaseAdmin
-		.from("timer_segment")
-		.insert({
-			session_id: sessionId,
-			// Do NOT pass start_time - database will use DEFAULT NOW()
-			// end_time/duration null implicit
-		})
-		.select("id")
-		.single();
-
-	if (error) {
-		console.error("Error starting running segment:", error);
-		throw error;
-	}
-
-	return data;
-}
-
-/**
- * Pause an active timer by finalising its open segment and updating the session.
- *
- * Calls the `finalize_segment` RPC, which closes the running segment by setting
- * `end_time = NOW()` and computing `duration`. The RPC returns a
- * {@link FinalizeSegmentResult} with cumulative `elapsed_time_ms` (milliseconds)
- * and the duration of the just-closed segment (`duration_added_ms`, milliseconds).
- *
- * The `timer_session` is then updated in one round trip: `is_paused = true` and
- * `elapsed_time` is set from the RPC result to keep it consistent without a
- * separate read.
- *
- * @param sessionId - The `timer_session.id` UUID to pause.
- * @param userId    - Internal `user_profiles.id` UUID; used to verify ownership on the session update.
- * @returns The {@link FinalizeSegmentResult} from the `finalize_segment` RPC.
- */
-export async function pauseTimer(sessionId: string, userId: string): Promise<FinalizeSegmentResult> {
-	console.log("Pausing timer for session:", sessionId);
-	// Call RPC to finalize open segment(s) - uses database NOW() for end_time
-	const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc("finalize_segment", { p_session_id: sessionId });
-
-	if (rpcError || !rpcResult) {
-		console.error("Error finalizing segment:", rpcError);
-		throw new Error("Failed to finalize timer segment");
-	}
-
-	// Cast to proper type - RPC returns the jsonb object
-	const result = rpcResult as unknown as FinalizeSegmentResult;
-
-	console.log("Segment finalized, RPC result:", result);
-
-	// Update session flags and elapsed time in one operation
-	const { error: sessionUpdateError } = await supabaseAdmin
-		.from("timer_session")
-		.update({
-			is_paused: true,
-			elapsed_time: result.elapsed_time_ms, // Use RPC result to avoid separate updates
-		})
-		.eq("id", sessionId)
-		.eq("user_id", userId);
-
-	if (sessionUpdateError) {
-		console.error("Error updating session pause state:", sessionUpdateError);
-		throw sessionUpdateError;
-	}
-
-	return result;
-}
-
-/**
- * Resume a paused timer by creating a new running segment.
- *
- * Calls {@link startRunningSegment} to insert a new `timer_segment` with
- * `end_time IS NULL`, then sets `timer_session.is_paused = false`. The session's
- * `elapsed_time` is not updated here — it will be recomputed on the next pause
- * or via the `get_timer_session_with_elapsed` RPC.
- *
- * @param sessionId - The `timer_session.id` UUID to resume.
- * @param userId    - Internal `user_profiles.id` UUID; verified against the session.
- * @returns Object with a `message` string (always `"Timer resumed successfully"`).
- */
-export async function resumeTimer(sessionId: string, userId: string) {
-	console.log("Resuming timer for session:", sessionId);
-	// Verify session ownership
-	const { data: session, error: sessionError } = await supabaseAdmin.from("timer_session").select("id").eq("id", sessionId).eq("user_id", userId).single();
-
-	if (sessionError || !session) {
-		throw new Error("Timer session not found or access denied");
-	}
-
-	// Start new running segment - start_time will be set by database
-	await startRunningSegment(sessionId, userId);
-
-	// Update session flags to reflect resume (elapsed_time will be updated via real-time or API if needed)
-	const { error: sessionUpdateError } = await supabaseAdmin
-		.from("timer_session")
-		.update({
-			is_paused: false,
-		})
-		.eq("id", sessionId)
-		.eq("user_id", userId);
-
-	if (sessionUpdateError) {
-		console.error("Error updating session resume state:", sessionUpdateError);
-		throw sessionUpdateError;
-	}
-
-	return { message: "Timer resumed successfully" };
 }
 
 // =====================================
@@ -916,7 +618,7 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 
 	// Whitelist the columns a user may change. cleanUpdates still holds whatever
 	// the client sent (minus dimension fields); copying only allowed keys keeps
-	// system columns (user_id, is_draft, deleted_*, synced_to_monday, created_at)
+	// system columns (user_id, timer_state, deleted_*, synced_to_monday, created_at)
 	// unreachable from the request body. Runs last so the board/duration fixes above are included.
 	const updatePayload: TimeEntryUpdate = {};
 	for (const field of SELF_EDITABLE_TIME_ENTRY_FIELDS) {

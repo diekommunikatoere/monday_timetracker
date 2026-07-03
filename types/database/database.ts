@@ -430,13 +430,11 @@ export type Database = {
           duration: number | null
           end_time: string | null
           id: string
-          is_draft: boolean
           item_id: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          timer_session: Json | null
-          timer_state: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
         }
@@ -449,13 +447,11 @@ export type Database = {
           duration?: number | null
           end_time?: string | null
           id?: string
-          is_draft?: boolean
           item_id?: string | null
           role_id?: string | null
           start_time?: string
           synced_to_monday?: boolean
-          timer_session?: Json | null
-          timer_state?: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at?: string
           user_id: string
         }
@@ -468,13 +464,11 @@ export type Database = {
           duration?: number | null
           end_time?: string | null
           id?: string
-          is_draft?: boolean
           item_id?: string | null
           role_id?: string | null
           start_time?: string
           synced_to_monday?: boolean
-          timer_session?: Json | null
-          timer_state?: Database["public"]["Enums"]["timer_state"] | null
+          timer_state?: Database["public"]["Enums"]["timer_state"]
           updated_at?: string
           user_id?: string
         }
@@ -519,29 +513,23 @@ export type Database = {
       timer_segment: {
         Row: {
           created_at: string
-          duration: number | null
           end_time: string | null
-          entry_id: string | null
+          entry_id: string
           id: string
-          session_id: string | null
           start_time: string
         }
         Insert: {
           created_at?: string
-          duration?: number | null
           end_time?: string | null
-          entry_id?: string | null
+          entry_id: string
           id?: string
-          session_id?: string | null
           start_time?: string
         }
         Update: {
           created_at?: string
-          duration?: number | null
           end_time?: string | null
-          entry_id?: string | null
+          entry_id?: string
           id?: string
-          session_id?: string | null
           start_time?: string
         }
         Relationships: [
@@ -550,64 +538,6 @@ export type Database = {
             columns: ["entry_id"]
             isOneToOne: false
             referencedRelation: "time_entry"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "timer_segment_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "timer_session"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      timer_session: {
-        Row: {
-          created_at: string
-          draft_id: string | null
-          elapsed_time: number
-          id: string
-          is_paused: boolean
-          start_time: string
-          timer_segments: Json | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          draft_id?: string | null
-          elapsed_time?: number
-          id?: string
-          is_paused?: boolean
-          start_time?: string
-          timer_segments?: Json | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          draft_id?: string | null
-          elapsed_time?: number
-          id?: string
-          is_paused?: boolean
-          start_time?: string
-          timer_segments?: Json | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "timer_session_draft_id_fkey"
-            columns: ["draft_id"]
-            isOneToOne: false
-            referencedRelation: "time_entry"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "timer_session_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -686,37 +616,6 @@ export type Database = {
           utilization_percent: number
         }[]
       }
-      finalize_draft: {
-        Args: {
-          p_comment: string
-          p_draft_id: string
-          p_task_name: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
-      finalize_segment: { Args: { p_session_id: string }; Returns: Json }
-      finalize_time_entry: {
-        Args: {
-          p_board_id?: string
-          p_board_name?: string
-          p_comment: string
-          p_date?: string
-          p_draft_id: string
-          p_duration?: number
-          p_end_time?: string
-          p_is_draft?: boolean
-          p_item_id?: string
-          p_item_name?: string
-          p_parent_item_id?: string
-          p_parent_item_name?: string
-          p_role_id?: string
-          p_start_time?: string
-          p_task_name: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
       get_active_timers: {
         Args: { p_user_id: string }
         Returns: {
@@ -732,10 +631,6 @@ export type Database = {
           updated_at: string
           user_id: string
         }[]
-      }
-      get_current_elapsed_time: {
-        Args: { p_session_id: string }
-        Returns: Json
       }
       get_effective_hourly_rate: {
         Args: { p_board_id: string; p_role_id: string }
@@ -765,7 +660,6 @@ export type Database = {
           duration: number
           end_time: string
           id: string
-          is_draft: boolean
           item_id: string
           item_name: string
           parent_item_id: string
@@ -775,6 +669,7 @@ export type Database = {
           start_time: string
           synced_to_monday: boolean
           task_name: string
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
           user_name: string
@@ -784,10 +679,6 @@ export type Database = {
       get_item_total_time: {
         Args: { p_item_ids: string[]; p_user_id?: string }
         Returns: number
-      }
-      get_timer_session_with_elapsed: {
-        Args: { p_user_id: string }
-        Returns: Json
       }
       get_user_time_entries: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
@@ -799,7 +690,6 @@ export type Database = {
           duration: number
           end_time: string
           id: string
-          is_draft: boolean
           item_id: string
           item_name: string
           parent_item_id: string
@@ -822,14 +712,6 @@ export type Database = {
           purged_items: number
           purged_time_entries: number
         }[]
-      }
-      soft_reset_timer: {
-        Args: {
-          p_old_draft_id: string
-          p_old_session_id: string
-          p_user_id: string
-        }
-        Returns: Json
       }
       timer_finalize: {
         Args: {
@@ -857,13 +739,11 @@ export type Database = {
           duration: number | null
           end_time: string | null
           id: string
-          is_draft: boolean
           item_id: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          timer_session: Json | null
-          timer_state: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
         }
@@ -885,13 +765,11 @@ export type Database = {
           duration: number | null
           end_time: string | null
           id: string
-          is_draft: boolean
           item_id: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          timer_session: Json | null
-          timer_state: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
         }
@@ -913,13 +791,11 @@ export type Database = {
           duration: number | null
           end_time: string | null
           id: string
-          is_draft: boolean
           item_id: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          timer_session: Json | null
-          timer_state: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
         }
@@ -945,13 +821,11 @@ export type Database = {
           duration: number | null
           end_time: string | null
           id: string
-          is_draft: boolean
           item_id: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          timer_session: Json | null
-          timer_state: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
         }
@@ -978,13 +852,11 @@ export type Database = {
           duration: number | null
           end_time: string | null
           id: string
-          is_draft: boolean
           item_id: string | null
           role_id: string | null
           start_time: string
           synced_to_monday: boolean
-          timer_session: Json | null
-          timer_state: Database["public"]["Enums"]["timer_state"] | null
+          timer_state: Database["public"]["Enums"]["timer_state"]
           updated_at: string
           user_id: string
         }

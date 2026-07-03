@@ -51,17 +51,6 @@ export type Role = Database["public"]["Tables"]["role"]["Row"];
 export type RoleInsert = Database["public"]["Tables"]["role"]["Insert"];
 export type RoleUpdate = Database["public"]["Tables"]["role"]["Update"];
 
-/**
- * The `timer_session` table row (one active session per user).
- *
- * NOTE: collides by name with the client-side `TimerSession` in
- * [timer.types.ts](../timer.types.ts). This is the raw DB row; that one is the
- * UI/API shape. Import from the path matching which you mean.
- */
-export type TimerSession = Database["public"]["Tables"]["timer_session"]["Row"];
-export type TimerSessionInsert = Database["public"]["Tables"]["timer_session"]["Insert"];
-export type TimerSessionUpdate = Database["public"]["Tables"]["timer_session"]["Update"];
-
 /** Local mirror of a monday group, kept in sync by the webhook handler. `sync_enabled` gates whether items in the group sync time back. */
 export type MondayGroup = Database["public"]["Tables"]["monday_group"]["Row"];
 export type MondayGroupInsert = Database["public"]["Tables"]["monday_group"]["Insert"];
