@@ -44,8 +44,8 @@ interface TimeEntriesTableProps {
  *
  * Renders the shared {@link TimeEntryTable} using {@link getDashboardColumns};
  * row selection is limited to the current user's own entries (`userId` from
- * `useUserStore`). Editing is dispatched by entry type: **drafts**
- * (`entry.is_draft`) open {@link SaveTimerModal} seeded from the draft row,
+ * `useUserStore`). Editing is dispatched by entry type: **non-finalized entries**
+ * (`entry.timer_state !== "finalized"`) open {@link SaveTimerModal} seeded from the draft row,
  * while finalized entries open {@link EditTimeEntryModal}. Both "edit" and
  * "finalize draft" funnel through `onEdit`.
  *
@@ -106,7 +106,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 
 	// Edit handlers
 	const handleEdit = (entry: TimeEntry) => {
-		if (entry.is_draft) {
+		if (entry.timer_state !== "finalized") {
 			handleOpenSaveModal(entry);
 		} else {
 			setEditingEntry(entry);

@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: Props) {
 		console.log(`[BulkSync] Starting bulk sync for board ${boardId}`);
 
 		// Get all unique item IDs that have time entries on this board
-		const { data: itemIds, error: itemError } = await supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("is_draft", false).not("item_id", "is", null);
+		const { data: itemIds, error: itemError } = await supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("timer_state", "finalized").not("item_id", "is", null);
 
 		if (itemError) {
 			console.error("Error fetching items:", itemError);
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest, { params }: Props) {
 		const failureCount = stats?.filter((s) => !s.success).length || 0;
 
 		// Get unique items synced
-		const { data: itemCount, error: itemCountError } = await supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("is_draft", false).not("item_id", "is", null);
+		const { data: itemCount, error: itemCountError } = await supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("timer_state", "finalized").not("item_id", "is", null);
 
 		if (itemCountError) {
 			console.error("Error fetching item count:", itemCountError);

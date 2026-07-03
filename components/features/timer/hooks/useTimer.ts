@@ -36,9 +36,8 @@ function pickActiveTimer(timers: ActiveTimer[]): ActiveTimer | null {
  *    (`get_active_timers`), choosing one with {@link pickActiveTimer}.
  *  - Subscribes to Supabase realtime on the `time_entry` table (filtered to the
  *    current user) and re-fetches authoritative state on any change, for
- *    cross-device sync. NOTE: this lights up once migration 028 adds `time_entry`
- *    to the `supabase_realtime` publication; until then it is a harmless no-op and
- *    the per-action refetch keeps the acting device correct.
+ *    cross-device sync (enabled by migration 030's addition of `time_entry`
+ *    to the `supabase_realtime` publication).
  *  - Runs a 1-second tick that recomputes elapsed time locally as
  *    `baseElapsedTime + (Date.now() - syncedAt)` (all values in **milliseconds**;
  *    the RPC reports `elapsed_seconds`, converted to ms here).

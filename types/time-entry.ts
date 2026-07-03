@@ -30,7 +30,7 @@
  * @property parent_item_name  - Parent item display name. Resolved via JOIN; not stored on `time_entry`.
  * @property role_id           - FK to `role` — the source of truth for the billing role.
  * @property role_name         - Display name, joined from `role`.
- * @property is_draft          - True while a timer is live / the entry is unfinalized.
+ * @property timer_state       - Lifecycle discriminator: `running` | `paused` | `parked` while live, `finalized` once saved.
  * @property comment           - Optional free-text note.
  * @property synced_to_monday  - True once the entry's totals have been pushed to monday columns.
  * @property created_at        - ISO 8601 creation timestamp.
@@ -59,7 +59,7 @@ export interface TimeEntry {
 	parent_item_name?: string | null; // Resolved via monday_item JOIN (not stored on time_entry)
 	role_id: string | null; // Foreign key to role table - primary source of truth
 	role_name: string | null; // Human-readable role name
-	is_draft: boolean;
+	timer_state: "running" | "paused" | "parked" | "finalized";
 	comment: string | null;
 	synced_to_monday: boolean;
 	created_at: string; // ISO 8601 timestamp string
