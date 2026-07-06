@@ -1,12 +1,14 @@
 // components/dashboard/TimeEntriesTable.tsx
 "use client";
 
-import { useState } from "react";
-import { Flex } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { Flex, Group, Pagination } from "@mantine/core";
+import { Select } from "@/components";
 import { useUserStore } from "@/stores/userStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
+import { useHydration } from "@/lib/store-utils";
 import { TimeEntry } from "@/types/time-entry";
 import { secondsToDuration, formatTimeString } from "@/lib/utils";
 import SaveTimerModal from "./SaveTimerModal";
@@ -56,6 +58,12 @@ interface TimeEntriesTableProps {
  * {@link DeleteConfirmationDialog}. {@link BulkActionButtons} is rendered
  * alongside to drive bulk delete and selection clearing.
  *
+ * Below the table, a footer row renders a page-size picker (25/50/100, gated on
+ * `useHydration()` to avoid an SSR mismatch with the persisted `pageSize`) and a
+ * Mantine `Pagination` control (hidden once everything fits on one page). Both
+ * drive `useTimeEntriesStore`'s `setPage`/`setPageSize`, which refetch server-side;
+ * `selectedIds` is cleared whenever the page or page size changes.
+ *
  * Reads from: `useTimeEntriesStore`, `useUserStore`, `useMondayStore`
  * (session token), `useToast`.
  *
@@ -63,7 +71,8 @@ interface TimeEntriesTableProps {
  * @returns The table plus its modals, delete dialog, and bulk-action panel.
  */
 export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
-	const { timeEntries, loading, error } = useTimeEntriesStore();
+	const { timeEntries, loading, error, page, pageSize, total, setPage, setPageSize } = useTimeEntriesStore();
+	const isHydrated = useHydration();
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showSaveModal, setShowSaveModal] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<TimeEntry | null>(null);
@@ -76,6 +85,12 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const userId = useUserStore((state) => state.supabaseUser?.id);
 	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
+
+	// Rows shown on a page/page-size change are no longer the ones selection was
+	// computed against — clear it rather than acting on stale row ids.
+	useEffect(() => {
+		setSelectedIds([]);
+	}, [page, pageSize]);
 
 	const handleSelectAll = (checked: boolean) => {
 		if (checked) {
@@ -234,10 +249,28 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 		currentUserId: userId,
 	});
 
+	// Show the default page size until the persisted store has rehydrated on the
+	// client — reading `pageSize` before that would render a value the server
+	// didn't render, causing a hydration mismatch.
+	const displayedPageSize = isHydrated ? pageSize : DEFAULT_TIME_ENTRIES_PAGE_SIZE;
+
 	return (
 		<>
 			<Flex direction="column" gap="md" style={{ flex: 1, minHeight: 0, width: "100%" }}>
 				<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
+
+				<Group justify="space-between">
+					<Select
+						label="Pro Seite"
+						data={TIME_ENTRIES_PAGE_SIZES.map(String)}
+						value={String(displayedPageSize)}
+						onChange={(value) => value && setPageSize(Number(value))}
+						disabled={!isHydrated}
+						allowDeselect={false}
+						w={120}
+					/>
+					{total > pageSize && <Pagination total={Math.ceil(total / pageSize)} value={page} onChange={setPage} />}
+				</Group>
 			</Flex>
 
 			<SaveTimerModal

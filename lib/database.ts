@@ -499,25 +499,35 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 }
 
 /**
- * Fetch time entries for a single user in display-ready shape.
+ * Fetch a page of time entries for a single user in display-ready shape.
  *
  * Delegates to the `get_user_time_entries` Postgres RPC, which JOINs dimension
  * tables and returns the flattened {@link FrontendTimeEntry} shape (with
- * `board_name`, `item_name`, `role_name`, etc.) — not raw DB rows.
- * Results are **not** cached here.
+ * `board_name`, `item_name`, `role_name`, etc.) — not raw DB rows. Results are
+ * **not** cached here (per-user + per-page keys aren't worth caching).
  *
- * The RPC returns at most 100 rows (hard-coded `p_limit`) and includes
- * non-finalized entries too (`timer_state !== "finalized"`) — the entries
- * table uses `timer_state` to render draft-row styling.
+ * The RPC excludes the live running timer server-side (`timer_state <>
+ * 'running'`) but still includes other non-finalized entries (paused/parked
+ * drafts) — the entries table uses `timer_state` to render draft-row styling.
+ * Each row also carries a `total_count` column (the filtered total, identical
+ * on every row via `COUNT(*) OVER()`); it's ignored by the {@link TimeEntry}
+ * type and surfaced separately as `total` on the return value.
  *
- * @param userId - Internal `user_profiles.id` UUID; passed as `p_user_id` to the RPC.
- * @returns Up to 100 time entries for the user, sorted by the RPC's default order.
+ * @param userId       - Internal `user_profiles.id` UUID; passed as `p_user_id` to the RPC.
+ * @param opts.page     - 1-based page number. Defaults to `1`.
+ * @param opts.pageSize - Rows per page, passed as `p_limit`. Defaults to `50`.
+ * @returns `{ entries, total }` — the requested page and the total row count across all pages (`0` when there are no rows).
  */
-export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithRole[]> {
+export async function getUserTimeEntries(userId: string, opts?: { page?: number; pageSize?: number }): Promise<{ entries: TimeEntryWithRole[]; total: number }> {
+	const page = opts?.page ?? 1;
+	const pageSize = opts?.pageSize ?? 50;
+	const offset = (page - 1) * pageSize;
+
 	// Fetch from database using RPC to get joined names
 	const { data, error } = await supabaseAdmin.rpc("get_user_time_entries", {
 		p_user_id: userId,
-		p_limit: 100,
+		p_limit: pageSize,
+		p_offset: offset,
 	} as any);
 
 	if (error) {
@@ -525,7 +535,10 @@ export async function getUserTimeEntries(userId: string): Promise<TimeEntryWithR
 		throw error;
 	}
 
-	return data as any;
+	const rows = (data ?? []) as any[];
+	const total = rows[0]?.total_count ?? 0;
+
+	return { entries: rows as TimeEntryWithRole[], total };
 }
 
 // =====================================

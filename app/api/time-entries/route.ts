@@ -3,6 +3,10 @@ import { getUserTimeEntries } from "@/lib/database";
 import { getUserProfileByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 
+/** Allowed page sizes — mirrors the dashboard's page-size picker. */
+const ALLOWED_PAGE_SIZES = [25, 50, 100];
+const DEFAULT_PAGE_SIZE = 50;
+
 export async function GET(request: NextRequest) {
 	try {
 		// Validate session
@@ -23,10 +27,18 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "User profile not found" }, { status: 404 });
 		}
 
-		// Fetch time entries for this user using the internal Supabase ID
-		const timeEntries = await getUserTimeEntries(userProfile.id);
+		// Parse and clamp pagination params server-side — this is a public HTTP
+		// surface, don't trust the client's page/pageSize values.
+		const { searchParams } = new URL(request.url);
+		const requestedPageSize = Number(searchParams.get("pageSize"));
+		const pageSize = ALLOWED_PAGE_SIZES.includes(requestedPageSize) ? requestedPageSize : DEFAULT_PAGE_SIZE;
+		const requestedPage = Number(searchParams.get("page"));
+		const page = Math.max(1, Number.isFinite(requestedPage) ? Math.trunc(requestedPage) : 1);
 
-		return NextResponse.json(timeEntries);
+		// Fetch time entries for this user using the internal Supabase ID
+		const { entries, total } = await getUserTimeEntries(userProfile.id, { page, pageSize });
+
+		return NextResponse.json({ entries, total, page, pageSize });
 	} catch (error) {
 		console.error("Error fetching time entries:", error);
 		return NextResponse.json({ error: "Failed to fetch time entries" }, { status: 500 });
