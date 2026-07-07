@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flex, Group, Pagination } from "@mantine/core";
+import { Flex, Group, Input, Pagination } from "@mantine/core";
 import { Select } from "@/components";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
@@ -256,21 +256,18 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 
 	return (
 		<>
-			<Flex direction="column" gap="md" style={{ flex: 1, minHeight: 0, width: "100%" }}>
+			<Flex direction="column" style={{ flex: 1, minHeight: 0, width: "100%" }}>
 				<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
 
-				<Group justify="space-between">
-					<Select
-						label="Pro Seite"
-						data={TIME_ENTRIES_PAGE_SIZES.map(String)}
-						value={String(displayedPageSize)}
-						onChange={(value) => value && setPageSize(Number(value))}
-						disabled={!isHydrated}
-						allowDeselect={false}
-						w={120}
-					/>
-					{total > pageSize && <Pagination total={Math.ceil(total / pageSize)} value={page} onChange={setPage} />}
-				</Group>
+				<Flex justify="space-between" align="center" px="md" py="sm" style={{ flexShrink: 0 }}>
+					<Pagination total={Math.ceil(total / pageSize)} value={page} onChange={setPage} boundaries={1} />
+					<Flex align="center" gap={8}>
+						<Input.Label mb={0} size="xs">
+							Pro Seite
+						</Input.Label>
+						<Select data={TIME_ENTRIES_PAGE_SIZES.map(String)} value={String(displayedPageSize)} onChange={(value) => value && setPageSize(Number(value))} disabled={!isHydrated} allowDeselect={false} w={80} size="sm" style={{ flexShrink: 0 }} checkIconPosition="right" />
+					</Flex>
+				</Flex>
 			</Flex>
 
 			<SaveTimerModal

@@ -19,7 +19,7 @@ import logoWhite from "@/public/img/logo/timetracker_logo_white.svg";
  * @param props.loading - next/image loading strategy (`"eager"` | `"lazy"`), forwarded verbatim.
  * @returns A next/image `<Image>` element for the selected logo asset.
  */
-export const Logo = (props: { size?: { width: number; height: number }; style?: string; loading?: "eager" | "lazy" }) => {
+export const Logo = (props: { size?: { width: number; height: number }; style?: string; loading?: "eager" | "lazy"; ref?: React.Ref<HTMLImageElement> }) => {
 	let sizeProps;
 
 	if (props.size) {
@@ -30,14 +30,14 @@ export const Logo = (props: { size?: { width: number; height: number }; style?: 
 
 	switch (props.style) {
 		case "brand":
-			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
+			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} ref={props.ref} />;
 		case "light":
-			return <Image src={logoLight} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
+			return <Image src={logoLight} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} ref={props.ref} />;
 		case "black":
-			return <Image src={logoBlack} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
+			return <Image src={logoBlack} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} ref={props.ref} />;
 		case "white":
-			return <Image src={logoWhite} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
+			return <Image src={logoWhite} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} ref={props.ref} />;
 		default:
-			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} />;
+			return <Image src={logoBrand} alt="TimeTracker Logo" aria-label="TimeTracker Logo" {...sizeProps} loading={props.loading} ref={props.ref} />;
 	}
 };
