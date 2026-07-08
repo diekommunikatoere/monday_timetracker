@@ -6,13 +6,15 @@
 import { useEffect, useRef } from "react";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 
 /**
- * Rehydrates the app's persisted Zustand stores (`timerStore`, `userStore`) on
- * first client mount. **This must run client-side only** — the stores are
- * persisted to `localStorage`, so calling `persist.rehydrate()` during SSR would
- * read browser storage and cause hydration mismatches. A `useRef` guard ensures
- * rehydration fires exactly once per provider instance.
+ * Rehydrates the app's persisted Zustand stores (`timerStore`, `userStore`,
+ * `timeEntriesStore`) on first client mount. **This must run client-side
+ * only** — the stores are persisted to `localStorage`, so calling
+ * `persist.rehydrate()` during SSR would read browser storage and cause
+ * hydration mismatches. A `useRef` guard ensures rehydration fires exactly
+ * once per provider instance.
  *
  * @param children - React subtree to render once mounted.
  * @returns `children` unchanged (this provider renders no UI of its own).
@@ -25,6 +27,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 			// Manually hydrate persisted stores
 			useTimerStore.persist.rehydrate();
 			useUserStore.persist.rehydrate();
+			useTimeEntriesStore.persist.rehydrate();
 			hydrated.current = true;
 		}
 	}, []);

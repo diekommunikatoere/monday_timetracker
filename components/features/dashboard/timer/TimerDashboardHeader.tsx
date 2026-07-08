@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Logo } from "@/components/Logo";
 import TimerContainer from "@/components/features/timer/TimerContainer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex } from "@mantine/core";
+import { Flex, Tooltip } from "@mantine/core";
 import { useModalStore } from "@/stores/modalStore";
 import { useUserStore } from "@/stores/userStore";
 import { ManualTimeEntryModal } from "@/components/features/timer";
@@ -12,6 +12,7 @@ import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
 import { useTimerContext } from "@/contexts/TimerContext";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { APP_VERSION } from "@/lib/version";
 
 import "@/public/css/components/AppHeader.css";
 
@@ -59,7 +60,9 @@ export function TimerDashboardHeader(variant?) {
 				<Flex align="center" gap={16} className="header-left-section">
 					<Flex align="center" gap={16} className="logo-container">
 						{/* Logo for light/dark mode */}
-						<Logo size={{ width: 186, height: 32 }} style={logoStyle} loading="eager" />
+						<Tooltip label={`v${APP_VERSION}`} position="bottom">
+							<Logo size={{ width: 186, height: 32 }} style={logoStyle} loading="eager" />
+						</Tooltip>
 
 						<ManualTimeEntryButton
 							onClick={() => {

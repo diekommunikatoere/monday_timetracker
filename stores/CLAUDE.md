@@ -22,15 +22,16 @@ Until this resolves, `sessionToken` is `null` and **every other store's fetch is
 
 ## Persistence & SSR hydration
 
-Three stores persist to `localStorage` via the `persist` middleware, each with `skipHydration: true`:
+Four stores persist to `localStorage` via the `persist` middleware, each with `skipHydration: true`:
 
 | Store | localStorage key | Persisted fields (`partialize`) |
 |-------|------------------|----------------------------------|
 | `userStore` | `user-store` | `theme` only |
 | `timerStore` | `timer-store` | `comment`, `draftId`, `sessionId` |
 | `draftStore` | `draft-store` | `comment`, `taskName` |
+| `timeEntriesStore` | `time-entries-store` | `pageSize` only |
 
-`skipHydration` means they do **not** auto-rehydrate. [`components/StoreProvider.tsx`](../components/StoreProvider.tsx) (mounted in the root layout) calls `.persist.rehydrate()` on these three after client mount — this is what prevents Next.js hydration mismatches. In components that render persisted values, gate on `useHydration()` from [`lib/store-utils.ts`](../lib/store-utils.ts) until hydrated. If you add a new persisted store, add its `rehydrate()` call to `StoreProvider`.
+`skipHydration` means they do **not** auto-rehydrate. [`components/StoreProvider.tsx`](../components/StoreProvider.tsx) (mounted in the root layout) calls `.persist.rehydrate()` on these four after client mount — this is what prevents Next.js hydration mismatches. In components that render persisted values, gate on `useHydration()` from [`lib/store-utils.ts`](../lib/store-utils.ts) until hydrated. If you add a new persisted store, add its `rehydrate()` call to `StoreProvider`.
 
 ## Store reference
 
@@ -40,7 +41,7 @@ Three stores persist to `localStorage` via the `persist` middleware, each with `
 | `userStore` | theme | Monday user + Supabase profile + `authenticated`. Holds `theme` (`MondayTheme`: black/light/dark) and computed `appTheme` (light/dark); exports `mapMondayThemeToAppTheme`. `toggleTheme` persists to DB via `POST /api/user/theme`. Note: at runtime the user fields are filled by `mondayStore`, not this store's own setters. |
 | `timerStore` | comment, draftId, sessionId | **Pure state container** — sessionId/draftId/elapsedTime/status (`idle`/`running`/`paused`)/comment/`_serverSync`. Does no API calls; orchestration lives in [`components/features/timer/hooks/useTimer.ts`](../components/features/timer/hooks/useTimer.ts). Exposes `useShallow` selector hooks: `useTimerSession`, `useTimerElapsed`, `useTimerComment`, `useTimerUIState`, `useTimerComputed`. Types from `@/types/timer.types`. |
 | `draftStore` | comment, taskName | Draft comment auto-save (500 ms debounce → `PATCH /api/timer/draft`) and manual finalize (`saveDraft` → `POST /api/timer/finalize`). `setComment` auto-derives `taskName`. Remember to `clearDebounce()` on unmount. |
-| `timeEntriesStore` | — | Current user's finalized entries for the table. `fetchTimeEntries(userId)` → `GET /api/time-entries`; filters out the live running entry (`end_time`/`duration` null). |
+| `timeEntriesStore` | pageSize | Current user's entries for the dashboard table, server-paginated. `fetchTimeEntries(userId)` → `GET /api/time-entries?page&pageSize`; the live running entry is excluded server-side (`timer_state <> 'running'`), not filtered client-side. `page`/`total` are in-memory only; `setPage`/`setPageSize` refetch using the `userId` cached from the last fetch. `refetch(userId)` steps back a page if a delete empties the current (non-first) page. A monotonic request-id guards against rapid page clicks resolving out of order. |
 | `itemTimeEntriesStore` | — | Per-item (sidebar) entries across all users, with `byRole`/`byUser` aggregations and `filters` (date range, role, user). `setFilters` auto-refetches. `GET /api/items/:itemId/time-entries`. |
 | `appStore` | — | Connected boards from the widget context. `loadConnectedBoards()` → `POST /api/connectedBoards`. |
 | `modalStore` | — | Pure UI booleans: `showTimerSave`, `showEmptyCommentConfirmation` (+ open/close). |

@@ -700,6 +700,7 @@ export type Database = {
           synced_to_monday: boolean
           task_name: string
           timer_state: Database["public"]["Enums"]["timer_state"]
+          total_count: number
           updated_at: string
           user_id: string
           user_name: string
