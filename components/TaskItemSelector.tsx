@@ -1,7 +1,7 @@
 // components/TaskItemSelector.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelect, TreeSelectProps, type TreeNodeData } from "@mantine/core";
 import { Icon, IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
 import { useRoles } from "@/components/shared/hooks/useRoles";
 import RefreshIcon from "@/components/icons/Refresh";
+import Fuse, { type FuseResult } from "fuse.js";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 
@@ -145,6 +146,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
 	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
 	const [expandedValues, setExpandedValues] = useState<string[]>([]);
+	const [searchValue, setSearchValue] = useState("");
+	const [dropdownOpened, setDropdownOpened] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -204,6 +207,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 	const resetTask = useCallback(() => {
 		setSelectedTask(null);
+		setSearchValue("");
 	}, []);
 
 	const resetRole = useCallback(() => {
@@ -592,6 +596,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			const selectedOption = option as DropdownOption;
 			setSelectedBoard(value ? selectedOption : null);
 			setSelectedTask(null);
+			setSearchValue("");
 
 			onSelectionChange({
 				boardId: value || undefined,
@@ -662,6 +667,67 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			});
 		},
 		[selectedBoard, selectedTask, onSelectionChange],
+	);
+
+	// Handle task search
+	// 1) Flatten tree data with joined ancestor labels for each node to support searching by any level.
+	const flatDataSearchable = useMemo(() => {
+		const out: { value: string; path: string }[] = [];
+		const traverse = (nodes: TreeNodeData[], ancestors: string[]) => {
+			for (const n of nodes) {
+				const selfLabel = typeof n.label === "string" ? n.label : n.value;
+				const path = [...ancestors, selfLabel].join(" > ");
+				out.push({ value: n.value, path });
+				if (n.children) {
+					traverse(n.children, [...ancestors, selfLabel]);
+				}
+			}
+		};
+
+		traverse(treeData, []);
+		return out;
+	}, [treeData]);
+
+	// 2) Build Fuse index for searching once per tree data change.
+	const fuseIndex = useMemo(
+		() =>
+			new Fuse(flatDataSearchable, {
+				keys: ["path"],
+				useTokenSearch: true,
+				tokenMatch: "all",
+				ignoreLocation: true,
+				threshold: 0.3,
+				minMatchCharLength: 2,
+			}),
+		[flatDataSearchable],
+	);
+
+	// Cache the matched-value set per unique search query to avoid recomputing matches on every render while typing.
+	const matchCacheRef = useRef(new Map<string, Set<string>>());
+
+	const taskFilter = useCallback(
+		(query: string, node: TreeNodeData) => {
+			if (!query.trim()) return true;
+
+			const cache = matchCacheRef.current;
+			let hitValues = cache.get(query);
+			if (!hitValues) {
+				const hits: FuseResult<{ value: string; path: string }>[] = fuseIndex.search(query);
+				hitValues = new Set(hits.map((h) => h.item.value));
+				cache.set(query, hitValues);
+
+				// Limit cache size to prevent unbounded growth in long sessions with many unique queries. Evict least recently used entry when limit is exceeded.
+				const CACHE_LIMIT = 50;
+				if (cache.size > CACHE_LIMIT) {
+					const firstKey = cache.keys().next().value;
+					if (firstKey !== undefined) {
+						cache.delete(firstKey);
+					}
+				}
+			}
+			return hitValues.has(node.value);
+		},
+		[fuseIndex],
 	);
 
 	const hasTaskData = treeData.length > 0 || (tasksData?.groups && tasksData.groups.length > 0);
@@ -745,6 +811,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					id="task-selector"
 					placeholder={taskPlaceholder}
 					data={treeData}
+					filter={taskFilter}
 					renderNode={renderTaskNode}
 					value={selectedTask?.value ?? null}
 					onChange={handleTaskChange}
@@ -756,11 +823,35 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					clearButtonProps={{ "aria-label": "Auswahl löschen" }}
 					// Searchable matches group, job and task labels and reveals ancestors.
 					searchable={!!selectedBoard}
+					searchValue={searchValue}
+					onSearchChange={setSearchValue}
+					dropdownOpened={dropdownOpened}
+					onDropdownOpen={() => setDropdownOpened(true)}
+					onDropdownClose={() => setDropdownOpened(false)}
 					disabled={isTaskDropdownDisabled}
 					maxDropdownHeight={320}
 					nothingFoundMessage={!selectedBoard ? "Wählen Sie zuerst ein Board aus" : isTaskDropdownLoading ? "Lade Aufgaben..." : "Keine Aufgaben gefunden"}
-					// Show loading indicator for initial load or background refetch
-					rightSection={isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? <Loader size={14} /> : undefined}
+					// Show loader, or a clear-search button when the user has typed but nothing is selected yet.
+					rightSection={
+						isTaskDropdownLoading || (isFetchingTasks && hasTaskData) ? (
+							<Loader size={14} />
+						) : searchValue && !selectedTask ? (
+							<IconButton
+								variant="filled"
+								colorVariant="tertiary"
+								size="xs"
+								onMouseDown={(e) => e.preventDefault()}
+								onClick={() => {
+									setSearchValue("");
+									setDropdownOpened(true);
+								}}
+								aria-label="Suche löschen"
+							>
+								<Icon name="close" size={12} color="var(--color--text-secondary)" />
+							</IconButton>
+						) : undefined
+					}
+					rightSectionPointerEvents="auto"
 					classNames={{ option: styles.selectOption }}
 					required
 				/>
