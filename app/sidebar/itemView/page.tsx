@@ -8,6 +8,7 @@ import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { ItemSidebarHeader } from "@/components/sidebar/ItemSidebarHeader";
 import { ItemTimeEntriesView } from "@/components/sidebar/ItemTimeEntriesView";
 import { ItemManualEntryModal } from "@/components/sidebar/ItemManualEntryModal";
+import { ErrorState, LoadingState } from "@/components";
 import { TimeEntry } from "@/types/time-entry";
 import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
 import { useUserStore } from "@/stores/userStore";
@@ -88,13 +89,16 @@ export default function ItemViewPage() {
 
 	if (!itemId || !boardId || loadingDetails) {
 		return (
-			<Center h="100vh">
-				<Flex direction="column" align="center" gap="md">
-					<Loader size="lg" />
-					<Text c="dimmed">Warte auf monday.com Kontext...</Text>
-				</Flex>
-			</Center>
+			<Flex direction="column" style={{ height: "100vh", overflow: "hidden" }}>
+				<ItemSidebarHeader onManualEntryClick={() => setShowManualModal(true)} />
+				<LoadingState text="Warte auf monday.com Kontext..." />
+			</Flex>
 		);
+	}
+
+	// Show error if Monday initialization failed
+	if (mondayError) {
+		return <ErrorState message={mondayError} />;
 	}
 
 	return (

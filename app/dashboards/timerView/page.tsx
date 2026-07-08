@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { ErrorState, LoadingState } from "@/components";
 import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
@@ -30,12 +31,17 @@ export default function DashboardPage() {
 
 	// Show loading state while initializing
 	if (mondayLoading) {
-		return <div>Wird initialisiert...</div>;
+		return (
+			<div id="dashboard-app">
+				<TimerDashboardHeader variant="dashboard" />
+				<LoadingState />
+			</div>
+		);
 	}
 
 	// Show error if Monday initialization failed
 	if (mondayError) {
-		return <div>Fehler: {mondayError}</div>;
+		return <ErrorState message={mondayError} />;
 	}
 
 	return (

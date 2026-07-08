@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
 import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
-import { Button, IconButton, IconLink } from "@/components";
+import { Button, IconButton, IconLink, LoadingState, ErrorState } from "@/components";
 import { Icon } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
@@ -400,15 +400,27 @@ export default function AdminPage() {
 	// Show loading state while initializing
 	if (mondayLoading) {
 		return (
-			<div className="admin-loading">
-				<Loader size="lg" />
+			<div id="admin-app">
+				<header className="admin-header">
+					<Flex align="center" gap={16}>
+						<Logo size={{ width: 180, height: 32 }} style="brand" />
+						<Text size="lg" fw={600} c="dimmed">
+							/ Admin Settings
+						</Text>
+					</Flex>
+				</header>
+				<LoadingState />
 			</div>
 		);
 	}
 
 	// Show error if Monday initialization failed
 	if (mondayError) {
-		return <div className="admin-error">Error: {mondayError}</div>;
+		return (
+			<div className="admin-error">
+				<ErrorState message={mondayError} />
+			</div>
+		);
 	}
 
 	// Check admin access
@@ -416,8 +428,7 @@ export default function AdminPage() {
 		return (
 			<div id="admin-app">
 				<div className="admin-error">
-					<Text fw={600}>Access Denied</Text>
-					<Text size="sm">You need admin privileges to access this page.</Text>
+					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
 				</div>
 			</div>
 		);
