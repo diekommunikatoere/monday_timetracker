@@ -10,9 +10,8 @@ import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { useRoles } from "../shared/hooks/useRoles";
 import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase/client";
 import mondaySdk from "monday-sdk-js";
 
 const monday = mondaySdk();
@@ -54,9 +53,9 @@ export interface ItemManualEntryModalProps {
  *
  * Renders {@link TimeEntryFormFields} (date, start/end time, `HH:MM` duration,
  * comment, lock toggle, role selector, quick-adjust buttons). The selectable
- * roles are fetched from the Supabase `role` table via `useQuery`; the incoming
- * `roleId` prop is adopted once and kept in local state, re-syncing only when it
- * is unset/empty.
+ * roles are fetched via the shared {@link useRoles} hook (alphabetical,
+ * active-only); the incoming `roleId` prop is adopted once and kept in local
+ * state, re-syncing only when it is unset/empty.
  *
  * On save it builds the payload from the form — `duration` is converted with
  * `durationToSeconds` to **seconds**, `date` to an ISO string, and the
@@ -78,19 +77,8 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRoleId, setSelectedRoleId] = useState<string>(roleId);
 
-	// Fetch available roles
-	const { data: roles = [], isLoading: loadingRoles } = useQuery({
-		queryKey: ["roles"],
-		queryFn: async () => {
-			const { data, error } = await supabase.from("role").select("*");
-			if (error) throw error;
-			return data.map((role) => ({
-				label: role.name,
-				value: role.id,
-			}));
-		},
-		staleTime: 30 * 60 * 1000,
-	});
+	// Roles (alphabetical, active-only) — shared fetch, see useRoles.
+	const { roles, isLoading: loadingRoles } = useRoles();
 
 	// Synchronize selectedRoleId with prop if it changes
 	useEffect(() => {

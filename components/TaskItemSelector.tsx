@@ -7,6 +7,7 @@ import { Icon, IconButton, Select } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
+import { useRoles } from "@/components/shared/hooks/useRoles";
 import RefreshIcon from "@/components/icons/Refresh";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
@@ -322,29 +323,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [boards, queryClient, fetchTasks]);
 
-	// Roles query with enhanced caching
-	const { data: roles = [], isLoading: loadingRoles } = useQuery({
-		queryKey: ["roles"],
-		queryFn: async () => {
-			const { data, error } = await supabase.from("role").select("*");
-			if (error) throw error;
-			return data
-				.filter((role) => role.is_active)
-				.sort((a, b) => {
-					if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-					return a.name.localeCompare(b.name);
-				})
-				.map((role) => ({
-					label: role.name,
-					value: role.id,
-				}));
-		},
-		// OPTIMIZATION: Roles change very infrequently
-		staleTime: 30 * 60 * 1000, // 30 minutes
-		gcTime: 60 * 60 * 1000, // 1 hour
-		refetchOnWindowFocus: false,
-		refetchOnMount: false,
-	});
+	// Roles (alphabetical, active-only) — shared fetch, see useRoles.
+	const { roles, isLoading: loadingRoles } = useRoles();
 
 	// Tasks query with enhanced caching
 	const {
