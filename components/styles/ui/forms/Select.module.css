@@ -23,3 +23,37 @@
 .select--success {
 	border-color: var(--color--success-500);
 }
+
+.selectOption {
+	border-radius: var(--mantine-radius-sm);
+	padding-block: 0.25rem;
+
+	&[aria-selected="true"] {
+		background-color: var(--color--background-secondary);
+		color: var(--color--text-primary);
+		font-weight: 600;
+
+		&:hover {
+			background-color: var(--color--background-secondary-hover);
+		}
+	}
+
+	&[data-combobox-selected] {
+		background-color: var(--color--background-secondary);
+		font-weight: 600;
+	}
+
+	&:hover {
+		background-color: var(--color--background-secondary-hover);
+	}
+
+	&:focus {
+		background-color: var(--color--background-secondary-hover);
+		outline: 2px solid var(--color--primary-500);
+	}
+
+	svg {
+		color: var(--color--primary-500);
+		opacity: 1;
+	}
+}

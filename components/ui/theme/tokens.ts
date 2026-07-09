@@ -167,7 +167,7 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--background-primary-hover": "var(--color--tertiary-950)",
 		"--color--background-secondary": "var(--color--tertiary-950)",
 		"--color--background-secondary-hover": "var(--color--tertiary-900)",
-		"--color--background-disabled": "var(--color--tertiary-800)",
+		"--color--background-disabled": "var(--color--tertiary-700)",
 		"--color--background-backdrop": "color-mix(in srgb, var(--color--tertiary-900) 70%, transparent)",
 
 		"--color--button-primary-bg": "var(--color--primary-500)",
@@ -190,7 +190,7 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--text-on-primary": "#ffffff",
 		"--color--text-on-secondary": "var(--color--secondary-950)",
 		"--color--text-on-tertiary": "var(--color--tertiary-50)",
-		"--color--text-disabled": "var(--color--tertiary-400)",
+		"--color--text-disabled": "var(--color--tertiary-500)",
 		"--color--text-on-primary-muted": "var(--color--primary-400)",
 		"--color--text-placeholder": "var(--color--tertiary-500)",
 		"--color--text-link": "var(--color--primary-300)",
@@ -202,6 +202,7 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 
 		"--color--input-background": "#ffffff",
 		"--color--input-border": "var(--color--tertiary-500)",
+		"--color--input-border-focus": "var(--color--primary-500)",
 		"--color--input-label": "var(--color--tertiary-900)",
 		"--color--input-placeholder": "var(--color--tertiary-500)",
 		"--color--input-background-disabled": "var(--color--tertiary-800)",
@@ -256,7 +257,7 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--text-on-primary": "#ffffff",
 		"--color--text-on-secondary": "var(--color--secondary-900)",
 		"--color--text-on-tertiary": "var(--color--tertiary-900)",
-		"--color--text-disabled": "var(--color--tertiary-500)",
+		"--color--text-disabled": "var(--color--tertiary-400)",
 		"--color--text-on-primary-muted": "var(--color--primary-600)",
 		"--color--text-placeholder": "var(--color--tertiary-600)",
 		"--color--text-link": "var(--color--primary-700)",
@@ -268,6 +269,7 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 
 		"--color--input-background": "#000000",
 		"--color--input-border": "var(--color--tertiary-500)",
+		"--color--input-border-focus": "var(--color--primary-500)",
 		"--color--input-label": "var(--color--tertiary-900)",
 		"--color--input-placeholder": "var(--color--tertiary-500)",
 		"--color--input-background-disabled": "var(--color--tertiary-200)",

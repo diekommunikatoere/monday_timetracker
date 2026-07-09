@@ -2,13 +2,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flex, Indicator } from "@mantine/core";
-import { DatePickerInput, DatePickerInputProps, type DatesRangeValue } from "@mantine/dates";
+import { Flex } from "@mantine/core";
+import { type DatesRangeValue } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
 import { DatePicker, Input, Select, Button, Icon } from "@/components";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import type { TimeEntriesFilterOption } from "./hooks/useFilteredTimeEntries";
-import dayjs from "dayjs";
 
 /**
  * Props for {@link TimeEntriesToolbar}.
@@ -60,34 +59,9 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 		resetFilters();
 	};
 
-	const getDayProps: DatePickerInputProps["getDayProps"] = (date) => {
-		const d = dayjs(date);
-		const isToday = d.isSame(dayjs(), "day");
-
-		if (isToday) {
-			return {
-				style: {
-					borderColor: "var(--color--border-active)",
-				},
-			};
-		}
-
-		return {};
-	};
-
 	return (
 		<Flex gap="sm" wrap="wrap" align="flex-end" px="md" py="sm">
-			<Input
-				placeholder="Aufgabe oder Kommentar suchen…"
-				value={searchInput}
-				onChange={(event) => setSearchInput(event.currentTarget.value)}
-				leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />}
-				leftSectionPointerEvents="none"
-				style={{ flex: "0 1 min(350px, 100%)", minWidth: 180 }}
-				clearable
-				onClear={() => setSearchInput("")}
-				clearButtonLabel="Suche löschen"
-			/>
+			<Input placeholder="Aufgabe oder Kommentar suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" style={{ flex: "0 1 min(350px, 100%)", minWidth: 180 }} clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
 			<Select placeholder="Rolle" data={filterOptions.roles.map((r) => ({ value: r.id, label: r.name }))} value={filters.roleId} onChange={(value) => setFilter({ roleId: value })} clearable style={{ width: 200, flexShrink: 0 }} />
 			<Select placeholder="Board" data={filterOptions.boards.map((b) => ({ value: b.id, label: b.name }))} value={filters.boardId} onChange={(value) => setFilter({ boardId: value })} clearable style={{ width: 160, flexShrink: 0 }} />
 			<DatePicker
@@ -108,7 +82,7 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 				leftSectionPointerEvents="none"
 				style={{ width: "clamp(180px, 100%, 250px)", flexShrink: 0 }}
 				highlightToday
-				getDayProps={getDayProps}
+				withWeekNumbers
 			/>
 			{hasActiveFilters && (
 				<Button variant="default" onClick={handleReset}>

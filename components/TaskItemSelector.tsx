@@ -748,13 +748,13 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			const isGroupOrJob = node.value.startsWith("group:") || node.value.startsWith("job:");
 			const isSelected = selectedTask?.value === node.value;
 			return (
-				<Flex align="center" gap="xs" {...node} className={styles.selectOption} style={{ paddingBlock: ".25rem" }}>
+				<Flex align="center" gap="4px" {...node} className={styles.selectOption} style={{ paddingBlock: ".25rem" }}>
 					{hasChildren && (
 						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
 							<Icon name={expanded ? "collapse" : "expand"} size={12} color="var(--color--text-secondary)" />
 						</IconButton>
 					)}
-					{isSelected && <Icon name="check" size={14} color="var(--color--primary)" />}
+					{isSelected && <Icon name="check" size={16} color="var(--color--primary)" weight="bold" />}
 					<span style={{ fontStyle: expanded ? "italic" : "normal" }}>{node.label}</span>
 				</Flex>
 			);

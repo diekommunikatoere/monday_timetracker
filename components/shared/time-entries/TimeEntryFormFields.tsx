@@ -193,6 +193,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />}
 					leftSectionPointerEvents="none"
 					style={{ flex: 1 }}
+					highlightToday
 				/>
 			</Flex>
 

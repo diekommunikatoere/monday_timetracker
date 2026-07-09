@@ -32,12 +32,5 @@ import { defaultClearButtonProps } from "./clearButton";
 export const Select: React.FC<SelectProps> = ({ error, validationState, className = "", clearButtonProps, ...props }) => {
 	const selectClass = [styles.select, validationState ? styles[`select--${validationState}`] : "", className].filter(Boolean).join(" ");
 
-	return (
-		<MantineSelect
-			classNames={{ input: selectClass }}
-			error={typeof error === "string" ? error : error ? "Ungültige Auswahl" : null}
-			clearButtonProps={{ ...defaultClearButtonProps, ...clearButtonProps }}
-			{...props}
-		/>
-	);
+	return <MantineSelect classNames={{ input: selectClass, option: styles.selectOption }} error={typeof error === "string" ? error : error ? "Ungültige Auswahl" : null} clearButtonProps={{ ...defaultClearButtonProps, ...clearButtonProps }} {...props} />;
 };

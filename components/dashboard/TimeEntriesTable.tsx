@@ -2,8 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flex, Group, Input, Pagination } from "@mantine/core";
-import { Select } from "@/components";
+import { Flex, Group, Input } from "@mantine/core";
+import { Select, Pagination } from "@/components";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";

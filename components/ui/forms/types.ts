@@ -3,7 +3,7 @@
 
 import React from "react";
 import { TextInputProps as MantineTextInputProps, TextareaProps as MantineTextareaProps, SelectProps as MantineSelectProps, TreeSelectProps as MantineTreeSelectProps } from "@mantine/core";
-import { DatePickerInputProps, TimeInputProps as MantineTimeInputProps } from "@mantine/dates";
+import { DatePickerInputProps, DatePickerType, TimeInputProps as MantineTimeInputProps } from "@mantine/dates";
 import { TimePickerProps } from "@mantine/dates";
 
 /**
@@ -74,10 +74,15 @@ export interface TreeSelectProps extends Omit<MantineTreeSelectProps, "error"> {
 /**
  * Props for the {@link DatePicker} control.
  *
+ * Generic over `Type` (`"default" | "multiple" | "range"`, same as Mantine's
+ * `DatePickerInputProps`) so mode-specific props like `allowSingleDateInRange`
+ * (range-only) and `allowDeselect` (default-only) resolve correctly instead of
+ * collapsing to `never` under the implicit `Type = "default"` default.
+ *
  * @property error           - Error message or flag (see shared contract above).
  * @property validationState - Visual validation state used to select a modifier class.
  */
-export interface DatePickerProps extends Omit<DatePickerInputProps, "error"> {
+export interface DatePickerProps<Type extends DatePickerType = "default"> extends Omit<DatePickerInputProps<Type>, "error"> {
 	error?: string | boolean;
 	validationState?: "error" | "warning" | "success";
 }

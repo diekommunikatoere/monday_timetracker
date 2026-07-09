@@ -1,12 +1,6 @@
 .iconButton {
 	border-radius: var(--border-radius-small);
 
-	&:disabled {
-		cursor: not-allowed;
-		background-color: var(--color--background-disabled);
-		color: var(--color--text-disabled);
-	}
-
 	&[data-variant="filled"] {
 		background-color: var(--color--button-primary-bg);
 		color: var(--color--text-on-primary);
@@ -44,8 +38,13 @@
 
 	&:disabled,
 	&[data-disabled] {
-		background-color: var(--color--background-disabled);
 		cursor: not-allowed;
+		background-color: var(--color--background-disabled);
+		color: var(--color--text-disabled);
+
+		svg path {
+			fill: var(--color--text-disabled);
+		}
 	}
 }
 
