@@ -59,6 +59,11 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 		resetFilters();
 	};
 
+	// Sort roles and boards by name for the dropdowns, so the order is stable and
+	// predictable (and not dependent on the order of the user's entries).
+	filterOptions.roles.sort((a, b) => a.name.localeCompare(b.name));
+	filterOptions.boards.sort((a, b) => a.name.localeCompare(b.name));
+
 	return (
 		<Flex gap="sm" wrap="wrap" align="flex-end" px="md" py="sm">
 			<Input placeholder="Aufgabe oder Kommentar suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" style={{ flex: "0 1 min(350px, 100%)", minWidth: 180 }} clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
