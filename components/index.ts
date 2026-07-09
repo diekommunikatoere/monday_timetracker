@@ -9,7 +9,9 @@ export * from "./ui/icons/Icon";
 
 export { Input, Textarea } from "./ui/forms/Input";
 export { Select } from "./ui/forms/Select";
+export { TreeSelect } from "./ui/forms/TreeSelect";
 export { DatePicker } from "./ui/forms/DatePicker";
+export { TimeInput } from "./ui/forms/TimeInput";
 export { TimePicker } from "./ui/forms/TimePicker";
 
 export * from "./ui/modals/Modal";

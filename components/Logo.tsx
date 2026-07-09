@@ -19,11 +19,15 @@ import logoWhite from "@/public/img/logo/timetracker_logo_white.svg";
  * @param props.loading - next/image loading strategy (`"eager"` | `"lazy"`), forwarded verbatim.
  * @returns A next/image `<Image>` element for the selected logo asset.
  */
-export const Logo = (props: { size?: { width: number; height: number }; style?: string; loading?: "eager" | "lazy"; ref?: React.Ref<HTMLImageElement> }) => {
+export const Logo = (props: { size: { width?: number; height?: number }; style?: string; loading?: "eager" | "lazy"; ref?: React.Ref<HTMLImageElement> }) => {
 	let sizeProps;
 
 	if (props.size) {
 		sizeProps = { width: props.size.width, height: props.size.height };
+	} else if (props.size?.height) {
+		sizeProps = { width: (props.size.height / 40) * 231, height: props.size.height };
+	} else if (props.size?.width) {
+		sizeProps = { width: props.size.width, height: (props.size.width / 231) * 40 };
 	} else {
 		sizeProps = { width: 231, height: 40 };
 	}

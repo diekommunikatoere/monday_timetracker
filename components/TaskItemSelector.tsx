@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelect, TreeSelectProps, type TreeNodeData } from "@mantine/core";
-import { Icon, IconButton, Select } from "@/components";
+import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelectProps, type TreeNodeData } from "@mantine/core";
+import { Icon, IconButton, Select, TreeSelect } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
@@ -788,7 +788,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 							Board auswählen
 						</Text>
 					</label>
-					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" classNames={{ option: styles.selectOption }} required />
+					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" /* classNames={{ option: styles.selectOption }} */ required />
 				</div>
 			)}
 
@@ -852,7 +852,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 						) : undefined
 					}
 					rightSectionPointerEvents="auto"
-					classNames={{ option: styles.selectOption }}
+					/* classNames={{ option: styles.selectOption }} */
 					required
 				/>
 			</div>
@@ -872,7 +872,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 							Rolle auswählen
 						</Text>
 					</label>
-					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" classNames={{ option: styles.selectOption }} required />
+					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" /* classNames={{ option: styles.selectOption }} */ required />
 				</div>
 			)}
 		</Flex>

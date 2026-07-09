@@ -98,9 +98,22 @@ export function TimeEntryTable({ timeEntries, columns, loading, error, selectedI
 
 	if (!hasRows) {
 		return (
-			<Center p="xl" style={{ flex: 1 }}>
-				<Text>Keine Zeiteinträge gefunden.</Text>
-			</Center>
+			<>
+				<Table withTableBorder highlightOnHover withColumnBorders withRowBorders stickyHeader verticalSpacing="sm" className={styles.timeEntryTable} layout="auto" style={{ width: "100%", minWidth: "100%" }}>
+					<Table.Thead className={styles.headerRow}>
+						<Table.Tr>
+							{visibleColumns.map((col) => (
+								<Table.Th key={col.id} fw={600} style={{ width: col.width, maxWidth: col.maxWidth, minWidth: col.minWidth }} ta={col.align || "left"}>
+									{typeof col.header === "function" ? col.header({ data: timeEntries }) : col.header}
+								</Table.Th>
+							))}
+						</Table.Tr>
+					</Table.Thead>
+				</Table>
+				<Center p="xl" style={{ flex: 1 }}>
+					<Text>Keine Zeiteinträge gefunden.</Text>
+				</Center>
+			</>
 		);
 	}
 

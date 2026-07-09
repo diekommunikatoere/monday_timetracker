@@ -1,6 +1,7 @@
 "use client";
 
 import "@mantine/core/styles.css";
+import "@mantine/dates/styles.css";
 import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
 import "@/public/css/fonts.css";
