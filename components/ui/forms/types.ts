@@ -2,8 +2,8 @@
 // Shared prop types for the form control design-system components.
 
 import React from "react";
-import { TextInputProps as MantineTextInputProps, TextareaProps as MantineTextareaProps, SelectProps as MantineSelectProps } from "@mantine/core";
-import { DatePickerInputProps } from "@mantine/dates";
+import { TextInputProps as MantineTextInputProps, TextareaProps as MantineTextareaProps, SelectProps as MantineSelectProps, TreeSelectProps as MantineTreeSelectProps } from "@mantine/core";
+import { DatePickerInputProps, TimeInputProps as MantineTimeInputProps } from "@mantine/dates";
 import { TimePickerProps } from "@mantine/dates";
 
 /**
@@ -13,7 +13,7 @@ import { TimePickerProps } from "@mantine/dates";
  * prop** and re-adds it in a more permissive form. The wrapper components
  * translate this prop into the Mantine `error` slot at render time:
  *   - a `string`  → shown verbatim as the error message;
- *   - `true`      → a generic localized fallback (`"Invalid input"`, `"Invalid time"`, …);
+ *   - `true`      → a generic German fallback (`"Ungültige Eingabe"`, `"Ungültige Zeit"`, …);
  *   - `false`/`undefined` → no error shown.
  *
  * `validationState` is the design-system flag that toggles the `--<state>`
@@ -30,6 +30,12 @@ import { TimePickerProps } from "@mantine/dates";
 export interface InputProps extends Omit<MantineTextInputProps, "error"> {
 	error?: string | boolean;
 	validationState?: "error" | "warning" | "success";
+	/** Shows a clear button (matching `Select`/`DatePicker`'s) in `rightSection` when there's a value. Mantine's `TextInput` has no native clear affordance, so this is built by hand — unlike `Select`/`DatePicker`, it renders whenever a value is present, since there's no separate Mantine gate to opt into. */
+	clearable?: boolean;
+	/** Called when the clear button is clicked. Required for `clearable` to do anything — this component doesn't own the value. */
+	onClear?: () => void;
+	/** Accessible label / tooltip text for the clear button. @default "Eingabe löschen" */
+	clearButtonLabel?: string;
 }
 
 /**
@@ -55,12 +61,38 @@ export interface SelectProps extends Omit<MantineSelectProps, "error"> {
 }
 
 /**
+ * Props for the {@link TreeSelect} tree-structured dropdown.
+ *
+ * @property error           - Error message or flag (see shared contract above).
+ * @property validationState - Visual validation state used to select a modifier class.
+ */
+export interface TreeSelectProps extends Omit<MantineTreeSelectProps, "error"> {
+	error?: string | boolean;
+	validationState?: "error" | "warning" | "success";
+}
+
+/**
  * Props for the {@link DatePicker} control.
  *
  * @property error           - Error message or flag (see shared contract above).
  * @property validationState - Visual validation state used to select a modifier class.
  */
 export interface DatePickerProps extends Omit<DatePickerInputProps, "error"> {
+	error?: string | boolean;
+	validationState?: "error" | "warning" | "success";
+}
+
+/**
+ * Props for the {@link TimeInput} control.
+ *
+ * Unlike {@link TimePickerComponentProps}, Mantine's `TimeInput` is already a
+ * plain string-valued `<input type="time">` (`value`/`onChange` pass through
+ * unchanged) — no Date-based signature to narrow.
+ *
+ * @property error           - Error message or flag (see shared contract above).
+ * @property validationState - Visual validation state used to select a modifier class.
+ */
+export interface TimeInputProps extends Omit<MantineTimeInputProps, "error"> {
 	error?: string | boolean;
 	validationState?: "error" | "warning" | "success";
 }

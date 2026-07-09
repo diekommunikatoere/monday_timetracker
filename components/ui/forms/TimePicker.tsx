@@ -6,7 +6,7 @@
 import React from "react";
 import { TimePicker as MantineTimePicker } from "@mantine/dates";
 import { TimePickerComponentProps } from "./types";
-import "@/components/styles/ui/forms/TimePicker.module.css";
+import styles from "@/components/styles/ui/forms/TimePicker.module.css";
 
 /**
  * Time field built on Mantine's `TimePicker`.
@@ -14,7 +14,7 @@ import "@/components/styles/ui/forms/TimePicker.module.css";
  * Applies a `time-picker` base class plus an optional `time-picker--<state>`
  * modifier and the caller's `className`. Resolves the design-system `error`
  * prop into Mantine's error slot: strings pass through verbatim, `true` falls
- * back to `"Invalid time"`, and falsy values clear it. The string-based
+ * back to `"Ungültige Zeit"`, and falsy values clear it. The string-based
  * `value`/`onChange` pair is forwarded directly (see {@link TimePickerComponentProps}).
  *
  * @param props                 - {@link TimePickerComponentProps} for the field.
@@ -26,7 +26,7 @@ import "@/components/styles/ui/forms/TimePicker.module.css";
  * @returns A Mantine `TimePicker` with design-system classes and a resolved error.
  */
 export const TimePicker: React.FC<TimePickerComponentProps> = ({ error, validationState, className = "", value, onChange, ...props }) => {
-	const timePickerClass = ["time-picker", validationState ? `time-picker--${validationState}` : "", className].filter(Boolean).join(" ");
+	const timePickerClass = [styles["time-picker"], validationState ? styles[`time-picker--${validationState}`] : "", className].filter(Boolean).join(" ");
 
-	return <MantineTimePicker className={timePickerClass} value={value} onChange={onChange} error={typeof error === "string" ? error : error ? "Invalid time" : null} {...props} />;
+	return <MantineTimePicker classNames={{ input: timePickerClass }} value={value} onChange={onChange} error={typeof error === "string" ? error : error ? "Ungültige Zeit" : null} {...props} />;
 };

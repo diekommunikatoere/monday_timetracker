@@ -9,7 +9,7 @@ import { ModalProps, ModalCompoundComponent } from "./types";
 import { ModalHeader } from "./ModalHeader";
 import { ModalBody } from "./ModalBody";
 import { ModalFooter } from "./ModalFooter";
-import "@/components/styles/ui/modals/Modal.module.css";
+import styles from "@/components/styles/ui/modals/Modal.module.css";
 
 /**
  * Modal root component built on Mantine's `Modal`.
@@ -30,7 +30,7 @@ import "@/components/styles/ui/modals/Modal.module.css";
  */
 const ModalRoot: React.FC<ModalProps> & ModalCompoundComponent = ({ children, show = false, onClose, ...props }) => {
 	return (
-		<MantineModal.Root opened={show} onClose={onClose || (() => {})} className="modal" {...props}>
+		<MantineModal.Root opened={show} onClose={onClose || (() => {})} className={styles.modal} {...props}>
 			<MantineModal.Overlay />
 			<MantineModal.Content>{children}</MantineModal.Content>
 		</MantineModal.Root>

@@ -1,5 +1,5 @@
-.date-picker {
-	/* Base date picker styling */
+.time-input {
+	/* Base time-input styling */
 	--input-bg: var(--color--input-background);
 	--input-bd: var(--color--input-border);
 	color: var(--color--input-text);
@@ -12,14 +12,14 @@
 	}
 }
 
-.date-picker--error {
-	border-color: var(--color--error-500);
+.time-input--error {
+	--input-bd: var(--color--error-500);
 }
 
-.date-picker--warning {
-	border-color: var(--color--secondary-500);
+.time-input--warning {
+	--input-bd: var(--color--secondary-500);
 }
 
-.date-picker--success {
-	border-color: var(--color--success-500);
+.time-input--success {
+	--input-bd: var(--color--success-500);
 }

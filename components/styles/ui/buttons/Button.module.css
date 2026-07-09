@@ -1,4 +1,4 @@
-button.button {
+.button {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -11,13 +11,41 @@ button.button {
 
 	&.button--primary,
 	&[data-variant="filled"] {
-		background-color: var(--color-primary);
+		background-color: var(--color--button-primary-bg);
 		color: var(--color--text-on-primary);
 
-		&:disabled,
-		&[data-disabled] {
-			background-color: var(--color--background-disabled);
-			color: var(--color--text-disabled);
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-primary-bg-hover);
+		}
+	}
+
+	&.button--secondary,
+	&[data-variant="secondary"] {
+		background-color: var(--color--button-secondary-bg);
+		color: var(--color--text-on-secondary);
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-secondary-bg-hover);
+		}
+	}
+
+	&.button--tertiary,
+	&[data-variant="tertiary"] {
+		background-color: var(--color--button-tertiary-bg);
+		color: var(--color--text-on-tertiary);
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-tertiary-bg-hover);
+		}
+	}
+
+	&.button--primary-muted,
+	&[data-variant="primary-muted"] {
+		background-color: var(--color--button-primary-muted-bg);
+		color: var(--color--text-on-primary-muted);
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-primary-muted-bg-hover);
 		}
 	}
 
@@ -38,8 +66,9 @@ button.button {
 	}
 
 	&:disabled,
-	&[data-disabled] {
+	&[data-disabled="true"] {
 		background-color: var(--color--background-disabled);
+		color: var(--color--text-disabled);
 		cursor: not-allowed;
 	}
 }
