@@ -14,6 +14,7 @@ export interface TimeEntriesFilters {
 	search: string;
 	roleId: string | null;
 	boardId: string | null;
+	timerState: string | null;
 	/** Inclusive range start. */
 	startDate: Date | null;
 	/** Inclusive range end (compared through end-of-day — see `useFilteredTimeEntries`). */
@@ -24,6 +25,7 @@ const EMPTY_FILTERS: TimeEntriesFilters = {
 	search: "",
 	roleId: null,
 	boardId: null,
+	timerState: null,
 	startDate: null,
 	endDate: null,
 };

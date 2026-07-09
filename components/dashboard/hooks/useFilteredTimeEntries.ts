@@ -23,6 +23,7 @@ export interface UseFilteredTimeEntriesResult {
 	filterOptions: {
 		roles: TimeEntriesFilterOption[];
 		boards: TimeEntriesFilterOption[];
+		timerState: TimeEntriesFilterOption[];
 	};
 }
 
@@ -94,6 +95,10 @@ export function useFilteredTimeEntries(): UseFilteredTimeEntriesResult {
 		return {
 			roles: Array.from(roles, ([id, name]) => ({ id, name })),
 			boards: Array.from(boards, ([id, name]) => ({ id, name })),
+			timerState: [
+				{ id: "finalized", name: "Abgeschlossen" },
+				{ id: "parked", name: "Draft" },
+			],
 		};
 	}, [allEntries]);
 
@@ -108,6 +113,7 @@ export function useFilteredTimeEntries(): UseFilteredTimeEntriesResult {
 			if (matchedIds && !matchedIds.has(entry.id)) return false;
 			if (filters.roleId && entry.role_id !== filters.roleId) return false;
 			if (filters.boardId && entry.board_id !== filters.boardId) return false;
+			if (filters.timerState && entry.timer_state !== filters.timerState) return false;
 
 			if (startMs !== null || endMs !== null) {
 				const entryMs = new Date(entry.start_time).getTime();
