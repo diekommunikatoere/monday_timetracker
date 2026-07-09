@@ -14,6 +14,8 @@ import { secondsToDuration, formatTimeString } from "@/lib/utils";
 import SaveTimerModal from "./SaveTimerModal";
 import EditTimeEntryModal from "./EditTimeEntryModal";
 import BulkActionButtons from "./BulkActionButtons";
+import TimeEntriesToolbar from "./TimeEntriesToolbar";
+import { useFilteredTimeEntries } from "./hooks/useFilteredTimeEntries";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getDashboardColumns } from "../shared/time-entries/TimeEntryTableConfigs";
@@ -41,8 +43,16 @@ interface TimeEntriesTableProps {
 }
 
 /**
- * Dashboard time-entries table with inline edit, delete (with undo), and bulk
- * actions.
+ * Dashboard time-entries table with search/filter, pagination, inline edit,
+ * delete (with undo), and bulk actions.
+ *
+ * `useTimeEntriesStore` holds the user's **entire** entry history
+ * (`allEntries`, bulk-loaded once via `fetchTimeEntries`); {@link
+ * useFilteredTimeEntries} derives the visible page from it by applying
+ * tokenized-fuzzy search + role/board/date filters, then client-side
+ * pagination — see that hook for the Fuse.js setup. {@link TimeEntriesToolbar}
+ * (rendered above the table) writes into the store's `filters`; this
+ * component only reads the derived `pageEntries`/`total`/`pageCount`.
  *
  * Renders the shared {@link TimeEntryTable} using {@link getDashboardColumns};
  * row selection is limited to the current user's own entries (`userId` from
@@ -60,18 +70,21 @@ interface TimeEntriesTableProps {
  *
  * Below the table, a footer row renders a page-size picker (25/50/100, gated on
  * `useHydration()` to avoid an SSR mismatch with the persisted `pageSize`) and a
- * Mantine `Pagination` control (hidden once everything fits on one page). Both
- * drive `useTimeEntriesStore`'s `setPage`/`setPageSize`, which refetch server-side;
- * `selectedIds` is cleared whenever the page or page size changes.
+ * Mantine `Pagination` control (hidden once the filtered set fits on one page).
+ * Both drive `useTimeEntriesStore`'s `setPage`/`setPageSize` — purely in-memory,
+ * no refetch. `selectedIds` is cleared whenever the page, page size, or filters
+ * change; a page number past the end of the filtered set (e.g. after a filter
+ * narrows the results, or a delete empties the last page) is clamped back.
  *
- * Reads from: `useTimeEntriesStore`, `useUserStore`, `useMondayStore`
- * (session token), `useToast`.
+ * Reads from: `useTimeEntriesStore`, `useFilteredTimeEntries`, `useUserStore`,
+ * `useMondayStore` (session token), `useToast`.
  *
  * @param props - Component props (only `onRefetch` is used; see the prop docs).
- * @returns The table plus its modals, delete dialog, and bulk-action panel.
+ * @returns The toolbar, table, footer, plus modals/delete dialog/bulk-action panel.
  */
 export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
-	const { timeEntries, loading, error, page, pageSize, total, setPage, setPageSize } = useTimeEntriesStore();
+	const { loading, error, page, pageSize, setPage, setPageSize, filters } = useTimeEntriesStore();
+	const { pageEntries, pageCount, filterOptions } = useFilteredTimeEntries();
 	const isHydrated = useHydration();
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showSaveModal, setShowSaveModal] = useState(false);
@@ -86,15 +99,21 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 
-	// Rows shown on a page/page-size change are no longer the ones selection was
-	// computed against — clear it rather than acting on stale row ids.
+	// Rows shown on a page/page-size/filter change are no longer the ones
+	// selection was computed against — clear it rather than acting on stale row ids.
 	useEffect(() => {
 		setSelectedIds([]);
-	}, [page, pageSize]);
+	}, [page, pageSize, filters]);
+
+	// A filter/pageSize change (or a delete emptying the current page) can leave
+	// `page` past the end of the filtered result set — clamp it back.
+	useEffect(() => {
+		if (page > pageCount) setPage(pageCount);
+	}, [page, pageCount, setPage]);
 
 	const handleSelectAll = (checked: boolean) => {
 		if (checked) {
-			const ownEntryIds = timeEntries.filter((entry) => entry.user_id === userId).map((entry) => entry.id);
+			const ownEntryIds = pageEntries.filter((entry) => entry.user_id === userId).map((entry) => entry.id);
 			setSelectedIds(ownEntryIds);
 		} else {
 			setSelectedIds([]);
@@ -257,10 +276,12 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	return (
 		<>
 			<Flex direction="column" style={{ flex: 1, minHeight: 0, width: "100%" }}>
-				<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
+				<TimeEntriesToolbar filterOptions={filterOptions} />
+
+				<TimeEntryTable timeEntries={pageEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
 
 				<Flex justify="space-between" align="center" px="md" py="sm" style={{ flexShrink: 0 }}>
-					<Pagination total={Math.ceil(total / pageSize)} value={page} onChange={setPage} boundaries={1} />
+					{pageCount > 1 ? <Pagination total={pageCount} value={page} onChange={setPage} boundaries={1} /> : <div />}
 					<Flex align="center" gap={8}>
 						<Input.Label mb={0} size="xs">
 							Pro Seite
