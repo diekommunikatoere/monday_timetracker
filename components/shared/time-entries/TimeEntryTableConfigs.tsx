@@ -157,7 +157,11 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSaveDraft, onSelectRow
  * start–end time range (via {@link TimeRangeCell}), and an actions column
  * embedding a {@link TimeEntryRowMenu}. No select column here.
  *
- * @param opts - {@link ConfigOptions}; only `onEdit` and `onDelete` are used.
+ * @param opts - {@link ConfigOptions}; uses `onEdit`, `onDelete`, and `onSaveDraft`
+ *   (all forwarded to the {@link TimeEntryRowMenu}). In practice `onSaveDraft` is
+ *   inert here — the sidebar's `get_item_time_entries` RPC returns only finalized
+ *   entries, so no draft rows (which is where the "Speichern" item shows) reach
+ *   this view — but the callback is wired through for parity with `getDashboardColumns`.
  * @returns Array of {@link ColumnDef} for {@link TimeEntryTable}.
  */
 export const getSidebarColumns = ({ onEdit, onDelete, onSaveDraft }: ConfigOptions): ColumnDef<TimeEntry>[] => [
