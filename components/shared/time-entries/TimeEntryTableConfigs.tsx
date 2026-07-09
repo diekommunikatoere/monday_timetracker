@@ -17,6 +17,7 @@ import { TimeEntryRowMenu } from "./TimeEntryRowMenu";
  *
  * @property onEdit        - Wired into {@link TaskCell} / {@link TimeEntryRowMenu} as the edit action.
  * @property onDelete      - Wired into the cell menus as the delete action.
+ * @property onSaveDraft   - Wired into the cell menus as the save-draft action.
  * @property onSelectRow   - Row-checkbox callback `(id, selected)`; rendered only for rows owned by `currentUserId`.
  * @property onSelectAll   - Header-checkbox callback `(selected)`; checked against own-entry count.
  * @property selectedIds   - Currently-selected row ids.
@@ -25,6 +26,7 @@ import { TimeEntryRowMenu } from "./TimeEntryRowMenu";
 interface ConfigOptions {
 	onEdit?: (entry: TimeEntry) => void;
 	onDelete?: (entry: TimeEntry) => void;
+	onSaveDraft?: (entry: TimeEntry) => void;
 	onSelectRow?: (id: string, selected: boolean) => void;
 	onSelectAll?: (selected: boolean) => void;
 	selectedIds?: string[];
@@ -47,7 +49,7 @@ interface ConfigOptions {
  *   `onSelectRow`, `onSelectAll`, `selectedIds`, `currentUserId`.
  * @returns Array of {@link ColumnDef} for {@link TimeEntryTable}.
  */
-export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll, selectedIds = [], currentUserId }: ConfigOptions): ColumnDef<TimeEntry>[] => [
+export const getDashboardColumns = ({ onEdit, onDelete, onSaveDraft, onSelectRow, onSelectAll, selectedIds = [], currentUserId }: ConfigOptions): ColumnDef<TimeEntry>[] => [
 	{
 		id: "checkbox",
 		width: 40,
@@ -68,7 +70,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 		id: "task",
 		header: "Aufgabe",
 		minWidth: 280,
-		cell: ({ row }) => <TaskCell entry={row} onEdit={onEdit} onDelete={onDelete} />,
+		cell: ({ row }) => <TaskCell entry={row} onEdit={onEdit} onDelete={onDelete} onSaveDraft={onSaveDraft} />,
 	},
 	{
 		id: "board",
@@ -140,7 +142,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
 	},
 	{
 		id: "total",
-		header: "Gesamtzeit",
+		header: "Dauer",
 		minWidth: 100,
 		cell: ({ row }) => <Text size="sm">{formatDuration(row.duration)}</Text>,
 	},
@@ -158,7 +160,7 @@ export const getDashboardColumns = ({ onEdit, onDelete, onSelectRow, onSelectAll
  * @param opts - {@link ConfigOptions}; only `onEdit` and `onDelete` are used.
  * @returns Array of {@link ColumnDef} for {@link TimeEntryTable}.
  */
-export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDef<TimeEntry>[] => [
+export const getSidebarColumns = ({ onEdit, onDelete, onSaveDraft }: ConfigOptions): ColumnDef<TimeEntry>[] => [
 	{
 		id: "total",
 		header: "Dauer",
@@ -199,6 +201,6 @@ export const getSidebarColumns = ({ onEdit, onDelete }: ConfigOptions): ColumnDe
 		id: "actions",
 		header: "",
 		width: 40,
-		cell: ({ row }) => <TimeEntryRowMenu entry={row} onEdit={onEdit} onDelete={onDelete} />,
+		cell: ({ row }) => <TimeEntryRowMenu entry={row} onEdit={onEdit} onDelete={onDelete} onSaveDraft={onSaveDraft} />,
 	},
 ];

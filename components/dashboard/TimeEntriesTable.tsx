@@ -13,6 +13,7 @@ import { TimeEntry } from "@/types/time-entry";
 import { secondsToDuration, formatTimeString } from "@/lib/utils";
 import SaveTimerModal from "./SaveTimerModal";
 import EditTimeEntryModal from "./EditTimeEntryModal";
+import EditDraftEntryModal from "./EditDraftEntryModal";
 import BulkActionButtons from "./BulkActionButtons";
 import TimeEntriesToolbar from "./TimeEntriesToolbar";
 import { useFilteredTimeEntries } from "./hooks/useFilteredTimeEntries";
@@ -56,10 +57,15 @@ interface TimeEntriesTableProps {
  *
  * Renders the shared {@link TimeEntryTable} using {@link getDashboardColumns};
  * row selection is limited to the current user's own entries (`userId` from
- * `useUserStore`). Editing is dispatched by entry type: **non-finalized entries**
- * (`entry.timer_state !== "finalized"`) open {@link SaveTimerModal} seeded from the draft row,
- * while finalized entries open {@link EditTimeEntryModal}. Both "edit" and
- * "finalize draft" funnel through `onEdit`.
+ * `useUserStore`). `onEdit` (offered by {@link TimeEntryRowMenu} only for
+ * `finalized`/`parked` rows — never `paused`/`running`, which are still
+ * segment-governed) is dispatched by entry type: **finalized entries** open
+ * the full {@link EditTimeEntryModal} (task/role reassignment included);
+ * **parked entries** open the reduced {@link EditDraftEntryModal} (time
+ * fields + comment only, no task/role) — either way the edit is a plain field
+ * PATCH that never changes `timer_state`. Draft rows (`timer_state !==
+ * "finalized"`) additionally expose a "Speichern" action (`onSaveDraft`) that
+ * opens {@link SaveTimerModal} seeded from the row to finalize it.
  *
  * Single-row delete hits `DELETE /api/time-entries/:id` and surfaces a toast
  * with a "Rückgängig" action that calls `POST /api/time-entries/:id/undo` using
@@ -91,6 +97,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const [selectedDraft, setSelectedDraft] = useState<TimeEntry | null>(null);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+	const [showEditDraftModal, setShowEditDraftModal] = useState(false);
+	const [editingDraftEntry, setEditingDraftEntry] = useState<TimeEntry | null>(null);
 	const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 	const [deleteCount, setDeleteCount] = useState(0);
 	const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
@@ -139,9 +147,13 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	};
 
 	// Edit handlers
+	// "Bearbeiten" is only offered (see TimeEntryRowMenu) for finalized or parked
+	// entries — paused/running rows are still segment-governed and excluded there —
+	// so this only ever needs to distinguish those two cases.
 	const handleEdit = (entry: TimeEntry) => {
-		if (entry.timer_state !== "finalized") {
-			handleOpenSaveModal(entry);
+		if (entry.timer_state === "parked") {
+			setEditingDraftEntry(entry);
+			setShowEditDraftModal(true);
 		} else {
 			setEditingEntry(entry);
 			setShowEditModal(true);
@@ -151,6 +163,11 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const handleCloseEditModal = () => {
 		setShowEditModal(false);
 		setEditingEntry(null);
+	};
+
+	const handleCloseEditDraftModal = () => {
+		setShowEditDraftModal(false);
+		setEditingDraftEntry(null);
 	};
 
 	const handleEditSaved = () => {
@@ -262,6 +279,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const columns = getDashboardColumns({
 		onEdit: handleEdit,
 		onDelete: handleDelete,
+		onSaveDraft: handleOpenSaveModal,
 		onSelectRow: handleRowSelect,
 		onSelectAll: handleSelectAll,
 		selectedIds,
@@ -318,6 +336,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 				}
 			/>
 			{editingEntry && <EditTimeEntryModal show={showEditModal} onClose={handleCloseEditModal} entry={editingEntry} onSaved={handleEditSaved} />}
+			{editingDraftEntry && <EditDraftEntryModal show={showEditDraftModal} onClose={handleCloseEditDraftModal} entry={editingDraftEntry} onSaved={handleEditSaved} />}
 			<DeleteConfirmationDialog show={showDeleteConfirmation} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} count={deleteCount} />
 			<BulkActionButtons selectedIds={selectedIds} onBulkDelete={handleBulkDelete} onClearSelection={() => setSelectedIds([])} />
 		</>

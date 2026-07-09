@@ -36,24 +36,41 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 		console.log("[API] Updating time entry:", id, "with updates:", updates, "by user:", userId);
 
-		const { board_id, item_id, role_id } = updates;
-
-		if (!board_id || !item_id) {
-			return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
+		// board_id/item_id/role_id are only required for finalized entries. A parked
+		// (draft) entry is commonly edited via the reduced draft form, which sends only
+		// time fields + comment and leaves an unassigned task/role as-is. The entry's
+		// actual timer_state is looked up server-side rather than trusted from the
+		// request — the client can't be relied on to honestly declare which case this
+		// is, since that would let a caller bypass the requirement for a finalized
+		// entry simply by shaping the payload (or a claimed flag) like a draft edit.
+		const existingEntry = await getTimeEntryById(id);
+		if (!existingEntry) {
+			return NextResponse.json({ error: "Zeiteintrag nicht gefunden" }, { status: 404 });
 		}
 
-		if (!role_id) {
-			return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
+		if (existingEntry.timer_state === "finalized") {
+			const { board_id, item_id, role_id } = updates;
+
+			if (!board_id || !item_id) {
+				return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
+			}
+
+			if (!role_id) {
+				return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
+			}
 		}
 
 		// Update time entry with optimistic locking
 		try {
 			const { old: oldEntry, new: newEntry } = await updateTimeEntry(id, updates, userId, expectedUpdatedAt);
 
-			// Queue sync operations (non-blocking)
-			syncAfterUpdate(newEntry, oldEntry, userId).catch((err) => {
-				console.error("[API] Error queueing sync after update:", err);
-			});
+			// A parked-to-parked edit can't change monday totals — aggregation RPCs only
+			// count timer_state = 'finalized' entries — so skip queuing a no-op sync.
+			if (newEntry.timer_state === "finalized" || oldEntry.timer_state === "finalized") {
+				syncAfterUpdate(newEntry, oldEntry, userId).catch((err) => {
+					console.error("[API] Error queueing sync after update:", err);
+				});
+			}
 
 			return NextResponse.json({
 				success: true,
