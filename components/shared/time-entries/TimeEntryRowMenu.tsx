@@ -73,9 +73,12 @@ export function TimeEntryRowMenu<T extends { id: string; user_id: string; timer_
 
 			<Menu.Dropdown>
 				{isDraft && canEdit ? (
-					<Menu.Item leftSection={<Icon name="save" size={16} color="var(--color--icon)" />} onClick={() => onSaveDraft?.(entry)}>
-						Speichern
-					</Menu.Item>
+					<>
+						<Menu.Item leftSection={<Icon name="save" size={16} color="var(--color--icon)" />} onClick={() => onSaveDraft?.(entry)}>
+							Speichern
+						</Menu.Item>
+						<Menu.Divider />
+					</>
 				) : null}
 				{isEditable && onEdit && canEdit ? (
 					<Menu.Item leftSection={<Icon name="edit" size={16} color="var(--color--icon)" />} onClick={() => onEdit(entry)}>

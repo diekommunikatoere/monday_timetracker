@@ -12,6 +12,7 @@ import { TimeEntry } from "@/types/time-entry";
 import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { useRoles } from "../shared/hooks/useRoles";
 
 import "@mantine/dates/styles.css";
 
@@ -32,7 +33,7 @@ interface EditDraftEntryModalProps {
 
 /**
  * Reduced edit modal for a **parked** (`timer_state === "parked"`) time entry
- * — time fields + comment only.
+ * — time fields + comment + an optional role only.
  *
  * Only valid for `parked` entries, not `paused`/`running` ones: a parked
  * timer's segments are already closed and its `duration`/`start_time`/
@@ -43,19 +44,23 @@ interface EditDraftEntryModalProps {
  * overwritten on the next timer transition; {@link TimeEntryRowMenu} does not
  * offer "Bearbeiten" for `paused` rows for this reason.
  *
- * A parked draft also usually has no board/item/role selected yet, so unlike
- * {@link EditTimeEntryModal} this form omits the task/role selectors entirely;
- * a user who wants to assign a task/role finalizes the draft via "Speichern"
- * ({@link SaveTimerModal}) instead. Edits here are a plain field PATCH that
- * never touches `entry.timer_state`, so the entry stays parked.
+ * A parked draft has no board/item yet, so unlike {@link EditTimeEntryModal}
+ * this form omits the task selector entirely — a user who wants to assign a
+ * task finalizes the draft via "Speichern" ({@link SaveTimerModal}) instead.
+ * A draft **can** already carry a role (set at creation time or while saving
+ * a timer as a draft), so a standalone `RoleSelector` is rendered, optional,
+ * seeded from `entry.role_id`. Edits here are a plain field PATCH that never
+ * touches `entry.timer_state`, so the entry stays parked.
  *
  * Seeding and save/conflict handling mirror {@link EditTimeEntryModal}: on
  * open it splits `start_time`/`end_time` (ISO 8601) into a date + `HH:MM`
  * strings and converts `duration` (seconds) via `secondsToDuration`. On save
- * it PATCHes `/api/time-entries/:id` with `comment`, `duration` (back to
- * seconds), `start_time`/`end_time` (recombined to ISO 8601), and
- * `expectedUpdatedAt` (`entry.updated_at`) for optimistic-concurrency control
- * — no `board_id`/`item_id`/`role_id` are sent. A `409` response is surfaced
+ * it PATCHes `/api/time-entries/:id` with `comment`, `role_id` (optional),
+ * `duration` (back to seconds), `start_time`/`end_time` (recombined to ISO
+ * 8601), and `expectedUpdatedAt` (`entry.updated_at`) for optimistic-concurrency
+ * control — no `board_id`/`item_id` are sent, and the PATCH route only requires
+ * `role_id` when the entry is `finalized` (see `app/api/time-entries/[id]/route.ts`),
+ * so leaving it unset on a parked entry is valid. A `409` response is surfaced
  * as a conflict toast and the save is aborted without closing; other errors
  * set the inline error. On success it `refetch`es `useTimeEntriesStore` for
  * the current user, calls `onSaved`, and closes.
@@ -69,8 +74,10 @@ interface EditDraftEntryModalProps {
 export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: EditDraftEntryModalProps) {
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [selectedRoleId, setSelectedRoleId] = useState<string>("");
 
 	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "none" });
+	const { roles, isLoading: loadingRoles } = useRoles();
 
 	const { refetch } = useTimeEntriesStore();
 	const { showToast } = useToast();
@@ -94,6 +101,7 @@ export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: E
 				"none",
 				false,
 			);
+			setSelectedRoleId(entry.role_id || "");
 		}
 	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
 
@@ -125,6 +133,7 @@ export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: E
 				body: JSON.stringify({
 					id: entry.id,
 					comment: values.comment,
+					role_id: selectedRoleId || null,
 					duration: durationSeconds,
 					start_time: startTimeIso,
 					end_time: endTimeIso,
@@ -192,6 +201,13 @@ export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: E
 								{ label: "-1h", minutes: -60 },
 							],
 							onAdjust: handlers.adjustDuration,
+						}}
+						roleSelector={{
+							show: true,
+							roles,
+							selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
 						}}
 					/>
 

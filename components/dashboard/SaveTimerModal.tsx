@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Flex, Text, Group } from "@mantine/core";
+import { Flex, Text, Group, Switch } from "@mantine/core";
 import { Button, Modal } from "@/components";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useTimerStore } from "@/stores/timerStore";
@@ -12,6 +12,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { useRoles } from "../shared/hooks/useRoles";
 import { roundDuration, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
 
 import "@mantine/dates/styles.css";
@@ -23,7 +24,9 @@ import "@/public/css/components/SaveTimerModal.css";
  * When omitted the modal reads live state from `useTimerStore` instead.
  *
  * @property entryId       - Entry id to finalize (falls back to the live timer's `entryId`).
- * @property taskSelection - Pre-selected board/item/role ({@link TaskSelection}).
+ * @property taskSelection - Pre-selected board/item ({@link TaskSelection}).
+ * @property roleId        - Pre-selected billing-role id (Supabase `role.id`).
+ * @property roleName      - Pre-selected billing-role display name.
  * @property comment       - Pre-filled comment.
  * @property date          - Entry date.
  * @property duration      - `HH:MM` duration string.
@@ -36,6 +39,8 @@ interface SaveTimerModalProps {
 	initialData?: {
 		entryId?: string;
 		taskSelection?: TaskSelection;
+		roleId?: string;
+		roleName?: string;
 		comment?: string;
 		date?: Date;
 		duration?: string;
@@ -69,6 +74,14 @@ interface SaveTimerModalProps {
  * `timer_finalize` RPC) — it closes the open segment and flips `timer_state` to
  * `finalized` in one transaction, so there is no separate soft-reset call.
  *
+ * **"Als Entwurf speichern" toggle:** switches to draft mode, hiding the
+ * `TaskItemSelector` (board/task) and relaxing validation to only require a
+ * duration — no board/task, and role stays optional. Role is always rendered
+ * as a standalone `RoleSelector` (via {@link useRoles}), independent of the
+ * toggle. The finalize request is sent with `asDraft: true`, which keeps
+ * `timer_state` at `parked` instead of promoting to `finalized`, and skips the
+ * monday column sync.
+ *
  * On save the end time is *derived* from `start + duration` (in **seconds**) to
  * guarantee it never inverts and crosses midnight correctly; `duration` is sent
  * to the API in **seconds** and start/end as full **ISO 8601** timestamps.
@@ -84,11 +97,14 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [asDraft, setAsDraft] = useState(false);
+	const [selectedRoleId, setSelectedRoleId] = useState<string>("");
 
 	// Local comment state - used when modal is opened with initialData
 	const [localComment, setLocalComment] = useState<string>("");
 
 	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
+	const { roles, isLoading: loadingRoles } = useRoles();
 
 	// Store selectors
 	const { refetch } = useTimeEntriesStore();
@@ -111,9 +127,11 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	useEffect(() => {
 		if (!show) return;
 		setError(null);
+		setAsDraft(false);
 
 		if (initialData) {
 			setSelectedTask(initialData.taskSelection || null);
+			setSelectedRoleId(initialData.roleId || "");
 			setLocalComment(initialData.comment || "");
 			const date = initialData.date || new Date();
 			const draftComment = initialData.comment || "";
@@ -131,6 +149,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 		} else {
 			// Live timer: snapshot the (paused) elapsed time, end at "now", end-locked.
 			setSelectedTask(null);
+			setSelectedRoleId("");
 			setLocalComment("");
 			const roundedSeconds = roundDuration(Math.floor(useTimerStore.getState().elapsedTime / 1000));
 			const now = getCurrentTimeString();
@@ -143,8 +162,15 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 		// Reopening a draft (initialData) finalizes that entry; otherwise finalize the live timer.
 		const activeEntryId = initialData?.entryId || entryId;
 
-		if (!activeEntryId || !selectedTask || !userProfile?.id || !selectedTask.roleId) {
-			console.error("Cannot save: missing required data", { entryId: activeEntryId, selectedTask, userId: userProfile?.id });
+		if (!activeEntryId || !userProfile?.id) {
+			console.error("Cannot save: missing required data", { entryId: activeEntryId, userId: userProfile?.id });
+			setError("Bitte wähle eine Aufgabe und Rolle aus");
+			return;
+		}
+
+		// A draft only needs a duration; a finalized entry still needs a task + role.
+		if (!asDraft && (!selectedTask || !selectedRoleId)) {
+			console.error("Cannot save: missing required data", { selectedTask });
 			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
 		}
@@ -160,7 +186,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 		try {
 			// Use actual task name from selection, with fallback
-			const taskName = selectedTask.itemName || "Unbenannter Zeit-Eintrag";
+			const taskName = selectedTask?.itemName || "Unbenannter Zeit-Eintrag";
 
 			// Build full ISO date-time strings from date + time inputs.
 			// Derive the end from start + duration so it can never invert and crosses midnight correctly.
@@ -168,8 +194,8 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			const endTimeIso = new Date(new Date(startTimeIso).getTime() + durationSeconds * 1000).toISOString();
 
 			// Finalize via the atomic timer_finalize RPC. It closes the open segment, sets
-			// duration/start/end + assignment columns, and flips timer_state to 'finalized'
-			// in one transaction — no separate soft-reset/session cleanup needed.
+			// duration/start/end + assignment columns, and sets timer_state ('finalized', or
+			// 'parked' when asDraft) in one transaction — no separate soft-reset/session cleanup needed.
 			const response = await fetch("/api/timer/finalize", {
 				method: "POST",
 				headers: {
@@ -178,18 +204,19 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 				},
 				body: JSON.stringify({
 					entryId: activeEntryId,
-					taskName,
+					taskName: asDraft ? undefined : taskName,
 					comment,
-					boardId: selectedTask.boardId,
-					boardName: selectedTask.boardName,
-					itemId: selectedTask.itemId,
-					itemName: selectedTask.itemName,
-					parentItemId: selectedTask.parentItemId || null,
-					parentItemName: selectedTask.parentItemName || null,
-					roleId: selectedTask.roleId,
+					boardId: asDraft ? undefined : selectedTask?.boardId,
+					boardName: asDraft ? undefined : selectedTask?.boardName,
+					itemId: asDraft ? undefined : selectedTask?.itemId,
+					itemName: asDraft ? undefined : selectedTask?.itemName,
+					parentItemId: asDraft ? undefined : selectedTask?.parentItemId || null,
+					parentItemName: asDraft ? undefined : selectedTask?.parentItemName || null,
+					roleId: selectedRoleId || undefined,
 					duration: durationSeconds,
 					startTime: startTimeIso,
 					endTime: endTimeIso,
+					asDraft,
 				}),
 			});
 
@@ -198,10 +225,11 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 				throw new Error(errorData.error || "Failed to save time entry");
 			}
 
-			showToast("Zeiteintrag gespeichert.", "positive", 2000);
+			showToast(asDraft ? "Entwurf gespeichert." : "Zeiteintrag gespeichert.", "positive", 2000);
 
 			// Only clear the live timer when saving it directly (no initialData). When initialData
 			// is present we are finalizing a draft row from the entries table, not the live timer.
+			// A live timer saved as a draft still needs its local state cleared either way.
 			if (!initialData) {
 				resetTimer();
 			}
@@ -258,36 +286,49 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 							],
 							onAdjust: handlers.adjustDuration,
 						}}
-						taskSelector={{
-							show: true,
-							node: (
-								<TaskItemSelector
-									onSelectionChange={setSelectedTask}
-									initialValues={
-										selectedTask
-											? {
-													boardId: selectedTask.boardId,
-													boardName: selectedTask.boardName,
-													itemId: selectedTask.itemId,
-													itemName: selectedTask.itemName,
-													roleId: selectedTask.roleId,
-													roleName: selectedTask.roleName,
+						taskSelector={
+							asDraft
+								? undefined
+								: {
+										show: true,
+										node: (
+											<TaskItemSelector
+												onSelectionChange={setSelectedTask}
+												initialValues={
+													selectedTask
+														? {
+																boardId: selectedTask.boardId,
+																boardName: selectedTask.boardName,
+																itemId: selectedTask.itemId,
+																itemName: selectedTask.itemName,
+															}
+														: undefined
 												}
-											: undefined
+											/>
+										),
 									}
-								/>
-							),
+						}
+						roleSelector={{
+							show: true,
+							roles,
+							selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
+							required: !asDraft,
 						}}
 					/>
 
-					<Group justify="flex-end" mt="md">
-						<Button variant="default" onClick={onClose}>
-							Abbrechen
-						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || isSaving} loading={isSaving}>
-							{isSaving ? "Speichern..." : "Speichern"}
-						</Button>
-					</Group>
+					<Flex justify="space-between" align="center" gap="sm" wrap="wrap" mt="md">
+						<Switch label="Als Entwurf speichern" checked={asDraft} onChange={(event) => setAsDraft(event.currentTarget.checked)} />
+						<Group justify="flex-end">
+							<Button variant="default" onClick={onClose}>
+								Abbrechen
+							</Button>
+							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) || isSaving} loading={isSaving}>
+								{isSaving ? "Speichern..." : "Speichern"}
+							</Button>
+						</Group>
+					</Flex>
 				</Flex>
 			</Modal.Body>
 		</Modal>
