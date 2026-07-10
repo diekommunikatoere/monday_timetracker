@@ -241,7 +241,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 			{taskSelector?.show ? taskSelector.node : null}
 
 			{/* Role selector */}
-			{roleSelector?.show && <Select label="Rolle" placeholder="Rolle auswählen..." data={roleSelector.roles} value={roleSelector.selectedRoleId} onChange={(val) => roleSelector.onRoleChange(val || "")} disabled={roleSelector.loading} searchable />}
+			{roleSelector?.show && <Select label="Rolle" placeholder="Rolle auswählen..." data={roleSelector.roles} value={roleSelector.selectedRoleId} onChange={(val) => roleSelector.onRoleChange(val || null)} disabled={roleSelector.loading} searchable clearable clearButtonProps={{ "aria-label": "Auswahl löschen" }} />}
 
 			{/* Comment */}
 			<Input label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />

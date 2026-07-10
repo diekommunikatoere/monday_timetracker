@@ -748,7 +748,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			const isGroupOrJob = node.value.startsWith("group:") || node.value.startsWith("job:");
 			const isSelected = selectedTask?.value === node.value;
 			return (
-				<Flex align="center" gap="4px" {...node} className={styles.selectOption} style={{ paddingBlock: ".25rem" }}>
+				<Flex align="center" gap="4px" {...node}>
 					{hasChildren && (
 						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
 							<Icon name={expanded ? "collapse" : "expand"} size={12} color="var(--color--text-secondary)" />
@@ -774,38 +774,27 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			{error && <Text c="dki-error">{error}</Text>}
 
 			{/* Board Selector with skeleton loading */}
-			{loadingBoards ? (
-				<div>
-					<Text size="sm" fw={500}>
-						Board auswählen
+			<div>
+				<label htmlFor="board-selector">
+					<Text size="sm" fw={500} span>
+						Board
 					</Text>
-					<Skeleton height={36} radius="sm" />
-				</div>
-			) : (
-				<div>
-					<label htmlFor="board-selector">
-						<Text size="sm" fw={500} span>
-							Board auswählen
-						</Text>
-					</label>
-					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" /* classNames={{ option: styles.selectOption }} */ required />
-				</div>
-			)}
+				</label>
+				<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} loading={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" required />
+			</div>
 
 			<div>
 				<Flex justify="space-between" align="center">
 					<label htmlFor="task-selector">
 						<Text size="sm" fw={500} span>
-							Aufgabe auswählen
+							Aufgabe
 						</Text>
 					</label>
-					{selectedBoard && (
-						<Tooltip label="Aufgabenliste aktualisieren" position="left">
-							<IconButton variant="filled" colorVariant="tertiary" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
-								{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
-							</IconButton>
-						</Tooltip>
-					)}
+					<Tooltip label="Aufgabenliste aktualisieren" position="left">
+						<IconButton colorVariant="tertiary" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks || !selectedBoard} aria-label="Aufgaben aktualisieren">
+							{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
+						</IconButton>
+					</Tooltip>
 				</Flex>
 				<TreeSelect
 					id="task-selector"
@@ -820,7 +809,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 					// Expand groups/jobs by clicking the whole row, not just the chevron.
 					expandOnClick
 					clearable
-					clearButtonProps={{ "aria-label": "Auswahl löschen" }}
+					clearButtonProps={{ "aria-label": "Auswahl löschen", label: "Auswahl löschen" }}
 					// Searchable matches group, job and task labels and reveals ancestors.
 					searchable={!!selectedBoard}
 					searchValue={searchValue}
@@ -852,29 +841,19 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 						) : undefined
 					}
 					rightSectionPointerEvents="auto"
-					/* classNames={{ option: styles.selectOption }} */
 					required
 				/>
 			</div>
 
-			{/* Role Selector with skeleton loading */}
-			{loadingRoles ? (
-				<div>
+			{/* Role Selector */}
+			<div>
+				<label htmlFor="role-selector">
 					<Text size="sm" fw={500}>
-						Rolle auswählen
+						Rolle
 					</Text>
-					<Skeleton height={36} radius="sm" />
-				</div>
-			) : (
-				<div>
-					<label htmlFor="role-selector">
-						<Text size="sm" fw={500} span>
-							Rolle auswählen
-						</Text>
-					</label>
-					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" /* classNames={{ option: styles.selectOption }} */ required />
-				</div>
-			)}
+				</label>
+				<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" required />
+			</div>
 		</Flex>
 	);
 }
