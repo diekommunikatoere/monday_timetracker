@@ -1,8 +1,7 @@
 "use client";
 
-import { Flex, TextInput, Tooltip } from "@mantine/core";
-import { TimeInput } from "@mantine/dates";
-import { Button, ButtonGroup, DatePicker, Icon, IconButton, Select } from "@/components";
+import { Flex, Tooltip } from "@mantine/core";
+import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, Select, TimeInput } from "@/components";
 
 import styles from "@/components/styles/features/time-entries/TimeEntryForm.module.css";
 
@@ -150,7 +149,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={
 						onStartTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen" disabled={startInputDisabled}>
 									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
@@ -169,7 +168,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={
 						onEndTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen" disabled={endInputDisabled}>
 									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
@@ -194,6 +193,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />}
 					leftSectionPointerEvents="none"
 					style={{ flex: 1 }}
+					highlightToday
 				/>
 			</Flex>
 
@@ -244,7 +244,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 			{roleSelector?.show && <Select label="Rolle" placeholder="Rolle auswählen..." data={roleSelector.roles} value={roleSelector.selectedRoleId} onChange={(val) => roleSelector.onRoleChange(val || "")} disabled={roleSelector.loading} searchable />}
 
 			{/* Comment */}
-			<TextInput label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
+			<Input label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
 		</Flex>
 	);
 }

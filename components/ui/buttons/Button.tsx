@@ -5,7 +5,7 @@
 
 import { Button as MantineButton } from "@mantine/core";
 import { ButtonProps } from "./types";
-import "@/components/styles/ui/buttons/Button.module.css";
+import styles from "@/components/styles/ui/buttons/Button.module.css";
 
 /**
  * Design-system button built on Mantine's `Button`.
@@ -23,19 +23,14 @@ import "@/components/styles/ui/buttons/Button.module.css";
  * @param props.variant   - Visual variant; falls back to `primary` when omitted.
  * @param props.loading   - When true, shows Mantine's loading indicator.
  * @param props.disabled  - When true, disables interaction.
+ * @param props.className - Extra classes appended after the base/modifier classes.
  * @returns A Mantine `Button` element with design-system classes applied.
  */
-export function Button({ iconLeft, iconRight, children, onClick, loading, disabled, ...props }: ButtonProps) {
-	let className = props.className || "";
-
-	if (props.variant) {
-		className = className + ` button--${props.variant}`;
-	} else {
-		className = className + ` button--primary`;
-	}
+export function Button({ iconLeft, iconRight, children, onClick, loading, disabled, variant, className = "", ...props }: ButtonProps) {
+	const buttonClass = [styles.button, styles[`button--${variant || "primary"}`], className].filter(Boolean).join(" ");
 
 	return (
-		<MantineButton className={`button ${className}`} loading={loading} disabled={disabled} leftSection={iconLeft} rightSection={iconRight} onClick={onClick} {...props}>
+		<MantineButton classNames={{ root: buttonClass }} variant={variant} loading={loading} disabled={disabled} leftSection={iconLeft} rightSection={iconRight} onClick={onClick} {...props}>
 			{children}
 		</MantineButton>
 	);

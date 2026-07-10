@@ -1,0 +1,105 @@
+/*
+ * Layout for the dashboard TimeEntriesToolbar.
+ *
+ * The toolbar lives inside a monday dashboard widget whose width is independent
+ * of the browser viewport (users resize it freely, up to ~1500px), so all
+ * responsive behavior is driven by CONTAINER queries against the toolbar's own
+ * available width -- not viewport media queries / Mantine breakpoints.
+ * `.container` establishes the query context; everything inside responds to it.
+ *
+ * Switch point: 1200px of available width flips the toolbar from stacked
+ * (search on top, filters below) to side-by-side (search left, filters right).
+ * (Container-query conditions can't read custom properties, so it's a literal.)
+ */
+
+.container {
+	container-type: inline-size;
+	container-name: time-entries-toolbar;
+}
+
+.toolbar {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+	padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+
+/*
+ * Search box + filter toggle (+ optional reset button), laid out as a grid so
+ * the reset button can drop to its own row WITHOUT stealing width from the
+ * search input: the input always owns the first column's track, whether or not
+ * the reset button is rendered. `minmax(0, 1fr)` lets that track shrink instead
+ * of overflowing on narrow widths.
+ */
+.searchGroup {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto; /* search | toggle */
+	align-items: center;
+	gap: var(--mantine-spacing-sm);
+	width: 100%;
+	max-width: 500px;
+}
+
+/* Reset button: its own full-width row below, at natural width, left-aligned. */
+.resetButton {
+	grid-column: 1 / -1;
+	justify-self: start;
+}
+
+/* Filters panel. */
+.filtersCollapse {
+	width: 100%;
+}
+
+/*
+ * Filter controls as an auto-fitting grid: the column count follows the space
+ * available (each column is >= 200px), so they reflow from a single stacked
+ * column when narrow up to a full row when wide -- no fixed column breakpoints
+ * needed. Swap `auto-fit`/the 200px floor if you want to dictate exact counts.
+ */
+.filtersRow {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+	align-items: start;
+	gap: var(--mantine-spacing-sm);
+	width: 100%;
+	/* Separate from the search group when stacked (the toolbar gap is 0 there). */
+	padding-top: var(--mantine-spacing-sm);
+}
+
+.filtersRow > * {
+	min-width: 0; /* shrink to the grid track instead of overflowing */
+}
+
+@container time-entries-toolbar (min-width: 1200px) {
+	.toolbar {
+		flex-direction: row;
+		align-items: center;
+		gap: var(--mantine-spacing-sm);
+	}
+
+	/*
+	 * Side-by-side: fixed-width search column so the input never resizes when the
+	 * reset button appears; toggle and reset sit inline on the same row.
+	 */
+	.searchGroup {
+		grid-template-columns: 500px auto auto; /* search | toggle | reset */
+		width: auto;
+		flex: 0 0 auto; /* don't shrink when the filters panel expands beside it */
+		max-width: none; /* don't constrain to 500px when the toolbar is wider */
+	}
+
+	.resetButton {
+		grid-column: auto;
+	}
+
+	.filtersCollapse {
+		flex: 1 1 auto; /* take the remaining row width beside the search group */
+		min-width: 0;
+	}
+
+	.filtersRow {
+		padding-top: 0;
+	}
+}

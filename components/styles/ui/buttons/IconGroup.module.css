@@ -1,11 +1,6 @@
 .iconButton {
 	border-radius: var(--border-radius-small);
 
-	&:disabled {
-		cursor: not-allowed;
-		background-color: var(--color--background-disabled);
-	}
-
 	&[data-variant="filled"] {
 		background-color: var(--color--button-primary-bg);
 		color: var(--color--text-on-primary);
@@ -43,12 +38,18 @@
 
 	&:disabled,
 	&[data-disabled] {
-		background-color: var(--color--background-disabled);
 		cursor: not-allowed;
+		background-color: var(--color--background-disabled);
+		color: var(--color--text-disabled);
+
+		svg path {
+			fill: var(--color--text-disabled);
+		}
 	}
 }
 
-.buttonPrimary {
+.buttonPrimary,
+.buttonPrimary[data-variant="filled"] {
 	background-color: var(--color--button-primary-bg);
 	color: var(--color--text-on-primary);
 
@@ -71,7 +72,8 @@
 	}
 }
 
-.buttonSecondary {
+.buttonSecondary,
+.buttonSecondary[data-variant="filled"] {
 	background-color: var(--color--button-secondary-bg);
 	color: var(--color--text-on-secondary);
 
@@ -94,7 +96,8 @@
 	}
 }
 
-.buttonTertiary {
+.buttonTertiary,
+.buttonTertiary[data-variant="filled"] {
 	background-color: var(--color--button-tertiary-bg);
 	color: var(--color--text-on-tertiary);
 
@@ -117,7 +120,8 @@
 	}
 }
 
-.buttonPrimaryMuted {
+.buttonPrimaryMuted,
+.buttonPrimaryMuted[data-variant="filled"] {
 	background-color: var(--color--button-primary-muted-bg);
 	color: var(--color--text-on-primary-muted);
 

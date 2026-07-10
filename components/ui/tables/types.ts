@@ -1,6 +1,7 @@
 // components/ui/tables/types.ts
 // Column-definition types powering the data table (used by TimeEntryTable et al.).
 import { ReactNode } from "react";
+import { PaginationProps as MantinePaginationProps } from "@mantine/core";
 
 /**
  * Declarative definition of a single table column.
@@ -53,3 +54,11 @@ export interface CellProps<T> {
 	row: T;
 	index: number;
 }
+
+/**
+ * Props for the {@link Pagination} control.
+ *
+ * Adds nothing beyond Mantine's `PaginationProps` — the wrapper only exists
+ * to apply design-system classes to the root/control/dots parts.
+ */
+export type PaginationProps = MantinePaginationProps;

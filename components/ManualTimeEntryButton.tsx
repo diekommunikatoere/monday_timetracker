@@ -2,8 +2,7 @@
 // Primary button that opens the manual time-entry modal.
 
 import { Tooltip } from "@mantine/core";
-import { Button } from "@/components/ui/buttons/Button";
-import { Icon } from "@/components";
+import { Button, Icon } from "@/components";
 
 /**
  * A primary call-to-action button labelled "Zeit eintragen" ("Enter time")

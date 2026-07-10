@@ -6,7 +6,7 @@
 import { ButtonGroupProps } from "@/components/ui/buttons/types";
 import { Button } from "@mantine/core";
 
-import "@/components/styles/ui/buttons/ButtonGroup.module.css";
+import styles from "@/components/styles/ui/buttons/ButtonGroup.module.css";
 
 /**
  * Groups a set of {@link Button} children into a connected toolbar.
@@ -19,13 +19,11 @@ import "@/components/styles/ui/buttons/ButtonGroup.module.css";
  * @param props - {@link ButtonGroupProps} for the group.
  * @returns A Mantine `Button.Group` element with the design-system class applied.
  */
-export function ButtonGroup({ children, className, ...props }: ButtonGroupProps) {
-	if (!className) {
-		className = "";
-	}
+export function ButtonGroup({ children, className = "", ...props }: ButtonGroupProps) {
+	const buttonGroupClass = [styles["button-group"], className].filter(Boolean).join(" ");
 
 	return (
-		<Button.Group className={`button-group${className}`} {...props}>
+		<Button.Group className={buttonGroupClass} {...props}>
 			{children}
 		</Button.Group>
 	);

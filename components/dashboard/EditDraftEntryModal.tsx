@@ -1,10 +1,9 @@
-// components/dashboard/EditTimeEntryModal.tsx
+// components/dashboard/EditDraftEntryModal.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { Flex, Text, Group } from "@mantine/core";
 import { Button, Modal } from "@/components";
-import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
@@ -17,14 +16,14 @@ import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import "@mantine/dates/styles.css";
 
 /**
- * Props for {@link EditTimeEntryModal}.
+ * Props for {@link EditDraftEntryModal}.
  *
  * @property show     - Controls {@link Modal} visibility.
  * @property onClose  - Closes the modal (cancel / after a successful save).
- * @property entry    - The existing {@link TimeEntry} to edit; its fields seed the form when the modal opens.
+ * @property entry    - The existing **parked** (`timer_state === "parked"`) {@link TimeEntry} to edit; its fields seed the form when the modal opens.
  * @property onSaved  - Fired after a successful PATCH so the parent can refresh.
  */
-interface EditTimeEntryModalProps {
+interface EditDraftEntryModalProps {
 	show: boolean;
 	onClose: () => void;
 	entry: TimeEntry;
@@ -32,34 +31,42 @@ interface EditTimeEntryModalProps {
 }
 
 /**
- * Modal for editing an existing, finalized time entry.
+ * Reduced edit modal for a **parked** (`timer_state === "parked"`) time entry
+ * — time fields + comment only.
  *
- * For parked (draft) entries, use {@link EditDraftEntryModal} instead — it
- * omits the task/role selectors, which a draft typically hasn't been assigned
- * yet (that happens at finalize time via {@link SaveTimerModal}).
+ * Only valid for `parked` entries, not `paused`/`running` ones: a parked
+ * timer's segments are already closed and its `duration`/`start_time`/
+ * `end_time` snapshotted (by `timer_park`), so a plain field PATCH is stable.
+ * A `paused` entry is still live — its `duration`/`end_time` stay `NULL`
+ * until `timer_park`/`timer_finalize` recomputes them from segments — so
+ * editing those columns directly would seed garbage and be silently
+ * overwritten on the next timer transition; {@link TimeEntryRowMenu} does not
+ * offer "Bearbeiten" for `paused` rows for this reason.
  *
- * When `show` becomes true (or `entry.id` changes) it seeds {@link TimeEntryFormFields}
- * from `entry`: `start_time`/`end_time` (**ISO 8601**) are split into a date and
- * `HH:MM` time strings, and `duration` (**seconds**) is converted to `HH:MM` via
- * `secondsToDuration`. A {@link TaskItemSelector} is pre-filled from the entry's
- * board/item/role so the user can reassign the task.
+ * A parked draft also usually has no board/item/role selected yet, so unlike
+ * {@link EditTimeEntryModal} this form omits the task/role selectors entirely;
+ * a user who wants to assign a task/role finalizes the draft via "Speichern"
+ * ({@link SaveTimerModal}) instead. Edits here are a plain field PATCH that
+ * never touches `entry.timer_state`, so the entry stays parked.
  *
- * On save it PATCHes `/api/time-entries/:id` with the new fields — `duration`
- * back to **seconds** via `durationToSeconds`, start/end combined into **ISO 8601**
- * — and sends `expectedUpdatedAt` (`entry.updated_at`) for optimistic-concurrency
- * control. A `409` response is surfaced as a conflict toast and the save is
- * aborted without closing; other errors set the inline error. On success it
- * `refetch`es `useTimeEntriesStore` for the current user, calls `onSaved`, and
- * closes.
+ * Seeding and save/conflict handling mirror {@link EditTimeEntryModal}: on
+ * open it splits `start_time`/`end_time` (ISO 8601) into a date + `HH:MM`
+ * strings and converts `duration` (seconds) via `secondsToDuration`. On save
+ * it PATCHes `/api/time-entries/:id` with `comment`, `duration` (back to
+ * seconds), `start_time`/`end_time` (recombined to ISO 8601), and
+ * `expectedUpdatedAt` (`entry.updated_at`) for optimistic-concurrency control
+ * — no `board_id`/`item_id`/`role_id` are sent. A `409` response is surfaced
+ * as a conflict toast and the save is aborted without closing; other errors
+ * set the inline error. On success it `refetch`es `useTimeEntriesStore` for
+ * the current user, calls `onSaved`, and closes.
  *
  * Reads from: `useTimeEntriesStore` (refetch), `useUserStore` (Supabase user),
  * `useMondayStore` (session token), `useToast`.
  *
  * @param props - Component props.
- * @returns A {@link Modal} titled "Zeiteintrag bearbeiten" with the form and update/cancel buttons.
+ * @returns A {@link Modal} titled "Entwurf bearbeiten" with the reduced form and update/cancel buttons.
  */
-export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: EditTimeEntryModalProps) {
-	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
+export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: EditDraftEntryModalProps) {
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -87,24 +94,12 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				"none",
 				false,
 			);
-
-			setSelectedTask({
-				boardId: entry.board_id || "",
-				boardName: entry.board_name || "",
-				itemId: entry.item_id || "",
-				itemName: entry.item_name || "",
-				parentItemId: entry.parent_item_id || undefined,
-				parentItemName: entry.parent_item_name || undefined,
-				roleId: entry.role_id || "",
-				roleName: entry.role_name || "",
-			});
 		}
 	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
 
 	const handleSave = async () => {
-		if (!selectedTask || !selectedTask.roleId || !userProfile?.id) {
-			console.error("Cannot save: missing required data");
-			setError("Bitte wähle eine Aufgabe und Rolle aus");
+		if (!userProfile?.id) {
+			console.error("Cannot save: missing user profile");
 			return;
 		}
 
@@ -130,9 +125,6 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				body: JSON.stringify({
 					id: entry.id,
 					comment: values.comment,
-					board_id: selectedTask.boardId,
-					item_id: selectedTask.itemId,
-					role_id: selectedTask.roleId,
 					duration: durationSeconds,
 					start_time: startTimeIso,
 					end_time: endTimeIso,
@@ -164,7 +156,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 
 	return (
 		<Modal show={show} onClose={onClose} size={"lg"}>
-			<Modal.Header>Zeiteintrag bearbeiten</Modal.Header>
+			<Modal.Header>Entwurf bearbeiten</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
 					{error && <Text c="red">{error}</Text>}
@@ -201,33 +193,13 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 							],
 							onAdjust: handlers.adjustDuration,
 						}}
-						taskSelector={{
-							show: true,
-							node: (
-								<TaskItemSelector
-									onSelectionChange={setSelectedTask}
-									initialValues={
-										selectedTask
-											? {
-													boardId: selectedTask.boardId,
-													boardName: selectedTask.boardName,
-													itemId: selectedTask.itemId,
-													itemName: selectedTask.itemName,
-													roleId: selectedTask.roleId,
-													roleName: selectedTask.roleName,
-												}
-											: undefined
-									}
-								/>
-							),
-						}}
 					/>
 
 					<Group justify="flex-end" mt="md">
 						<Button variant="default" onClick={onClose}>
 							Abbrechen
 						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || isSaving} loading={isSaving}>
+						<Button onClick={handleSave} disabled={isSaving} loading={isSaving}>
 							Aktualisieren
 						</Button>
 					</Group>

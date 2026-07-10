@@ -11,7 +11,7 @@ import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
 export default function DashboardPage() {
 	// Get user and time entries state
 	const userId = useUserStore((state) => state.supabaseUser?.id);
-	const { timeEntries, loading, error, fetchTimeEntries, refetch } = useTimeEntriesStore();
+	const { fetchTimeEntries, refetch } = useTimeEntriesStore();
 
 	// Initialize Monday context (which sets up user authentication)
 	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
@@ -43,7 +43,7 @@ export default function DashboardPage() {
 		<TimeEntriesProvider refetch={() => refetch(userId!)}>
 			<div id="dashboard-app">
 				<TimerDashboardHeader variant="dashboard" />
-				<TimeEntriesTable timeEntries={timeEntries} loading={loading} error={error} onRefetch={() => refetch(userId!)} />
+				<TimeEntriesTable onRefetch={() => refetch(userId!)} />
 			</div>
 		</TimeEntriesProvider>
 	);

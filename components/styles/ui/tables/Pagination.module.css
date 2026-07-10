@@ -1,0 +1,30 @@
+.pagination {
+	gap: 0.375rem;
+}
+
+.control {
+	background-color: var(--color--button-tertiary-bg);
+	color: var(--color--text-on-tertiary);
+	transition: background-color var(--transition);
+
+	&:hover:not([data-disabled="true"]):not([data-active="true"]) {
+		background-color: var(--color--button-tertiary-bg-hover);
+	}
+
+	&[data-active="true"] {
+		background-color: var(--color--button-primary-bg);
+		color: var(--color--text-on-primary);
+	}
+
+	&[data-disabled="true"] {
+		background-color: var(--color--background-disabled);
+		border-color: var(--color--border-disabled);
+		color: var(--color--text-disabled);
+		cursor: not-allowed;
+		opacity: 1;
+	}
+}
+
+.dots {
+	color: var(--color--text-secondary);
+}

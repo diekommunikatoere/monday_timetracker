@@ -24,6 +24,7 @@ export { default as edit } from "@/components/icons/Edit";
 export { default as expand } from "@/components/icons/Expand";
 export { default as favorite } from "@/components/icons/Favorite";
 export { default as filter } from "@/components/icons/Filter";
+export { default as filterOff } from "@/components/icons/FilterOff";
 export { default as filterList } from "@/components/icons/FilterList";
 export { default as light } from "@/components/icons/Light";
 export { default as lock } from "@/components/icons/Lock";
