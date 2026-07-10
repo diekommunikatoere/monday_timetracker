@@ -41,10 +41,11 @@ interface ManualTimeEntryModalProps {
  * `monday-context` header and the `sessionToken` as a Bearer token.
  *
  * **"Als Entwurf speichern" toggle:** switches the modal into draft mode, which
- * swaps the `TaskItemSelector` (board/task/role) for a standalone role `Select`
- * (via {@link useRoles}) and relaxes validation to only require a duration — no
- * board/task, and role is optional. The request is sent with `asDraft: true`,
- * which the API inserts as a `parked` row (skipping the monday column sync).
+ * hides the `TaskItemSelector` (board/task) and relaxes validation to only
+ * require a duration — no board/task, and role stays optional. Role is always
+ * rendered as a standalone `RoleSelector` (via {@link useRoles}), independent of
+ * the toggle. The request is sent with `asDraft: true`, which the API inserts as
+ * a `parked` row (skipping the monday column sync).
  *
 
  * **Units:** the on-screen `duration` is an `"HH:MM"` string; it is converted to
@@ -97,7 +98,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 		}
 
 		// A draft only needs a duration; a finalized entry still needs a task + role.
-		if (!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId)) {
+		if (!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) {
 			console.error("Cannot save: missing required data");
 			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
@@ -134,7 +135,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 					itemName: asDraft ? undefined : selectedTask?.itemName,
 					parentItemId: asDraft ? undefined : selectedTask?.parentItemId,
 					parentItemName: asDraft ? undefined : selectedTask?.parentItemName,
-					roleId: asDraft ? selectedRoleId || undefined : selectedTask?.roleId,
+					roleId: selectedRoleId || undefined,
 					duration: durationSeconds,
 					date: values.date.toISOString(),
 					startTime: startTimeIso,
@@ -205,17 +206,14 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 										node: <TaskItemSelector onSelectionChange={setSelectedTask} subItemsOnly={true} />,
 									}
 						}
-						roleSelector={
-							asDraft
-								? {
-										show: true,
-										roles,
-										selectedRoleId,
-										onRoleChange: setSelectedRoleId,
-										loading: loadingRoles,
-									}
-								: undefined
-						}
+						roleSelector={{
+							show: true,
+							roles,
+							selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
+							required: !asDraft,
+						}}
 					/>
 
 					<Flex justify="space-between" align="center" gap="sm" wrap="wrap" mt="md">
@@ -224,7 +222,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 							<Button variant="default" onClick={onClose}>
 								Abbrechen
 							</Button>
-							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId)) || isSaving} loading={isSaving}>
+							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) || isSaving} loading={isSaving}>
 								Speichern
 							</Button>
 						</Group>

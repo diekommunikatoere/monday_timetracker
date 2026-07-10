@@ -24,7 +24,9 @@ import "@/public/css/components/SaveTimerModal.css";
  * When omitted the modal reads live state from `useTimerStore` instead.
  *
  * @property entryId       - Entry id to finalize (falls back to the live timer's `entryId`).
- * @property taskSelection - Pre-selected board/item/role ({@link TaskSelection}).
+ * @property taskSelection - Pre-selected board/item ({@link TaskSelection}).
+ * @property roleId        - Pre-selected billing-role id (Supabase `role.id`).
+ * @property roleName      - Pre-selected billing-role display name.
  * @property comment       - Pre-filled comment.
  * @property date          - Entry date.
  * @property duration      - `HH:MM` duration string.
@@ -37,6 +39,8 @@ interface SaveTimerModalProps {
 	initialData?: {
 		entryId?: string;
 		taskSelection?: TaskSelection;
+		roleId?: string;
+		roleName?: string;
 		comment?: string;
 		date?: Date;
 		duration?: string;
@@ -70,12 +74,13 @@ interface SaveTimerModalProps {
  * `timer_finalize` RPC) — it closes the open segment and flips `timer_state` to
  * `finalized` in one transaction, so there is no separate soft-reset call.
  *
- * **"Als Entwurf speichern" toggle:** switches to draft mode, swapping the
- * `TaskItemSelector` (board/task/role) for a standalone role `Select` (via
- * {@link useRoles}) and relaxing validation to only require a duration — no
- * board/task, and role is optional. The finalize request is sent with
- * `asDraft: true`, which keeps `timer_state` at `parked` instead of promoting
- * to `finalized`, and skips the monday column sync.
+ * **"Als Entwurf speichern" toggle:** switches to draft mode, hiding the
+ * `TaskItemSelector` (board/task) and relaxing validation to only require a
+ * duration — no board/task, and role stays optional. Role is always rendered
+ * as a standalone `RoleSelector` (via {@link useRoles}), independent of the
+ * toggle. The finalize request is sent with `asDraft: true`, which keeps
+ * `timer_state` at `parked` instead of promoting to `finalized`, and skips the
+ * monday column sync.
  *
  * On save the end time is *derived* from `start + duration` (in **seconds**) to
  * guarantee it never inverts and crosses midnight correctly; `duration` is sent
@@ -126,7 +131,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 
 		if (initialData) {
 			setSelectedTask(initialData.taskSelection || null);
-			setSelectedRoleId(initialData.taskSelection?.roleId || "");
+			setSelectedRoleId(initialData.roleId || "");
 			setLocalComment(initialData.comment || "");
 			const date = initialData.date || new Date();
 			const draftComment = initialData.comment || "";
@@ -164,7 +169,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 		}
 
 		// A draft only needs a duration; a finalized entry still needs a task + role.
-		if (!asDraft && (!selectedTask || !selectedTask.roleId)) {
+		if (!asDraft && (!selectedTask || !selectedRoleId)) {
 			console.error("Cannot save: missing required data", { selectedTask });
 			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
@@ -207,7 +212,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 					itemName: asDraft ? undefined : selectedTask?.itemName,
 					parentItemId: asDraft ? undefined : selectedTask?.parentItemId || null,
 					parentItemName: asDraft ? undefined : selectedTask?.parentItemName || null,
-					roleId: asDraft ? selectedRoleId || undefined : selectedTask?.roleId,
+					roleId: selectedRoleId || undefined,
 					duration: durationSeconds,
 					startTime: startTimeIso,
 					endTime: endTimeIso,
@@ -296,8 +301,6 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 																boardName: selectedTask.boardName,
 																itemId: selectedTask.itemId,
 																itemName: selectedTask.itemName,
-																roleId: selectedTask.roleId,
-																roleName: selectedTask.roleName,
 															}
 														: undefined
 												}
@@ -305,17 +308,14 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 										),
 									}
 						}
-						roleSelector={
-							asDraft
-								? {
-										show: true,
-										roles,
-										selectedRoleId,
-										onRoleChange: setSelectedRoleId,
-										loading: loadingRoles,
-									}
-								: undefined
-						}
+						roleSelector={{
+							show: true,
+							roles,
+							selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
+							required: !asDraft,
+						}}
 					/>
 
 					<Flex justify="space-between" align="center" gap="sm" wrap="wrap" mt="md">
@@ -324,7 +324,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 							<Button variant="default" onClick={onClose}>
 								Abbrechen
 							</Button>
-							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId)) || isSaving} loading={isSaving}>
+							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) || isSaving} loading={isSaving}>
 								{isSaving ? "Speichern..." : "Speichern"}
 							</Button>
 						</Group>

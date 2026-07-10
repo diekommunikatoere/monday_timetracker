@@ -1,7 +1,8 @@
 "use client";
 
 import { Flex, Tooltip } from "@mantine/core";
-import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, Select, TimeInput } from "@/components";
+import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, TimeInput } from "@/components";
+import { RoleSelector } from "./RoleSelector";
 
 import styles from "@/components/styles/features/time-entries/TimeEntryForm.module.css";
 
@@ -47,7 +48,7 @@ export type TimeEntryQuickAdjust = {
  * @property onEndTimeNowClick     - Optional; when provided, renders a "now" icon button that sets the end time (works even while the end input is read-only).
  * @property quickAdjustments      - Optional `{ add?, subtract?, onAdjust }` to render quick-add / quick-subtract button groups; buttons pass their {@link TimeEntryQuickAdjust.minutes} to `onAdjust`. Disabled while `durationLocked`.
  * @property taskSelector         - Optional `{ show, node }`; when `show` is true, `node` is inserted into the form (e.g. a monday task picker).
- * @property roleSelector         - Optional `{ show, roles, selectedRoleId, onRoleChange, loading? }`; when `show` is true, renders a searchable role `Select`.
+ * @property roleSelector         - Optional `{ show, roles, selectedRoleId, onRoleChange, loading?, required? }`; when `show` is true, renders a {@link RoleSelector}.
  */
 export interface TimeEntryFormFieldsProps {
 	// Core fields
@@ -91,6 +92,7 @@ export interface TimeEntryFormFieldsProps {
 		selectedRoleId: string;
 		onRoleChange: (roleId: string) => void;
 		loading?: boolean;
+		required?: boolean;
 	};
 }
 
@@ -241,7 +243,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 			{taskSelector?.show ? taskSelector.node : null}
 
 			{/* Role selector */}
-			{roleSelector?.show && <Select label="Rolle" placeholder="Rolle auswählen..." data={roleSelector.roles} value={roleSelector.selectedRoleId} onChange={(val) => roleSelector.onRoleChange(val || null)} disabled={roleSelector.loading} searchable clearable clearButtonProps={{ "aria-label": "Auswahl löschen" }} />}
+			{roleSelector?.show && <RoleSelector roles={roleSelector.roles} selectedRoleId={roleSelector.selectedRoleId} onChange={roleSelector.onRoleChange} loading={roleSelector.loading} required={roleSelector.required} />}
 
 			{/* Comment */}
 			<Input label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />

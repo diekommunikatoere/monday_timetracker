@@ -13,6 +13,7 @@ import { TimeEntry } from "@/types/time-entry";
 import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { useRoles } from "../shared/hooks/useRoles";
 
 import "@mantine/dates/styles.css";
 
@@ -42,7 +43,8 @@ interface EditTimeEntryModalProps {
  * from `entry`: `start_time`/`end_time` (**ISO 8601**) are split into a date and
  * `HH:MM` time strings, and `duration` (**seconds**) is converted to `HH:MM` via
  * `secondsToDuration`. A {@link TaskItemSelector} is pre-filled from the entry's
- * board/item/role so the user can reassign the task.
+ * board/item so the user can reassign the task; role is tracked separately via
+ * a standalone `RoleSelector` (seeded from `entry.role_id`).
  *
  * On save it PATCHes `/api/time-entries/:id` with the new fields — `duration`
  * back to **seconds** via `durationToSeconds`, start/end combined into **ISO 8601**
@@ -60,10 +62,12 @@ interface EditTimeEntryModalProps {
  */
 export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: EditTimeEntryModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
+	const [selectedRoleId, setSelectedRoleId] = useState<string>("");
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "none" });
+	const { roles, isLoading: loadingRoles } = useRoles();
 
 	const { refetch } = useTimeEntriesStore();
 	const { showToast } = useToast();
@@ -95,14 +99,13 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				itemName: entry.item_name || "",
 				parentItemId: entry.parent_item_id || undefined,
 				parentItemName: entry.parent_item_name || undefined,
-				roleId: entry.role_id || "",
-				roleName: entry.role_name || "",
 			});
+			setSelectedRoleId(entry.role_id || "");
 		}
 	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
 
 	const handleSave = async () => {
-		if (!selectedTask || !selectedTask.roleId || !userProfile?.id) {
+		if (!selectedTask || !selectedRoleId || !userProfile?.id) {
 			console.error("Cannot save: missing required data");
 			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
@@ -132,7 +135,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 					comment: values.comment,
 					board_id: selectedTask.boardId,
 					item_id: selectedTask.itemId,
-					role_id: selectedTask.roleId,
+					role_id: selectedRoleId,
 					duration: durationSeconds,
 					start_time: startTimeIso,
 					end_time: endTimeIso,
@@ -213,13 +216,19 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 													boardName: selectedTask.boardName,
 													itemId: selectedTask.itemId,
 													itemName: selectedTask.itemName,
-													roleId: selectedTask.roleId,
-													roleName: selectedTask.roleName,
 												}
 											: undefined
 									}
 								/>
 							),
+						}}
+						roleSelector={{
+							show: true,
+							roles,
+							selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
+							required: true,
 						}}
 					/>
 
@@ -227,7 +236,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 						<Button variant="default" onClick={onClose}>
 							Abbrechen
 						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || isSaving} loading={isSaving}>
+						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId || isSaving} loading={isSaving}>
 							Aktualisieren
 						</Button>
 					</Group>
