@@ -12,9 +12,7 @@ import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields"
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { useRoles } from "../shared/hooks/useRoles";
 import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
-import mondaySdk from "monday-sdk-js";
-
-const monday = mondaySdk();
+import { getMondaySdk } from "@/lib/monday-browser-sdk";
 
 /**
  * Props for {@link ItemManualEntryModal}.
@@ -114,7 +112,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 		setError(null);
 
 		try {
-			const context = rawContext || (await monday.get("context"));
+			const context = rawContext || (await getMondaySdk().get("context"));
 			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = combineDateAndTime(values.date, values.endTime);
 

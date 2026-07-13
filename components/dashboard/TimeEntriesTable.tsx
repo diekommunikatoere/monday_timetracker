@@ -20,9 +20,6 @@ import { useFilteredTimeEntries } from "./hooks/useFilteredTimeEntries";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getDashboardColumns } from "../shared/time-entries/TimeEntryTableConfigs";
-import mondaySdk from "monday-sdk-js";
-
-const monday = mondaySdk();
 
 /**
  * Props for {@link TimeEntriesTable}.

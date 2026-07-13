@@ -840,6 +840,8 @@ export async function getMondayContext(request: NextRequest) {
  *          All `photo_urls` values are `null` if the user has no avatar.
  */
 export async function getUserDetails(userId: string): Promise<{
+	name: string | null;
+	email: string | null;
 	teams: Array<{ id: string; name: string }>;
 	photo_urls: {
 		original: string | null;
@@ -851,6 +853,8 @@ export async function getUserDetails(userId: string): Promise<{
 }> {
 	if (!userId) {
 		return {
+			name: null,
+			email: null,
 			teams: [],
 			photo_urls: { original: null, small: null, thumb: null, thumb_small: null, tiny: null },
 		};
@@ -861,6 +865,8 @@ export async function getUserDetails(userId: string): Promise<{
 
 	// Try cache first
 	const cached = await cacheHelper.get<{
+		name: string | null;
+		email: string | null;
 		teams: Array<{ id: string; name: string }>;
 		photo_urls: any;
 	}>(cacheKey);
@@ -874,6 +880,8 @@ export async function getUserDetails(userId: string): Promise<{
 	const query = `
 		query {
 			users(ids: [${userId}]) {
+				name
+				email
 				teams {
 					id
 					name
@@ -896,6 +904,8 @@ export async function getUserDetails(userId: string): Promise<{
 		}
 
 		const users = response.users || [];
+		let name: string | null = null;
+		let email: string | null = null;
 		let teams: Array<{ id: string; name: string }> = [];
 		let photo_urls = {
 			original: null,
@@ -906,6 +916,8 @@ export async function getUserDetails(userId: string): Promise<{
 		};
 
 		if (users.length > 0) {
+			name = users[0].name ?? null;
+			email = users[0].email ?? null;
 			if (users[0].teams) {
 				teams = users[0].teams;
 			}
@@ -918,7 +930,7 @@ export async function getUserDetails(userId: string): Promise<{
 			};
 		}
 
-		const result = { teams, photo_urls };
+		const result = { name, email, teams, photo_urls };
 
 		// Cache the result
 		await cacheHelper.set(cacheKey, result, CACHE_TTL.USER_TEAMS);
@@ -928,6 +940,8 @@ export async function getUserDetails(userId: string): Promise<{
 	} catch (error) {
 		console.error("Error in getUserDetails:", error);
 		return {
+			name: null,
+			email: null,
 			teams: [],
 			photo_urls: { original: null, small: null, thumb: null, thumb_small: null, tiny: null },
 		};
