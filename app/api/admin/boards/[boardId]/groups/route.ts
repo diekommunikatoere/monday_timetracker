@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import type { MondayGroupInsert } from "@/types/database";
 import { registerBoardWebhooks } from "@/lib/monday/webhooks";
 import { requireAdmin } from "@/lib/monday-auth";
+import { createMondayClient } from "@/lib/monday/client";
 
 /**
  * GET /api/admin/boards/[boardId]/groups
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		}
 
 		// 1. Fetch groups from Monday API
-		const client = new ApiClient({ token, apiVersion: "2025-10" });
+		const client = createMondayClient();
 		const query = `
 			query ($boardId: ID!) {
 				boards(ids: [$boardId]) {

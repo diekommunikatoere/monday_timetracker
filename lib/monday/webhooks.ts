@@ -1,7 +1,7 @@
 // lib/monday/webhooks.ts — Registers and reconciles monday.com board webhooks.
 
-import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { createMondayClient } from "./client";
 
 /**
  * monday.com `WebhookEventType` subscription names to register for every tracked board.
@@ -42,7 +42,7 @@ export async function registerBoardWebhooks(boardId: string, token: string) {
 		}
 
 		const webhookUrl = `${appUrl}/api/webhooks/monday`;
-		const client = new ApiClient({ token, apiVersion: "2025-10" });
+		const client = createMondayClient();
 
 		// 1. Determine which events we've already registered for this board+url.
 		// Monday's `webhooks` query never returns the target url, so we dedup against
@@ -130,7 +130,7 @@ export async function reconcileWebhooks(boardId: string, token: string) {
 		}
 
 		const webhookUrl = `${appUrl}/api/webhooks/monday`;
-		const client = new ApiClient({ token, apiVersion: "2025-10" });
+		const client = createMondayClient();
 
 		// 1. Live webhooks on the board (no url is returned here).
 		const getWebhooksQuery = `

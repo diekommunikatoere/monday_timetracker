@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/monday-auth";
+import { createMondayClient } from "@/lib/monday/client";
 
 /**
  * GET /api/admin/monday/boards/[boardId]/columns
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		}
 
 		// 2. If not in cache, fetch from Monday API
-		const client = new ApiClient({ token, apiVersion: "2025-10" });
+		const client = createMondayClient();
 		const query = `
 			query ($boardId: [ID!]) {
 				boards (ids: $boardId) {

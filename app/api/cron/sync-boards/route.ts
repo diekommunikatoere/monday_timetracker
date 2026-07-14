@@ -4,6 +4,7 @@ import { getBoardTasks } from "@/lib/monday";
 import { registerBoardWebhooks, reconcileWebhooks } from "@/lib/monday/webhooks";
 import { upsertMondayItemsBatch } from "@/lib/database";
 import { ApiClient } from "@mondaydotcomorg/api";
+import { createMondayClient } from "@/lib/monday/client";
 
 /**
  * GET /api/cron/sync-boards
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
 				console.log(`[Reconciliation Cron] Syncing board: ${board.name} (${board.id})`);
 
 				// A. Sync Board Metadata & Webhooks
-				const client = new ApiClient({ token, apiVersion: "2025-04" });
+				const client = createMondayClient();
 				const boardQuery = `
 					query ($boardId: ID!) {
 						boards(ids: [$boardId]) {
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
 							name
 							workspace_id
 							board_kind
+							type
 							state
 							groups {
 								id
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
 				const boardResponse = await client.request<any>(boardQuery, { boardId: board.id });
 				const mondayBoard = boardResponse.data?.data?.boards?.[0];
 
-				if (mondayBoard) {
+				if (mondayBoard && mondayBoard.type === "board") {
 					// Update metadata
 					await supabaseAdmin.from("monday_board").upsert({
 						id: board.id,

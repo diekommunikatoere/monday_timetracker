@@ -1,9 +1,10 @@
 // lib/monday.ts — monday.com GraphQL API client: boards, items, subitems, user details, linked items.
 
-import { ApiClient, ClientError } from "@mondaydotcomorg/api";
+import { ClientError } from "@mondaydotcomorg/api";
 import { NextRequest } from "next/server";
 import { cacheHelper } from "./redis";
 import { upsertMondayBoard, upsertMondayItem, upsertMondayItemsBatch } from "./database";
+import { createMondayClient } from "./monday/client";
 
 // Cache TTL constants (in seconds)
 const CACHE_TTL = {
@@ -178,7 +179,7 @@ if (!token) {
 }
 
 // Create client instance once
-const client = new ApiClient({ token, apiVersion: "2025-10" });
+const client = createMondayClient();
 
 /**
  * Resolves a list of monday.com board IDs to their names, for use in board-selection UIs.
@@ -996,11 +997,13 @@ export async function getUserDetails(userId: string): Promise<{
 					id
 					name
 				}
-				photo_original
-				photo_small
-				photo_thumb
-				photo_thumb_small
-				photo_tiny
+				photo_url {
+					original
+					small
+					thumb
+					thumb_small
+					tiny
+				}
 			}
 		}
 	`;
@@ -1032,11 +1035,11 @@ export async function getUserDetails(userId: string): Promise<{
 				teams = users[0].teams;
 			}
 			photo_urls = {
-				original: users[0].photo_original,
-				small: users[0].photo_small,
-				thumb: users[0].photo_thumb,
-				thumb_small: users[0].photo_thumb_small,
-				tiny: users[0].photo_tiny,
+				original: users[0].photo_url?.original ?? null,
+				small: users[0].photo_url?.small ?? null,
+				thumb: users[0].photo_url?.thumb ?? null,
+				thumb_small: users[0].photo_url?.thumb_small ?? null,
+				tiny: users[0].photo_url?.tiny ?? null,
 			};
 		}
 

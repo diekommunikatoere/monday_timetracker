@@ -23,7 +23,7 @@
  * - {@link syncItemColumns}   — sync all configured columns for an item directly.
  */
 
-import { ApiClient, ClientError } from "@mondaydotcomorg/api";
+import { ClientError } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { SyncPurpose, TimeFormat, SyncColumnType, GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
 
@@ -145,7 +145,7 @@ const token = process.env.MONDAY_API_TOKEN;
 if (!token) {
 	console.warn("MONDAY_API_TOKEN is not set - column sync will be disabled");
 }
-const client = token ? new ApiClient({ token, apiVersion: "2025-10" }) : null;
+const client = token ? createMondayClient() : null;
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -980,6 +980,7 @@ interface SyncQueueItem {
 
 // Import cacheHelper for Redis operations
 import { cacheHelper } from "@/lib/redis";
+import { createMondayClient } from "./monday/client";
 
 const SYNC_QUEUE_PREFIX = "sync_queue:";
 const SYNC_QUEUE_TTL = 15; // seconds
