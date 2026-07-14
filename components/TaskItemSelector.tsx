@@ -7,7 +7,6 @@ import { Icon, IconButton, Select, TreeSelect } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
-import RefreshIcon from "@/components/icons/Refresh";
 import Fuse, { type FuseResult } from "fuse.js";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
