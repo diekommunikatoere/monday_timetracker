@@ -705,7 +705,7 @@ export default function BoardConfigPage() {
 				<Anchor component={Link} href="/admin">
 					Admin
 				</Anchor>
-				<Anchor component={Link} href="/admin?tab=boards">
+				<Anchor component={Link} href="/admin">
 					Boards
 				</Anchor>
 				<Text>{(boardConfig as any).monday_board?.name || (boardConfig as any).board_name || boardConfig.board_id}</Text>
