@@ -739,10 +739,10 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				<Flex align="center" gap="4px" {...node}>
 					{hasChildren && (
 						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
-							<Icon name={expanded ? "collapse" : "expand"} size={12} color="var(--color--text-secondary)" />
+							<Icon name={expanded ? "collapse_all" : "expand_all"} size={12} color="var(--color--text-secondary)" />
 						</IconButton>
 					)}
-					{isSelected && <Icon name="check" size={16} color="var(--color--primary)" weight="bold" />}
+					{isSelected && <Icon name="check" size={16} color="var(--color--primary-500)" weight="bold" />}
 					<span style={{ fontStyle: expanded ? "italic" : "normal" }}>{node.label}</span>
 				</Flex>
 			);
@@ -780,7 +780,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 							</Text>
 							<Tooltip label="Aufgabenliste aktualisieren" position="left">
 								<IconButton colorVariant="tertiary" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks || !selectedBoard} aria-label="Aufgaben aktualisieren">
-									{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
+									{isRefreshing ? <Loader size={14} /> : <Icon name="refresh" size={14} />}
 								</IconButton>
 							</Tooltip>
 						</Flex>

@@ -12,7 +12,6 @@ import { TimeEntry } from "@/types/time-entry";
 import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
 import { useUserStore } from "@/stores/userStore";
 import { formatDuration } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
 
 export default function ItemViewPage() {
 	const userId = useUserStore((state) => state.supabaseUser?.id);
@@ -78,8 +77,6 @@ export default function ItemViewPage() {
 	const effectiveBoardId = itemDetails?.parentBoardId || boardId;
 	const parentItemId = itemDetails?.parentItemId;
 	const parentItemName = itemDetails?.parentItemName;
-	const roleId = "00000000-0000-0000-0000-000000000000"; // Placeholder
-	const roleName = "Standard-Rolle";
 
 	const handleEdit = (entry: TimeEntry) => {
 		setEditingEntry(entry);
@@ -121,7 +118,7 @@ export default function ItemViewPage() {
 				<ItemTimeEntriesView timeEntries={timeEntries} itemId={itemId} boardId={effectiveBoardId || boardId} onEdit={handleEdit} />
 			</div>
 
-			<ItemManualEntryModal show={showManualModal} onClose={() => setShowManualModal(false)} itemId={itemId} boardId={effectiveBoardId || boardId} itemName={itemName} boardName={boardName} parentItemId={parentItemId} parentItemName={parentItemName} roleId={roleId} roleName={roleName} />
+			<ItemManualEntryModal show={showManualModal} onClose={() => setShowManualModal(false)} itemId={itemId} boardId={effectiveBoardId || boardId} itemName={itemName} boardName={boardName} parentItemId={parentItemId} parentItemName={parentItemName} />
 
 			{editingEntry && (
 				<EditTimeEntryModal
@@ -134,10 +131,6 @@ export default function ItemViewPage() {
 					onSaved={() => refetch()}
 				/>
 			)}
-
-			<Flex style={{ position: "fixed", bottom: 10, right: 10, fontFamily: "var(--font--mono)", fontSize: "12px", lineHeight: "1", backgroundColor: "var(--color--background-secondary)", padding: "4px 8px", borderRadius: "4px", borderWidth: "1px", borderColor: "var(--color--primary)" }} direction="column" align="flex-end" gap="xs">
-				<span>v{APP_VERSION}</span>
-			</Flex>
 		</Flex>
 	);
 }

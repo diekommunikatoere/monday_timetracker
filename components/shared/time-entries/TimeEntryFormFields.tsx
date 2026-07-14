@@ -109,7 +109,7 @@ function LockButton({ active, onToggle, tooltip, ariaLabel, disabled }: { active
 	return (
 		<Tooltip label={tooltip} position="top" withArrow>
 			<IconButton variant="filled" colorVariant={active ? "primary" : "tertiary"} onClick={onToggle} disabled={disabled} aria-label={ariaLabel}>
-				<Icon name={active ? "lock" : "unlock"} size={16} color={active ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
+				<Icon name={active ? "lock" : "lock_open"} size={18} color={active ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
 			</IconButton>
 		</Tooltip>
 	);
@@ -152,7 +152,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						onStartTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
 								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen" disabled={startInputDisabled}>
-									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
+									<Icon name="schedule" size={18} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
@@ -171,7 +171,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						onEndTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
 								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen" disabled={endInputDisabled}>
-									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
+									<Icon name="schedule" size={18} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
@@ -192,7 +192,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						if (newDate) onDateChange(new Date(newDate));
 					}}
 					valueFormat="DD.MM.YYYY"
-					leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />}
+					leftSection={<Icon name="calendar_today" size={18} color="var(--color--text-placeholder)" />}
 					leftSectionPointerEvents="none"
 					style={{ flex: 1 }}
 					highlightToday

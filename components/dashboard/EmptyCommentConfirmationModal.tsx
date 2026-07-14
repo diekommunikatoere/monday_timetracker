@@ -65,9 +65,9 @@ export default function EmptyCommentConfirmationModal({ show, onClose, onConfirm
 							variant="primary"
 							onClick={onConfirm}
 							loading={isSaving}
-							rightSection={
+							leftSection={
 								<Flex align="center">
-									<Icon name="returnKey" size={16} color="white" weight="bold" />
+									<Icon name="keyboard_return" size={18} color="white" weight="bold" />
 								</Flex>
 							}
 						>

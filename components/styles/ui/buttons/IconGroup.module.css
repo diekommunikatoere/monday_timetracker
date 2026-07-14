@@ -3,20 +3,17 @@
 
 	&[data-variant="filled"] {
 		background-color: var(--color--button-primary-bg);
-		color: var(--color--text-on-primary);
+		color: var(--color--icon-on-primary);
 
 		&:hover:not(:disabled):not([data-disabled]) {
 			background-color: var(--color--button-primary-bg-hover);
+			color: var(--color--icon-on-primary);
 		}
 
 		&:disabled,
 		&[data-disabled] {
 			background-color: var(--color--background-disabled);
 			color: var(--color--text-disabled);
-
-			svg path {
-				fill: var(--color--text-disabled);
-			}
 		}
 	}
 
@@ -41,82 +38,57 @@
 		cursor: not-allowed;
 		background-color: var(--color--background-disabled);
 		color: var(--color--text-disabled);
-
-		svg path {
-			fill: var(--color--text-disabled);
-		}
 	}
 }
 
 .buttonPrimary,
 .buttonPrimary[data-variant="filled"] {
 	background-color: var(--color--button-primary-bg);
-	color: var(--color--text-on-primary);
+	color: var(--color--icon-on-primary);
 
 	&:hover:not(:disabled):not([data-disabled]) {
 		background-color: var(--color--button-primary-bg-hover);
-	}
-
-	svg path {
-		fill: var(--color--icon-on-primary);
+		color: var(--color--icon-on-primary);
 	}
 
 	&:disabled,
 	&[data-disabled] {
 		background-color: var(--color--background-disabled);
 		color: var(--color--text-disabled);
-
-		svg path {
-			fill: var(--color--text-disabled);
-		}
 	}
 }
 
 .buttonSecondary,
 .buttonSecondary[data-variant="filled"] {
 	background-color: var(--color--button-secondary-bg);
-	color: var(--color--text-on-secondary);
+	color: var(--color--icon-on-secondary);
 
 	&:hover:not(:disabled):not([data-disabled]) {
 		background-color: var(--color--button-secondary-bg-hover);
-	}
-
-	svg path {
-		fill: var(--color--icon-on-secondary);
+		color: var(--color--icon-on-secondary);
 	}
 
 	&:disabled,
 	&[data-disabled] {
 		background-color: var(--color--background-disabled);
 		color: var(--color--text-disabled);
-
-		svg path {
-			fill: var(--color--text-disabled);
-		}
 	}
 }
 
 .buttonTertiary,
 .buttonTertiary[data-variant="filled"] {
 	background-color: var(--color--button-tertiary-bg);
-	color: var(--color--text-on-tertiary);
+	color: var(--color--icon-on-tertiary);
 
 	&:hover:not(:disabled):not([data-disabled]) {
 		background-color: var(--color--button-tertiary-bg-hover);
-	}
-
-	svg path {
-		fill: var(--color--icon-on-tertiary);
+		color: var(--color--icon-on-tertiary);
 	}
 
 	&:disabled,
 	&[data-disabled] {
 		background-color: var(--color--background-disabled);
 		color: var(--color--text-disabled);
-
-		svg path {
-			fill: var(--color--text-disabled);
-		}
 	}
 }
 
@@ -127,19 +99,12 @@
 
 	&:hover:not(:disabled):not([data-disabled]) {
 		background-color: var(--color--button-primary-muted-bg-hover);
-	}
-
-	svg path {
-		fill: var(--color--text-on-primary-muted);
+		color: var(--color--text-on-primary-muted);
 	}
 
 	&:disabled,
 	&[data-disabled] {
 		background-color: var(--color--background-disabled);
 		color: var(--color--text-disabled);
-
-		svg path {
-			fill: var(--color--text-disabled);
-		}
 	}
 }

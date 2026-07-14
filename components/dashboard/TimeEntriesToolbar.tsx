@@ -78,7 +78,7 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 					<Input placeholder="Aufgabe oder Kommentar suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
 					<Tooltip label={showFilters ? "Filter ausblenden" : "Filter einblenden"} position="top" withArrow>
 						<IconButton size="lg" colorVariant={showFilters ? undefined : "tertiary"} onClick={handleToggleFilters} aria-label={showFilters ? "Filter ausblenden" : "Filter einblenden"}>
-							<Icon name={showFilters ? "filterOff" : "filter"} size={24} color={showFilters ? "var(--color--icon-on-primary)" : "var(--color--icon-on-tertiary)"} />
+							<Icon name={showFilters ? "filter_alt_off" : "filter_alt"} />
 						</IconButton>
 					</Tooltip>
 					{hasActiveFilters && (
@@ -106,7 +106,7 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 							}}
 							valueFormat="DD.MM.YYYY"
 							clearable
-							leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />}
+							leftSection={<Icon name="date_range" size={18} color="var(--color--text-placeholder)" />}
 							leftSectionPointerEvents="none"
 							highlightToday
 							withWeekNumbers

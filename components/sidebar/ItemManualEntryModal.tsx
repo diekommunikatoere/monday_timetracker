@@ -41,8 +41,7 @@ export interface ItemManualEntryModalProps {
 	boardName: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	roleId: string;
-	roleName: string;
+	roleId?: string;
 }
 
 /**
@@ -69,7 +68,7 @@ export interface ItemManualEntryModalProps {
  * @param props - Component props.
  * @returns A {@link Modal} titled "Zeit eintragen" with the form fields and save/cancel buttons.
  */
-export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId, roleName }: ItemManualEntryModalProps) {
+export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId }: ItemManualEntryModalProps) {
 	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -80,7 +79,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 
 	// Synchronize selectedRoleId with prop if it changes
 	useEffect(() => {
-		if (roleId && (selectedRoleId === "00000000-0000-0000-0000-000000000000" || selectedRoleId === "")) {
+		if (roleId && selectedRoleId === "") {
 			setSelectedRoleId(roleId);
 		}
 	}, [roleId]);

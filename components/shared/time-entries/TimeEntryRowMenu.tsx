@@ -67,26 +67,26 @@ export function TimeEntryRowMenu<T extends { id: string; user_id: string; timer_
 		<Menu width={150} position="bottom-end" withArrow styles={{ arrow: { borderColor: "var(--color--border-ui)" }, dropdown: { backgroundColor: "var(--color--background-primary)", borderColor: "var(--color--border-ui)", boxShadow: "var(--box-shadow--md)" } }}>
 			<Menu.Target>
 				<IconButton variant="filled" colorVariant="tertiary" size="sm" aria-label="Aktionen" style={style}>
-					<Icon name="moreVert" size={18} color="var(--color--icon)" />
+					<Icon name="more_vert" size={18} />
 				</IconButton>
 			</Menu.Target>
 
 			<Menu.Dropdown>
 				{isDraft && canEdit ? (
 					<>
-						<Menu.Item leftSection={<Icon name="save" size={16} color="var(--color--icon)" />} onClick={() => onSaveDraft?.(entry)}>
+						<Menu.Item leftSection={<Icon name="save" size={18} />} onClick={() => onSaveDraft?.(entry)}>
 							Speichern
 						</Menu.Item>
 						<Menu.Divider />
 					</>
 				) : null}
 				{isEditable && onEdit && canEdit ? (
-					<Menu.Item leftSection={<Icon name="edit" size={16} color="var(--color--icon)" />} onClick={() => onEdit(entry)}>
+					<Menu.Item leftSection={<Icon name="edit" size={18} />} onClick={() => onEdit(entry)}>
 						Bearbeiten
 					</Menu.Item>
 				) : null}
 				{onDelete && canDelete ? (
-					<Menu.Item leftSection={<Icon name="delete" size={16} color="var(--color--icon)" />} color="red" onClick={() => onDelete(entry)}>
+					<Menu.Item leftSection={<Icon name="delete" size={18} />} color="red" onClick={() => onDelete(entry)}>
 						Löschen
 					</Menu.Item>
 				) : null}

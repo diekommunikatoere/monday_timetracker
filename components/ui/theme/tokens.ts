@@ -178,6 +178,8 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--button-tertiary-bg-hover": "var(--color--tertiary-600)",
 		"--color--button-primary-muted-bg": "var(--color--tertiary-900)",
 		"--color--button-primary-muted-bg-hover": "var(--color--tertiary-800)",
+		"--color--button-warning-bg": "var(--color--error-500)",
+		"--color--button-warning-bg-hover": "var(--color--error-400)",
 
 		"--color--border-ui": "var(--color--tertiary-500)",
 		"--color--border-layout": "var(--color--tertiary-800)",
@@ -245,6 +247,8 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--button-tertiary-bg-hover": "var(--color--tertiary-400)",
 		"--color--button-primary-muted-bg": "var(--color--tertiary-100)",
 		"--color--button-primary-muted-bg-hover": "var(--color--tertiary-200)",
+		"--color--button-warning-bg": "var(--color--error-500)",
+		"--color--button-warning-bg-hover": "var(--color--error-600)",
 
 		"--color--border-ui": "var(--color--tertiary-500)",
 		"--color--border-layout": "var(--color--tertiary-400)",

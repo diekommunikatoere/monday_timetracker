@@ -5,9 +5,7 @@
 
 import { Tooltip } from "@mantine/core";
 import { useUserStore } from "@/stores/userStore";
-import { IconButton } from "@/components";
-import LightIcon from "@/components/icons/Light";
-import DarkIcon from "@/components/icons/Dark";
+import { Icon, IconButton } from "@/components";
 
 /**
  * Small icon button that switches the global app theme between light and dark.
@@ -27,7 +25,7 @@ export function ThemeToggle() {
 	return (
 		<Tooltip label={appTheme === "light" ? "Zu Dark Mode wechseln" : "Zu Light Mode wechseln"} position="top" withArrow>
 			<IconButton onClick={() => toggleTheme()} variant="filled" colorVariant="primary-muted" size="lg" aria-label={appTheme === "light" ? "Zu Dark Mode wechseln" : "Zu Light Mode wechseln"}>
-				{appTheme === "light" ? <LightIcon size={20} color="var(--color--primary)" /> : <DarkIcon size={20} color="var(--color--primary)" />}
+				<Icon name={appTheme === "light" ? "light_mode" : "dark_mode"} size={18} />
 			</IconButton>
 		</Tooltip>
 	);

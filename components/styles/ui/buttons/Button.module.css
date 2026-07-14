@@ -49,6 +49,16 @@
 		}
 	}
 
+	.button--warning,
+	&[data-variant="warning"] {
+		background-color: var(--color--button-warning-bg);
+		color: #fff;
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-warning-bg-hover);
+		}
+	}
+
 	&[data-variant="light"] {
 	}
 	&[data-variant="outline"] {

@@ -7,8 +7,7 @@ import React from "react";
 import { Tooltip, TextInput as MantineTextInput, Textarea as MantineTextarea } from "@mantine/core";
 import { InputProps, TextareaProps } from "./types";
 import styles from "@/components/styles/ui/forms/Input.module.css";
-import { IconButton } from "../buttons/IconButton";
-import { Icon } from "../icons";
+import { Icon, IconButton } from "@/components";
 
 /**
  * Single-line text field built on Mantine's `TextInput`.
@@ -46,7 +45,7 @@ export const Input: React.FC<InputProps> = ({ error, validationState, className 
 				showClearButton ? (
 					<Tooltip label={clearButtonLabel} position="top" withArrow openDelay={400}>
 						<IconButton onClick={onClear} colorVariant="tertiary" aria-label={clearButtonLabel} size="sm">
-							<Icon name="close" size={16} />
+							<Icon name="close" size={18} />
 						</IconButton>
 					</Tooltip>
 				) : (

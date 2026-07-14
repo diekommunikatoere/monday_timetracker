@@ -19,7 +19,7 @@ import buttonStyles from "@/components/styles/ui/buttons/IconGroup.module.css";
  * default (the button can otherwise sit in a `pointerEvents: "none"` zone).
  */
 export const defaultClearButtonProps = {
-	icon: <Icon name="close" size={16} />,
+	icon: <Icon name="close" size={18} />,
 	classNames: { root: `${buttonStyles.iconButton} ${buttonStyles.buttonTertiary}` },
 	style: { pointerEvents: "all" as const },
 };

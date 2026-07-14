@@ -45,10 +45,10 @@ export default function BulkActionButtons({ selectedIds, onBulkDelete, onClearSe
 					{selectedIds.length} {selectedIds.length === 1 ? "Eintrag" : "Einträge"} ausgewählt
 				</Text>
 				<Flex direction={"column"} gap="sm" justify="center" align="stretch">
-					<Button variant="default" onClick={onClearSelection} fullWidth size="sm" leftSection={<Icon name="close" size={16} />}>
+					<Button variant="default" onClick={onClearSelection} fullWidth size="sm" leftSection={<Icon name="close" size={18} />}>
 						Abbrechen
 					</Button>
-					<Button color="red" onClick={() => onBulkDelete(selectedIds)} fullWidth size="sm" leftSection={<Icon name="delete" size={16} color="white" />}>
+					<Button variant="warning" onClick={() => onBulkDelete(selectedIds)} fullWidth size="sm" leftSection={<Icon name="delete" size={18} />}>
 						Löschen
 					</Button>
 				</Flex>

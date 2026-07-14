@@ -72,7 +72,7 @@ function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemov
 				</Tooltip>
 				<Tooltip label="Board entfernen">
 					<IconButton variant="filled" color="var(--color--primary)" onClick={() => onRemove(board.board_id)}>
-						<Icon name="close" size={20} color="var(--color--text-on-primary)" />
+						<Icon name="delete" size={20} color="var(--color--text-on-primary)" />
 					</IconButton>
 				</Tooltip>
 			</div>
@@ -620,13 +620,8 @@ export default function AdminPage() {
 								</div>
 								<div className="role-card-actions">
 									<Tooltip label="Rolle bearbeiten">
-										<IconButton variant="light" onClick={() => handleOpenRoleModal(role)}>
+										<IconButton colorVariant="primary-muted" onClick={() => handleOpenRoleModal(role)}>
 											<Icon name="edit" size={21} />
-										</IconButton>
-									</Tooltip>
-									<Tooltip label={role.is_active ? "Rolle deaktivieren" : "Rolle ist inaktiv"}>
-										<IconButton color={role.is_active ? "var(--color--success-950)" : "var(--color--secondary-900)"} onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
-											<Icon name={role.is_active ? "toggleOn" : "toggleOff"} size={21} filled={role.is_active} color={role.is_active ? "var(--color--success-500)" : "var(--color--text-primary)"} />
 										</IconButton>
 									</Tooltip>
 								</div>
