@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/monday-auth";
-import type { BoardConfigInsert, BoardConfigUpdate } from "@/types/database";
+import { upsertMondayBoard } from "@/lib/database";
 
 /**
  * GET /api/admin/boards
- * Fetch all board configurations
+ * Fetch all board configurations, ordered by display sort order.
  * Note: Authentication is handled server-side via requireAdmin
  */
 export async function GET(request: NextRequest) {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 		const { searchParams } = new URL(request.url);
 		const boardId = searchParams.get("boardId");
 
-		let query = supabaseAdmin.from("board_config").select("*, monday_board(name)");
+		let query = supabaseAdmin.from("board_config").select("*, monday_board(name, workspace_id)").order("sort_order", { ascending: true });
 
 		if (boardId) {
 			query = query.eq("board_id", boardId);
@@ -29,12 +29,15 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: `Failed to fetch board configurations: ${error.message}` }, { status: 500 });
 		}
 
-		// Fetch last sync for each board
 		const boardIds = boards?.map((b) => b.board_id) || [];
 		let lastSyncs: Record<string, any> = {};
+		let boardsWithBudgetMapping = new Set<string>();
 
 		if (boardIds.length > 0) {
-			const { data: syncLogs } = await supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false });
+			const [{ data: syncLogs }, { data: budgetMappings }] = await Promise.all([
+				supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false }),
+				supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true),
+			]);
 
 			// Group by board_id and take the first (latest) one
 			if (syncLogs) {
@@ -44,33 +47,19 @@ export async function GET(request: NextRequest) {
 					}
 				});
 			}
+
+			boardsWithBudgetMapping = new Set((budgetMappings || []).map((m: any) => m.board_id));
 		}
 
-		const boardsWithStatus = boards?.map((board) => {
+		const boardsWithStatus = boards?.map((board: any) => {
 			const lastSync = lastSyncs[board.board_id];
-			const validationErrors: string[] = [];
-
-			// Mandatory linking errors (RED)
-			if (!board.budget_column_id) {
-				validationErrors.push("Missing Budget Column");
-			}
-			if (board.sync_linked_items && !board.linked_board_id) {
-				validationErrors.push("Missing Linked Board");
-			}
-
-			let configStatus = "GREEN";
-			if (validationErrors.length > 0) {
-				configStatus = "RED";
-			} else if (!board.sync_enabled || (lastSync && !lastSync.success)) {
-				configStatus = "YELLOW";
-			}
+			const configStatus = board.sync_enabled && !boardsWithBudgetMapping.has(board.board_id) ? "YELLOW" : "GREEN";
 
 			return {
 				...board,
 				last_sync: lastSync?.created_at || null,
 				sync_success: lastSync?.success ?? null,
 				config_status: configStatus,
-				validation_errors: validationErrors,
 			};
 		});
 
@@ -96,9 +85,8 @@ export async function POST(request: NextRequest) {
 		if (auth instanceof NextResponse) return auth;
 
 		const body = await request.json();
-		const { board_id, board_name, sync_enabled, budget_column_id, budget_column_type, sync_on_finalize, sync_budget_used, linked_board_id, sync_linked_items } = body;
+		const { board_id, board_name, workspace_id, sync_enabled, display_enabled, sort_order, settings } = body;
 
-		// Validate required fields
 		if (!board_id || typeof board_id !== "string") {
 			return NextResponse.json({ error: "Board ID is required" }, { status: 400 });
 		}
@@ -107,19 +95,20 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Board name is required" }, { status: 400 });
 		}
 
-		const boardData: BoardConfigInsert = {
+		// Ensure the monday_board dimension row exists so the board_config FK holds
+		await upsertMondayBoard(board_id, board_name, workspace_id ?? undefined);
+
+		const boardData: Record<string, unknown> = {
 			board_id,
 			sync_enabled: sync_enabled !== false, // Default to true
-			budget_column_id: budget_column_id || null,
-			budget_column_type: budget_column_type || null,
-			sync_on_finalize: sync_on_finalize !== false,
-			sync_budget_used: sync_budget_used !== false,
-			linked_board_id: linked_board_id || null,
-			sync_linked_items: sync_linked_items !== false,
+			display_enabled: display_enabled === true,
+			sort_order: sort_order ?? 0,
+			settings: settings ?? {},
 		};
 
-		// Upsert - update if exists, insert if not
-		const { data: board, error } = await supabaseAdmin.from("board_config").upsert(boardData, { onConflict: "board_id" }).select().single();
+		// TODO: drop the `as any` once types/database/database.ts is regenerated for migration 033
+		// (adds display_enabled/sort_order/settings, drops the six sync/budget columns referenced there).
+		const { data: board, error } = await supabaseAdmin.from("board_config").upsert(boardData as any, { onConflict: "board_id" }).select().single();
 
 		if (error) {
 			console.error("Error creating/updating board config:", error);
@@ -146,26 +135,23 @@ export async function PATCH(request: NextRequest) {
 		if (auth instanceof NextResponse) return auth;
 
 		const body = await request.json();
-		const { board_id, sync_enabled, budget_column_id, budget_column_type, sync_on_finalize, sync_budget_used, linked_board_id, sync_linked_items } = body;
+		const { board_id, sync_enabled, display_enabled, sort_order, settings } = body;
 
-		// Validate required fields
 		if (!board_id) {
 			return NextResponse.json({ error: "Board ID is required" }, { status: 400 });
 		}
 
-		const updateData: BoardConfigUpdate = {
+		const updateData: Record<string, unknown> = {
 			updated_at: new Date().toISOString(),
 		};
 
 		if (sync_enabled !== undefined) updateData.sync_enabled = sync_enabled;
-		if (budget_column_id !== undefined) updateData.budget_column_id = budget_column_id || null;
-		if (budget_column_type !== undefined) updateData.budget_column_type = budget_column_type || null;
-		if (sync_on_finalize !== undefined) updateData.sync_on_finalize = sync_on_finalize;
-		if (sync_budget_used !== undefined) updateData.sync_budget_used = sync_budget_used;
-		if (linked_board_id !== undefined) updateData.linked_board_id = linked_board_id || null;
-		if (sync_linked_items !== undefined) updateData.sync_linked_items = sync_linked_items;
+		if (display_enabled !== undefined) updateData.display_enabled = display_enabled;
+		if (sort_order !== undefined) updateData.sort_order = sort_order;
+		if (settings !== undefined) updateData.settings = settings;
 
-		const { data: board, error } = await supabaseAdmin.from("board_config").update(updateData).eq("board_id", board_id).select().single();
+		// TODO: drop the `as any` once types/database/database.ts is regenerated for migration 033.
+		const { data: board, error } = await supabaseAdmin.from("board_config").update(updateData as any).eq("board_id", board_id).select().single();
 
 		if (error) {
 			console.error("Error updating board config:", error);

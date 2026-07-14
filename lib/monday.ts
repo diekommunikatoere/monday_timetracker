@@ -251,6 +251,116 @@ export async function getConnectedBoards(boardIds: string[]): Promise<Array<Boar
 }
 
 /**
+ * One workspace's worth of boards, grouped for the admin board picker.
+ *
+ * @property workspaceId   - monday workspace ID, or `"__default__"` for boards with no workspace.
+ * @property workspaceName - Display name; `"Hauptbereich"` for the default bucket.
+ * @property boards        - Boards in this workspace, alphabetically sorted.
+ */
+export interface WorkspaceBoardGroup {
+	workspaceId: string;
+	workspaceName: string;
+	boards: Array<{ value: string; label: string; kind: string }>;
+}
+
+const ALL_BOARDS_CACHE_KEY = "monday:all_boards_grouped";
+const ALL_BOARDS_CACHE_TTL = 60 * 15; // 15 minutes
+
+/**
+ * Fetches every active board across all workspaces in the account, grouped by
+ * workspace, for the admin "Boards verwalten" picker.
+ *
+ * Pages through monday's `boards` query with `page:` (not cursor-based, unlike
+ * {@link getBoardTasks}'s `items_page`) until an empty page is returned. Filters
+ * to `state: active` and `type: "board"` — monday's `BoardObjectType` is one of
+ * `board` / `custom_object` / `document` / `sub_items_board`, so restricting to
+ * `board` keeps real boards (of any `board_kind`, including `share`) while
+ * excluding sub-items boards, workdocs, and custom objects in a single pass with
+ * no per-board sub-query.
+ *
+ * Results are cached in Redis under `monday:all_boards_grouped` for 15 minutes.
+ * As a side-effect, every discovered board is upserted into the local
+ * `monday_board` dimension table (fire-and-forget).
+ *
+ * @returns Workspace-grouped board options, sorted by workspace name then board name.
+ */
+export async function getAllBoardsGroupedByWorkspace(): Promise<WorkspaceBoardGroup[]> {
+	const cached = await cacheHelper.get<WorkspaceBoardGroup[]>(ALL_BOARDS_CACHE_KEY);
+	if (cached) {
+		return cached;
+	}
+
+	type BoardsPageResponse = {
+		boards: Array<{
+			id: string;
+			name: string;
+			type: string;
+			board_kind: string;
+			workspace: { id: string; name: string } | null;
+		}>;
+		error?: APIError;
+	};
+
+	const query = `
+		query ($page: Int!) {
+			boards(limit: 100, page: $page, state: active) {
+				id
+				name
+				type
+				board_kind
+				workspace {
+					id
+					name
+				}
+			}
+		}
+	`;
+
+	const allBoards: BoardsPageResponse["boards"] = [];
+	let page = 1;
+	// monday's `boards` query paginates with `page:`, not a cursor — loop until an empty page.
+	while (true) {
+		const response: BoardsPageResponse = await client.request(query, { page });
+
+		if (response.error) {
+			throw new Error(response.error?.message || "Failed to fetch boards");
+		}
+
+		const pageBoards = response.boards || [];
+		if (pageBoards.length === 0) break;
+
+		// Only real boards belong in the picker; `type` excludes sub-items boards, workdocs, and custom objects.
+		allBoards.push(...pageBoards.filter((b) => b.type === "board"));
+
+		if (pageBoards.length < 100) break;
+		page += 1;
+	}
+
+	// Upsert boards into dimension table (fire-and-forget)
+	Promise.all(allBoards.map((b) => upsertMondayBoard(b.id.toString(), b.name))).catch((err) => console.error("[getAllBoardsGroupedByWorkspace] Background upsert error:", err));
+
+	const DEFAULT_WORKSPACE_ID = "__default__";
+	const groups = new Map<string, WorkspaceBoardGroup>();
+
+	for (const board of allBoards) {
+		const workspaceId = board.workspace?.id?.toString() || DEFAULT_WORKSPACE_ID;
+		const workspaceName = board.workspace?.name || "Hauptbereich";
+
+		if (!groups.has(workspaceId)) {
+			groups.set(workspaceId, { workspaceId, workspaceName, boards: [] });
+		}
+		groups.get(workspaceId)!.boards.push({ value: board.id.toString(), label: board.name, kind: board.board_kind });
+	}
+
+	const result = Array.from(groups.values())
+		.map((group) => ({ ...group, boards: group.boards.sort((a, b) => a.label.localeCompare(b.label)) }))
+		.sort((a, b) => a.workspaceName.localeCompare(b.workspaceName));
+
+	await cacheHelper.set(ALL_BOARDS_CACHE_KEY, result, ALL_BOARDS_CACHE_TTL);
+	return result;
+}
+
+/**
  * Detects a Monday "subitems board" — the auto-generated board that holds an
  * item's subitems. Such a board must never be fetched as a normal board:
  * getBoardTasks would persist its subitems as top-level items (board_id = the

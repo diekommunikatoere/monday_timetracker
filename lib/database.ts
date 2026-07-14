@@ -71,13 +71,19 @@ export interface DimensionMetadata {
  * by the sync logic. The `insertTimeEntry` / `updateTimeEntry` callers enforce
  * this guard by checking `parent_item_id` before calling.
  *
- * @param id   - The monday board ID string.
- * @param name - Display name for the board.
+ * @param id          - The monday board ID string.
+ * @param name        - Display name for the board.
+ * @param workspaceId - Optional monday workspace ID; omitted keys are left untouched on conflict.
  */
-export async function upsertMondayBoard(id: string, name: string) {
+export async function upsertMondayBoard(id: string, name: string, workspaceId?: string | null) {
 	if (!id || !name) return;
 
-	const { error } = await supabaseAdmin.from("monday_board").upsert({ id, name, updated_at: new Date().toISOString() }, { onConflict: "id" });
+	const payload: { id: string; name: string; updated_at: string; workspace_id?: string | null } = { id, name, updated_at: new Date().toISOString() };
+	if (workspaceId !== undefined) {
+		payload.workspace_id = workspaceId;
+	}
+
+	const { error } = await supabaseAdmin.from("monday_board").upsert(payload, { onConflict: "id" });
 
 	if (error) {
 		console.error(`Error upserting monday_board ${id}:`, error);

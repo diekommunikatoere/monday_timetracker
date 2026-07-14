@@ -17,41 +17,32 @@ export type Database = {
       board_config: {
         Row: {
           board_id: string
-          budget_column_id: string | null
-          budget_column_type: string | null
           created_at: string
+          display_enabled: boolean
           id: string
-          linked_board_id: string | null
-          sync_budget_used: boolean | null
+          settings: Json
+          sort_order: number
           sync_enabled: boolean | null
-          sync_linked_items: boolean | null
-          sync_on_finalize: boolean | null
           updated_at: string
         }
         Insert: {
           board_id: string
-          budget_column_id?: string | null
-          budget_column_type?: string | null
           created_at?: string
+          display_enabled?: boolean
           id?: string
-          linked_board_id?: string | null
-          sync_budget_used?: boolean | null
+          settings?: Json
+          sort_order?: number
           sync_enabled?: boolean | null
-          sync_linked_items?: boolean | null
-          sync_on_finalize?: boolean | null
           updated_at?: string
         }
         Update: {
           board_id?: string
-          budget_column_id?: string | null
-          budget_column_type?: string | null
           created_at?: string
+          display_enabled?: boolean
           id?: string
-          linked_board_id?: string | null
-          sync_budget_used?: boolean | null
+          settings?: Json
+          sort_order?: number
           sync_enabled?: boolean | null
-          sync_linked_items?: boolean | null
-          sync_on_finalize?: boolean | null
           updated_at?: string
         }
         Relationships: [

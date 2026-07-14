@@ -109,8 +109,10 @@ type TaskGroupsResponse = {
 
 /**
  * Two-step selector for choosing a board and a task for a time entry. Boards
- * come from the monday.com context (`boardIds`) plus any `initialValues.boardId`;
- * tasks are fetched per board from `/api/tasks` and rendered in a
+ * come from the admin-enabled, admin-ordered board list (`/api/boards`), unioned
+ * with any board id still supplied via monday.com widget context (sidebar item
+ * view) or `initialValues.boardId` that isn't already in that set; tasks are
+ * fetched per board from `/api/tasks` and rendered in a
  * {@link TreeSelect} as a **Group → Job → Task** tree (top-level items with
  * subitems become non-selectable "job" containers). Role is a separate
  * concern — see the shared `RoleSelector`.
@@ -225,21 +227,23 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [onResetRef, resetSelections]);
 
-	// Boards query using React Query with enhanced caching
+	// Boards query using React Query with enhanced caching.
+	// Primary source: the admin-enabled, admin-ordered board list (/api/boards) —
+	// works with no monday widget context (workspace app). Any board id still
+	// arriving via monday context (sidebar item view) that isn't already in that
+	// set is resolved separately and appended after it, so item views on
+	// non-admin-enabled boards keep working.
 	const contextBoardIds = rawContext?.data?.boardIds;
 	const contextBoardId = rawContext?.data?.boardId;
-	const boardIds = useMemo(() => {
+	const contextOnlyIds = useMemo(() => {
 		const ids = new Set<string>();
 
-		// Add boards from context
 		if (contextBoardIds && contextBoardIds.length > 0) {
 			contextBoardIds.forEach((id) => ids.add(id.toString()));
 		}
 		if (contextBoardId) {
 			ids.add(contextBoardId.toString());
 		}
-
-		// Add initial board if provided
 		if (initialValues?.boardId) {
 			ids.add(initialValues.boardId.toString());
 		}
@@ -248,21 +252,16 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	}, [contextBoardIds, contextBoardId, initialValues?.boardId]);
 
 	const {
-		data: boards = [],
+		data: displayBoards = [],
 		isLoading: loadingBoards,
 		error: boardsError,
 	} = useQuery({
-		queryKey: ["boards", boardIds],
-		queryFn: async () => {
-			if (!boardIds || boardIds.length === 0) return [];
-
-			const response = await fetch("/api/connectedBoards", {
-				method: "POST",
+		queryKey: ["boards", "display"],
+		queryFn: async (): Promise<DropdownOption[]> => {
+			const response = await fetch("/api/boards", {
 				headers: {
-					"Content-Type": "application/json",
 					Authorization: `Bearer ${sessionToken}`,
 				},
-				body: JSON.stringify({ boardIds }),
 			});
 
 			if (!response.ok) {
@@ -275,19 +274,66 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				throw new Error(data.error);
 			}
 
-			return (data.boards || [])
-				.map((board: any) => ({
-					label: board.label,
-					value: board.value.toString(),
-				}))
-				.sort((a, b) => a.label.localeCompare(b.label));
+			return (data.boards || []) as DropdownOption[];
 		},
-		enabled: !!boardIds?.length,
+		enabled: !!sessionToken,
 		staleTime: 10 * 60 * 1000, // 10 minutes - boards rarely change
 		gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
 		refetchOnWindowFocus: false, // Don't refetch on tab focus
 		refetchOnMount: false, // Use cached data on remount
 	});
+
+	const missingContextIds = useMemo(() => {
+		const known = new Set(displayBoards.map((b) => b.value));
+		return contextOnlyIds.filter((id) => !known.has(id));
+	}, [contextOnlyIds, displayBoards]);
+
+	const { data: contextBoards = [] } = useQuery({
+		queryKey: ["boards", "context", missingContextIds],
+		queryFn: async (): Promise<DropdownOption[]> => {
+			const response = await fetch("/api/connectedBoards", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify({ boardIds: missingContextIds }),
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch boards");
+			}
+
+			const data = await response.json();
+
+			if (data.error) {
+				throw new Error(data.error);
+			}
+
+			return (data.boards || []).map((board: any) => ({
+				label: board.label,
+				value: board.value.toString(),
+			}));
+		},
+		enabled: !!sessionToken && missingContextIds.length > 0,
+		staleTime: 10 * 60 * 1000,
+		gcTime: 30 * 60 * 1000,
+		refetchOnWindowFocus: false,
+		refetchOnMount: false,
+	});
+
+	// Admin-ordered boards first, then any context-only boards appended (deduped).
+	const boards = useMemo(() => {
+		const seen = new Set<string>();
+		const combined: DropdownOption[] = [];
+		for (const board of [...displayBoards, ...contextBoards]) {
+			if (!seen.has(board.value)) {
+				seen.add(board.value);
+				combined.push(board);
+			}
+		}
+		return combined;
+	}, [displayBoards, contextBoards]);
 
 	useEffect(() => {
 		if (boards.length > 0) {
