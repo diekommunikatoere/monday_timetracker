@@ -1,5 +1,5 @@
 .timerContainer {
-	padding: 8px;
+	padding: 6px;
 	background-color: var(--color--background-secondary);
 	border-radius: var(--border-radius--md);
 }
