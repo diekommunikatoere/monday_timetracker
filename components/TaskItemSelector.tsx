@@ -322,17 +322,13 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		refetchOnMount: false,
 	});
 
-	// Admin-ordered boards first, then any context-only boards appended (deduped).
+	// Admin-ordered boards, context-only boards only if no admin boards exist (deduped).
 	const boards = useMemo(() => {
-		const seen = new Set<string>();
-		const combined: DropdownOption[] = [];
-		for (const board of [...displayBoards, ...contextBoards]) {
-			if (!seen.has(board.value)) {
-				seen.add(board.value);
-				combined.push(board);
-			}
+		if (displayBoards.length > 0) {
+			return [...displayBoards];
+		} else {
+			return [...contextBoards];
 		}
-		return combined;
 	}, [displayBoards, contextBoards]);
 
 	useEffect(() => {
