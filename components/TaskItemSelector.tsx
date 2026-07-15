@@ -2,26 +2,27 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelect, TreeSelectProps, type TreeNodeData } from "@mantine/core";
-import { Icon, IconButton, Select } from "@/components";
+import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelectProps, type TreeNodeData } from "@mantine/core";
+import { Icon, IconButton, Select, TreeSelect } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMondayStore } from "@/stores/mondayStore";
 import { supabase } from "@/lib/supabase/client";
-import { useRoles } from "@/components/shared/hooks/useRoles";
-import RefreshIcon from "@/components/icons/Refresh";
 import Fuse, { type FuseResult } from "fuse.js";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 
 /**
  * Selection payload emitted to the parent whenever the user picks (or clears)
- * a board, task, or role. **All fields are optional and `undefined` when
- * unset** — every `onSelectionChange` call delivers the *full* current
- * selection, not a delta, so consumers can replace their state wholesale.
+ * a board or task. **All fields are optional and `undefined` when unset** —
+ * every `onSelectionChange` call delivers the *full* current selection, not
+ * a delta, so consumers can replace their state wholesale.
  *
  * Note that `parentItemId`/`parentItemName` describe the **parent item** of a
  * subitem task (monday.com subitems), not the group; they are derived from the
  * task option's metadata, not stored separately.
+ *
+ * Role is **not** part of this selection — it's a separate concern rendered
+ * via the shared `RoleSelector` (see `components/shared/time-entries/RoleSelector.tsx`).
  *
  * @property boardId         - monday.com board id (stringified).
  * @property boardName       - Human-readable board label.
@@ -29,8 +30,6 @@ import styles from "@/components/styles/features/timer/TaskItemSelector.module.c
  * @property itemName        - Selected task/item name.
  * @property parentItemId    - Id of the parent item when `itemId` is a subitem.
  * @property parentItemName  - Name of the parent item when `itemId` is a subitem.
- * @property roleId          - Supabase `role.id` (UUID) of the selected role.
- * @property roleName        - Display name of the selected role.
  */
 export interface TaskSelection {
 	boardId?: string;
@@ -39,8 +38,6 @@ export interface TaskSelection {
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	roleId?: string;
-	roleName?: string;
 }
 
 /**
@@ -48,9 +45,9 @@ export interface TaskSelection {
  * selector that reports every change upward via {@link onSelectionChange} and
  * optionally exposes a reset callback to its parent.
  *
- * @property onSelectionChange - Fired on every board/task/role change with the full {@link TaskSelection}.
+ * @property onSelectionChange - Fired on every board/task change with the full {@link TaskSelection}.
  * @property onResetRef        - If provided, called once with a `reset()` function the parent can invoke to clear all selections.
- * @property initialValues     - Optional preselected board/task/role; reconciled against loaded data (or rendered from the supplied names as a fallback).
+ * @property initialValues     - Optional preselected board/task; reconciled against loaded data (or rendered from the supplied names as a fallback).
  * @property subItemsOnly      - When `true`, top-level items without subitems are hidden from the task tree — only selectable leaves are subitems.
  */
 interface TaskItemSelectorProps {
@@ -61,14 +58,12 @@ interface TaskItemSelectorProps {
 		boardName?: string;
 		itemId?: string;
 		itemName?: string;
-		roleId?: string;
-		roleName?: string;
 	};
 	subItemsOnly?: boolean;
 }
 
 /**
- * Internal option shape shared by the board, task, and role dropdowns. `value`
+ * Internal option shape shared by the board and task dropdowns. `value`
  * is the selectable identifier; `label` is what Mantine displays; `name`
  * carries the monday.com item name (which may differ from `label` for tasks);
  * `parentItemId`/`parentItemName` are populated only for subitem options.
@@ -101,6 +96,7 @@ type DropdownOption = {
 type TaskGroupsResponse = {
 	groups: {
 		label: string;
+		color: string;
 		options: {
 			value: string;
 			label: string;
@@ -112,12 +108,21 @@ type TaskGroupsResponse = {
 };
 
 /**
- * Three-step selector for choosing a board, a task, and a role for a time
- * entry. Boards come from the monday.com context (`boardIds`) plus any
- * `initialValues.boardId`; tasks are fetched per board from `/api/tasks` and
- * rendered in a {@link TreeSelect} as a **Group → Job → Task** tree (top-level
- * items with subitems become non-selectable "job" containers); roles are read
- * directly from Supabase (`role` table).
+ * `TreeNodeData` has no `color` field, so group nodes carry it as an extra
+ * property on top of the Mantine shape — read it back with this type in
+ * {@link TaskItemSelector}'s `renderNode`.
+ */
+type ColorTreeNodeData = TreeNodeData & { color?: string };
+
+/**
+ * Two-step selector for choosing a board and a task for a time entry. Boards
+ * come from the admin-enabled, admin-ordered board list (`/api/boards`), unioned
+ * with any board id still supplied via monday.com widget context (sidebar item
+ * view) or `initialValues.boardId` that isn't already in that set; tasks are
+ * fetched per board from `/api/tasks` and rendered in a
+ * {@link TreeSelect} as a **Group → Job → Task** tree (top-level items with
+ * subitems become non-selectable "job" containers). Role is a separate
+ * concern — see the shared `RoleSelector`.
  *
  * Data flow: each React Query (`@tanstack/react-query`) query is cached with
  * generous `staleTime`/`gcTime`, tasks are **prefetched** for all loaded
@@ -138,13 +143,12 @@ type TaskGroupsResponse = {
  * @param props.onResetRef        - Optional; receives a reset-all function.
  * @param props.initialValues     - Optional preselection to reconcile against loaded data.
  * @param props.subItemsOnly      - When `true`, only subitems are selectable leaves.
- * @returns A vertical `Flex` of three labelled selectors (board / task / role) with skeleton loading and inline error text.
+ * @returns A vertical `Flex` of two labelled selectors (board / task) with skeleton loading and inline error text.
  */
 export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues, subItemsOnly }: TaskItemSelectorProps) {
 	// State management for selections
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
-	const [selectedRole, setSelectedRole] = useState<DropdownOption | null>(null);
 	const [expandedValues, setExpandedValues] = useState<string[]>([]);
 	const [searchValue, setSearchValue] = useState("");
 	const [dropdownOpened, setDropdownOpened] = useState(false);
@@ -210,14 +214,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		setSearchValue("");
 	}, []);
 
-	const resetRole = useCallback(() => {
-		setSelectedRole(null);
-	}, []);
-
 	const resetSelections = useCallback(() => {
 		resetBoard();
 		resetTask();
-		resetRole();
 		onSelectionChange({
 			boardId: undefined,
 			boardName: undefined,
@@ -225,10 +224,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			itemName: undefined,
 			parentItemId: undefined,
 			parentItemName: undefined,
-			roleId: undefined,
-			roleName: undefined,
 		});
-	}, [onSelectionChange, resetBoard, resetTask, resetRole]);
+	}, [onSelectionChange, resetBoard, resetTask]);
 
 	// Provide reset function to parent via callback
 	useEffect(() => {
@@ -237,21 +234,23 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [onResetRef, resetSelections]);
 
-	// Boards query using React Query with enhanced caching
+	// Boards query using React Query with enhanced caching.
+	// Primary source: the admin-enabled, admin-ordered board list (/api/boards) —
+	// works with no monday widget context (workspace app). Any board id still
+	// arriving via monday context (sidebar item view) that isn't already in that
+	// set is resolved separately and appended after it, so item views on
+	// non-admin-enabled boards keep working.
 	const contextBoardIds = rawContext?.data?.boardIds;
 	const contextBoardId = rawContext?.data?.boardId;
-	const boardIds = useMemo(() => {
+	const contextOnlyIds = useMemo(() => {
 		const ids = new Set<string>();
 
-		// Add boards from context
 		if (contextBoardIds && contextBoardIds.length > 0) {
 			contextBoardIds.forEach((id) => ids.add(id.toString()));
 		}
 		if (contextBoardId) {
 			ids.add(contextBoardId.toString());
 		}
-
-		// Add initial board if provided
 		if (initialValues?.boardId) {
 			ids.add(initialValues.boardId.toString());
 		}
@@ -260,21 +259,16 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	}, [contextBoardIds, contextBoardId, initialValues?.boardId]);
 
 	const {
-		data: boards = [],
+		data: displayBoards = [],
 		isLoading: loadingBoards,
 		error: boardsError,
 	} = useQuery({
-		queryKey: ["boards", boardIds],
-		queryFn: async () => {
-			if (!boardIds || boardIds.length === 0) return [];
-
-			const response = await fetch("/api/connectedBoards", {
-				method: "POST",
+		queryKey: ["boards", "display"],
+		queryFn: async (): Promise<DropdownOption[]> => {
+			const response = await fetch("/api/boards", {
 				headers: {
-					"Content-Type": "application/json",
 					Authorization: `Bearer ${sessionToken}`,
 				},
-				body: JSON.stringify({ boardIds }),
 			});
 
 			if (!response.ok) {
@@ -287,19 +281,62 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				throw new Error(data.error);
 			}
 
-			return (data.boards || [])
-				.map((board: any) => ({
-					label: board.label,
-					value: board.value.toString(),
-				}))
-				.sort((a, b) => a.label.localeCompare(b.label));
+			return (data.boards || []) as DropdownOption[];
 		},
-		enabled: !!boardIds?.length,
+		enabled: !!sessionToken,
 		staleTime: 10 * 60 * 1000, // 10 minutes - boards rarely change
 		gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
 		refetchOnWindowFocus: false, // Don't refetch on tab focus
 		refetchOnMount: false, // Use cached data on remount
 	});
+
+	const missingContextIds = useMemo(() => {
+		const known = new Set(displayBoards.map((b) => b.value));
+		return contextOnlyIds.filter((id) => !known.has(id));
+	}, [contextOnlyIds, displayBoards]);
+
+	const { data: contextBoards = [] } = useQuery({
+		queryKey: ["boards", "context", missingContextIds],
+		queryFn: async (): Promise<DropdownOption[]> => {
+			const response = await fetch("/api/connectedBoards", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify({ boardIds: missingContextIds }),
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch boards");
+			}
+
+			const data = await response.json();
+
+			if (data.error) {
+				throw new Error(data.error);
+			}
+
+			return (data.boards || []).map((board: any) => ({
+				label: board.label,
+				value: board.value.toString(),
+			}));
+		},
+		enabled: !!sessionToken && missingContextIds.length > 0,
+		staleTime: 10 * 60 * 1000,
+		gcTime: 30 * 60 * 1000,
+		refetchOnWindowFocus: false,
+		refetchOnMount: false,
+	});
+
+	// Admin-ordered boards, context-only boards only if no admin boards exist (deduped).
+	const boards = useMemo(() => {
+		if (displayBoards.length > 0) {
+			return [...displayBoards];
+		} else {
+			return [...contextBoards];
+		}
+	}, [displayBoards, contextBoards]);
 
 	useEffect(() => {
 		if (boards.length > 0) {
@@ -326,9 +363,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			prefetchSequentially();
 		}
 	}, [boards, queryClient, fetchTasks]);
-
-	// Roles (alphabetical, active-only) — shared fetch, see useRoles.
-	const { roles, isLoading: loadingRoles } = useRoles();
 
 	// Tasks query with enhanced caching
 	const {
@@ -447,21 +481,6 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		}
 	}, [boards, initialValues?.boardId, initialValues?.boardName, selectedBoard?.value]);
 
-	// Set initial role when roles load
-	useEffect(() => {
-		if (initialValues?.roleId && selectedRole?.value !== initialValues.roleId) {
-			const initialRole = roles.find((role: DropdownOption) => role.value === initialValues.roleId);
-			if (initialRole) {
-				setSelectedRole(initialRole);
-			} else if (initialValues.roleName) {
-				setSelectedRole({
-					value: initialValues.roleId,
-					label: initialValues.roleName,
-				});
-			}
-		}
-	}, [roles, initialValues?.roleId, initialValues?.roleName, selectedRole?.value]);
-
 	// Build hierarchical tree data (Group > Job > Task) from query data.
 	// Also build a lookup map from a leaf value to its metadata, and a map
 	// from a leaf value to the ancestor node values needed to reveal it.
@@ -473,7 +492,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			return { treeData: [] as TreeNodeData[], valueMeta: meta, expansionMap: expansion };
 		}
 
-		const groups: TreeNodeData[] = [];
+		const groups: ColorTreeNodeData[] = [];
 
 		tasksData.groups.forEach((group, gi) => {
 			const groupValue = `group:${gi}:${group.label}`;
@@ -537,7 +556,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			});
 
 			if (itemNodes.length > 0) {
-				groups.push({ value: groupValue, label: group.label, children: itemNodes });
+				const groupNode: ColorTreeNodeData = { value: groupValue, color: group.color, label: group.label, children: itemNodes };
+				groups.push(groupNode);
 			}
 		});
 
@@ -605,11 +625,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				itemName: undefined,
 				parentItemId: undefined,
 				parentItemName: undefined,
-				roleId: selectedRole?.value,
-				roleName: selectedRole?.label,
 			});
 		},
-		[selectedRole, onSelectionChange],
+		[onSelectionChange],
 	);
 
 	// Handle task selection. TreeSelect returns only the node value, so we
@@ -642,31 +660,9 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 				itemName: m?.name,
 				parentItemId: m?.parentItemId,
 				parentItemName: m?.parentItemName,
-				roleId: selectedRole?.value,
-				roleName: selectedRole?.label,
 			});
 		},
-		[selectedBoard, selectedRole, onSelectionChange, valueMeta],
-	);
-
-	// Handle role selection
-	const handleRoleChange = useCallback(
-		(value: string | null, option: ComboboxItem) => {
-			const selectedOption = option as DropdownOption;
-			setSelectedRole(value ? selectedOption : null);
-
-			onSelectionChange({
-				boardId: selectedBoard?.value,
-				boardName: selectedBoard?.label,
-				itemId: selectedTask?.value,
-				itemName: selectedTask?.name,
-				parentItemId: selectedTask?.parentItemId,
-				parentItemName: selectedTask?.parentItemName,
-				roleId: value || undefined,
-				roleName: selectedOption?.label,
-			});
-		},
-		[selectedBoard, selectedTask, onSelectionChange],
+		[selectedBoard, onSelectionChange, valueMeta],
 	);
 
 	// Handle task search
@@ -745,16 +741,18 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Add Checkmark before label if item is selected
 	const renderTaskNode: TreeSelectProps["renderNode"] = useCallback(
 		({ node, hasChildren, expanded }) => {
-			const isGroupOrJob = node.value.startsWith("group:") || node.value.startsWith("job:");
+			const isGroup = node.value.startsWith("group:");
 			const isSelected = selectedTask?.value === node.value;
+			const groupColor = isGroup ? (node as ColorTreeNodeData).color : undefined;
 			return (
-				<Flex align="center" gap="xs" {...node} className={styles.selectOption} style={{ paddingBlock: ".25rem" }}>
+				<Flex align="center" gap="4px">
 					{hasChildren && (
 						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
-							<Icon name={expanded ? "collapse" : "expand"} size={12} color="var(--color--text-secondary)" />
+							<Icon name={expanded ? "collapse_all" : "expand_all"} size={12} color="var(--color--text-secondary)" />
 						</IconButton>
 					)}
-					{isSelected && <Icon name="check" size={14} color="var(--color--primary)" />}
+					{isSelected && <Icon name="check" size={16} color="var(--color--primary-500)" weight="bold" />}
+					{isGroup && <span style={{ height: ".25em", width: ".25em", display: "inline-block", borderRadius: "50%", backgroundColor: groupColor, margin: "4px" }} />}
 					<span style={{ fontStyle: expanded ? "italic" : "normal" }}>{node.label}</span>
 				</Flex>
 			);
@@ -774,41 +772,30 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			{error && <Text c="dki-error">{error}</Text>}
 
 			{/* Board Selector with skeleton loading */}
-			{loadingBoards ? (
-				<div>
-					<Text size="sm" fw={500}>
-						Board auswählen
-					</Text>
-					<Skeleton height={36} radius="sm" />
-				</div>
-			) : (
-				<div>
-					<label htmlFor="board-selector">
-						<Text size="sm" fw={500} span>
-							Board auswählen
-						</Text>
-					</label>
-					<Select id="board-selector" placeholder="Board auswählen..." data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" classNames={{ option: styles.selectOption }} required />
-				</div>
-			)}
+			<div>
+				<Select id="board-selector" placeholder="Board auswählen..." label="Board" data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} loading={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" required withAsterisk />
+			</div>
 
 			<div>
-				<Flex justify="space-between" align="center">
-					<label htmlFor="task-selector">
-						<Text size="sm" fw={500} span>
-							Aufgabe auswählen
-						</Text>
-					</label>
-					{selectedBoard && (
-						<Tooltip label="Aufgabenliste aktualisieren" position="left">
-							<IconButton variant="filled" colorVariant="tertiary" size="sm" onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks} aria-label="Aufgaben aktualisieren">
-								{isRefreshing ? <Loader size={14} /> : <RefreshIcon size={14} />}
-							</IconButton>
-						</Tooltip>
-					)}
-				</Flex>
 				<TreeSelect
 					id="task-selector"
+					label={
+						<Flex justify="space-between" align="center" style={{ flex: 1 }}>
+							<Text size="sm" fw={500} span>
+								Aufgabe
+								<span aria-hidden="true" style={{ color: "var(--mantine-color-error)", fontWeight: 600 }}>
+									{" "}
+									*
+								</span>
+							</Text>
+							<Tooltip label="Aufgabenliste aktualisieren" position="left">
+								<IconButton colorVariant="tertiary" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks || !selectedBoard} aria-label="Aufgaben aktualisieren">
+									{isRefreshing ? <Loader size={14} /> : <Icon name="refresh" size={14} />}
+								</IconButton>
+							</Tooltip>
+						</Flex>
+					}
+					labelProps={{ style: { display: "flex", width: "100%" } }}
 					placeholder={taskPlaceholder}
 					data={treeData}
 					filter={taskFilter}
@@ -852,29 +839,13 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 						) : undefined
 					}
 					rightSectionPointerEvents="auto"
-					classNames={{ option: styles.selectOption }}
+					// `required` keeps the input semantically required (parity with the Board select);
+					// the asterisk is rendered manually in `label` above, so suppress Mantine's auto one
+					// (it would otherwise append after the refresh button, the label's last child).
 					required
+					withAsterisk={false}
 				/>
 			</div>
-
-			{/* Role Selector with skeleton loading */}
-			{loadingRoles ? (
-				<div>
-					<Text size="sm" fw={500}>
-						Rolle auswählen
-					</Text>
-					<Skeleton height={36} radius="sm" />
-				</div>
-			) : (
-				<div>
-					<label htmlFor="role-selector">
-						<Text size="sm" fw={500} span>
-							Rolle auswählen
-						</Text>
-					</label>
-					<Select id="role-selector" placeholder="Rolle auswählen..." data={roles} value={selectedRole?.value || null} onChange={handleRoleChange} clearable searchable disabled={loadingRoles} nothingFoundMessage="Keine Rollen verfügbar" classNames={{ option: styles.selectOption }} required />
-				</div>
-			)}
 		</Flex>
 	);
 }

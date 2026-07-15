@@ -7,19 +7,21 @@ import { getUserProfileByMondayId } from "@/lib/database/users";
 
 interface ManualTimeEntryRequest {
 	userId: string;
-	taskName: string;
+	taskName?: string;
 	comment?: string;
-	boardId: string;
+	boardId?: string;
 	boardName?: string;
-	itemId: string;
+	itemId?: string;
 	itemName?: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	roleId: string;
+	roleId?: string;
 	duration: number; // in seconds
 	date: string; // ISO date string (fallback)
 	startTime: string; // ISO date-time string (preferred)
 	endTime: string; // ISO date-time string (preferred)
+	/** When true, insert as a `parked` draft instead of `finalized`; task/board/role become optional. */
+	asDraft?: boolean;
 }
 
 export async function POST(request: NextRequest) {
@@ -43,19 +45,23 @@ export async function POST(request: NextRequest) {
 
 		// Parse request body
 		const body: ManualTimeEntryRequest = await request.json();
-		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date, startTime, endTime } = body;
+		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date, startTime, endTime, asDraft } = body;
 
 		// Validate required fields
 		if (!userId || userId !== userProfile.id) {
 			return NextResponse.json({ error: "Ungültige Benutzer-ID." }, { status: 400 });
 		}
 
-		if (!taskName || !boardId || !itemId) {
-			return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
-		}
+		// A draft may be created without a task/board/role assignment; a finalized
+		// manual entry still requires all three.
+		if (!asDraft) {
+			if (!taskName || !boardId || !itemId) {
+				return NextResponse.json({ error: "Ungültige Aufgaben- oder Board-ID." }, { status: 400 });
+			}
 
-		if (!roleId) {
-			return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
+			if (!roleId) {
+				return NextResponse.json({ error: "Ungültige Rollen-ID." }, { status: 400 });
+			}
 		}
 
 		// Determine start_time, end_time, and duration values
@@ -104,18 +110,18 @@ export async function POST(request: NextRequest) {
 			{
 				user_id: userId,
 				comment: comment || null,
-				board_id: boardId,
-				item_id: itemId,
-				role_id: roleId,
+				board_id: asDraft ? null : boardId,
+				item_id: asDraft ? null : itemId,
+				role_id: roleId || null,
 				duration: finalDuration,
 				start_time: finalStartTime,
 				end_time: finalEndTime,
-				timer_state: "finalized",
-				// Dimension metadata for UPSERTing monday_item
-				board_name: boardName,
-				item_name: itemName,
-				parent_item_id: parentItemId,
-				parent_item_name: parentItemName,
+				timer_state: asDraft ? "parked" : "finalized",
+				// Dimension metadata for UPSERTing monday_item — irrelevant without a board/item.
+				board_name: asDraft ? undefined : boardName,
+				item_name: asDraft ? undefined : itemName,
+				parent_item_id: asDraft ? undefined : parentItemId,
+				parent_item_name: asDraft ? undefined : parentItemName,
 			},
 			userId,
 		);
@@ -124,9 +130,10 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Fehler beim Erstellen des Zeiteintrags." }, { status: 500 });
 		}
 
-		// 2. Trigger column sync after successful manual entry creation
-		// This runs asynchronously and doesn't block the response
-		if (boardId && itemId && timeEntry.id) {
+		// 2. Trigger column sync after successful (non-draft) manual entry creation.
+		// A parked draft has no guaranteed board/item and doesn't feed monday totals.
+		// This runs asynchronously and doesn't block the response.
+		if (!asDraft && boardId && itemId && timeEntry.id) {
 			// Don't await - let it run in the background
 			syncAfterFinalize(itemId, boardId, userProfile.id, timeEntry.id).catch((syncError) => {
 				console.error("[ColumnSync] Background sync failed:", syncError);

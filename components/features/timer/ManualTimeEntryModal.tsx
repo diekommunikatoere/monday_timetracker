@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Group, Flex, Text } from "@mantine/core";
+import { Group, Flex, Text, Switch } from "@mantine/core";
 import { Button, Modal } from "@/components";
 import TaskItemSelector, { TaskSelection } from "@/components/TaskItemSelector";
 import { useUserStore } from "@/stores/userStore";
@@ -12,9 +12,8 @@ import { useToast } from "@/components/ToastProvider";
 import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
 import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFields";
 import { useTimeEntryForm } from "../../shared/hooks/useTimeEntryForm";
-import mondaySdk from "monday-sdk-js";
-
-const monday = mondaySdk();
+import { useRoles } from "../../shared/hooks/useRoles";
+import { getMondaySdk } from "@/lib/monday-browser-sdk";
 
 /**
  * Props for {@link ManualTimeEntryModal}.
@@ -39,6 +38,14 @@ interface ManualTimeEntryModalProps {
  * with the monday `rawContext` (falling back to `monday.get("context")`) in the
  * `monday-context` header and the `sessionToken` as a Bearer token.
  *
+ * **"Als Entwurf speichern" toggle:** switches the modal into draft mode, which
+ * hides the `TaskItemSelector` (board/task) and relaxes validation to only
+ * require a duration — no board/task, and role stays optional. Role is always
+ * rendered as a standalone `RoleSelector` (via {@link useRoles}), independent of
+ * the toggle. The request is sent with `asDraft: true`, which the API inserts as
+ * a `parked` row (skipping the monday column sync).
+ *
+
  * **Units:** the on-screen `duration` is an `"HH:MM"` string; it is converted to
  * **seconds** via {@link durationToSeconds} before being sent as `duration`.
  * `startTime`/`endTime` are combined with the date via {@link combineDateAndTime}
@@ -58,8 +65,11 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [asDraft, setAsDraft] = useState(false);
+	const [selectedRoleId, setSelectedRoleId] = useState<string>("");
 
 	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
+	const { roles, isLoading: loadingRoles } = useRoles();
 
 	const { refetch } = useTimeEntriesStore();
 	const { rawContext, sessionToken } = useMondayStore();
@@ -72,12 +82,21 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 			const now = getCurrentTimeString();
 			handlers.reset({ date: new Date(), duration: "00:00", startTime: now, endTime: now, comment: "" }, "end", false);
 			setSelectedTask(null);
+			setAsDraft(false);
+			setSelectedRoleId("");
 			setError(null);
 		}
 	}, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleSave = async () => {
-		if (!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || !userProfile?.id) {
+		if (!userProfile?.id) {
+			console.error("Cannot save: missing user profile");
+			setError("Bitte wähle eine Aufgabe und Rolle aus");
+			return;
+		}
+
+		// A draft only needs a duration; a finalized entry still needs a task + role.
+		if (!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) {
 			console.error("Cannot save: missing required data");
 			setError("Bitte wähle eine Aufgabe und Rolle aus");
 			return;
@@ -93,7 +112,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 		setError(null);
 
 		try {
-			const context = rawContext || (await monday.get("context"));
+			const context = rawContext || (await getMondaySdk().get("context"));
 			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = combineDateAndTime(values.date, values.endTime);
 
@@ -106,19 +125,20 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 				},
 				body: JSON.stringify({
 					userId: userProfile.id,
-					taskName: selectedTask.itemName,
+					taskName: asDraft ? undefined : selectedTask?.itemName,
 					comment: values.comment,
-					boardId: selectedTask.boardId,
-					boardName: selectedTask.boardName,
-					itemId: selectedTask.itemId,
-					itemName: selectedTask.itemName,
-					parentItemId: selectedTask.parentItemId,
-					parentItemName: selectedTask.parentItemName,
-					roleId: selectedTask.roleId,
+					boardId: asDraft ? undefined : selectedTask?.boardId,
+					boardName: asDraft ? undefined : selectedTask?.boardName,
+					itemId: asDraft ? undefined : selectedTask?.itemId,
+					itemName: asDraft ? undefined : selectedTask?.itemName,
+					parentItemId: asDraft ? undefined : selectedTask?.parentItemId,
+					parentItemName: asDraft ? undefined : selectedTask?.parentItemName,
+					roleId: selectedRoleId || undefined,
 					duration: durationSeconds,
 					date: values.date.toISOString(),
 					startTime: startTimeIso,
 					endTime: endTimeIso,
+					asDraft,
 				}),
 			});
 
@@ -127,7 +147,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 				throw new Error(errorData.error || "Failed to save time entry");
 			}
 
-			showToast("Zeiteintrag gespeichert.", "positive", 2000);
+			showToast(asDraft ? "Entwurf gespeichert." : "Zeiteintrag gespeichert.", "positive", 2000);
 			refetch(userProfile.id);
 			onClose();
 		} catch (err: any) {
@@ -176,20 +196,35 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 							],
 							onAdjust: handlers.adjustDuration,
 						}}
-						taskSelector={{
+						taskSelector={
+							asDraft
+								? undefined
+								: {
+										show: true,
+										node: <TaskItemSelector onSelectionChange={setSelectedTask} subItemsOnly={true} />,
+									}
+						}
+						roleSelector={{
 							show: true,
-							node: <TaskItemSelector onSelectionChange={setSelectedTask} subItemsOnly={true} />,
+							roles,
+							selectedRoleId,
+							onRoleChange: setSelectedRoleId,
+							loading: loadingRoles,
+							required: !asDraft,
 						}}
 					/>
 
-					<Group justify="flex-end" mt="md">
-						<Button variant="default" onClick={onClose}>
-							Abbrechen
-						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedTask?.roleId || isSaving} loading={isSaving}>
-							Speichern
-						</Button>
-					</Group>
+					<Flex justify="space-between" align="center" gap="sm" wrap="wrap" mt="md">
+						<Switch label="Als Entwurf speichern" checked={asDraft} onChange={(event) => setAsDraft(event.currentTarget.checked)} />
+						<Group justify="flex-end">
+							<Button variant="default" onClick={onClose}>
+								Abbrechen
+							</Button>
+							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) || isSaving} loading={isSaving}>
+								Speichern
+							</Button>
+						</Group>
+					</Flex>
 				</Flex>
 			</Modal.Body>
 		</Modal>

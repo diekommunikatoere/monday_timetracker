@@ -53,7 +53,7 @@ export function IconButton({ children, colorVariant, onClick, href, ...props }: 
 	}
 
 	return (
-		<ActionIcon classNames={{ root: (styles.iconButton, styles[buttonVariant]) }} onClick={onClick} {...props}>
+		<ActionIcon classNames={{ root: `${styles.iconButton} ${styles[buttonVariant]}` }} onClick={onClick} {...props}>
 			{children}
 		</ActionIcon>
 	);

@@ -2,8 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flex, Group, Input, Pagination } from "@mantine/core";
-import { Select } from "@/components";
+import { Flex, Group, Input } from "@mantine/core";
+import { Select, Pagination } from "@/components";
 import { useUserStore } from "@/stores/userStore";
 import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -13,13 +13,13 @@ import { TimeEntry } from "@/types/time-entry";
 import { secondsToDuration, formatTimeString } from "@/lib/utils";
 import SaveTimerModal from "./SaveTimerModal";
 import EditTimeEntryModal from "./EditTimeEntryModal";
+import EditDraftEntryModal from "./EditDraftEntryModal";
 import BulkActionButtons from "./BulkActionButtons";
+import TimeEntriesToolbar from "./TimeEntriesToolbar";
+import { useFilteredTimeEntries } from "./hooks/useFilteredTimeEntries";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getDashboardColumns } from "../shared/time-entries/TimeEntryTableConfigs";
-import mondaySdk from "monday-sdk-js";
-
-const monday = mondaySdk();
 
 /**
  * Props for {@link TimeEntriesTable}.
@@ -41,15 +41,28 @@ interface TimeEntriesTableProps {
 }
 
 /**
- * Dashboard time-entries table with inline edit, delete (with undo), and bulk
- * actions.
+ * Dashboard time-entries table with search/filter, pagination, inline edit,
+ * delete (with undo), and bulk actions.
+ *
+ * `useTimeEntriesStore` holds the user's **entire** entry history
+ * (`allEntries`, bulk-loaded once via `fetchTimeEntries`); {@link
+ * useFilteredTimeEntries} derives the visible page from it by applying
+ * tokenized-fuzzy search + role/board/date filters, then client-side
+ * pagination — see that hook for the Fuse.js setup. {@link TimeEntriesToolbar}
+ * (rendered above the table) writes into the store's `filters`; this
+ * component only reads the derived `pageEntries`/`total`/`pageCount`.
  *
  * Renders the shared {@link TimeEntryTable} using {@link getDashboardColumns};
  * row selection is limited to the current user's own entries (`userId` from
- * `useUserStore`). Editing is dispatched by entry type: **non-finalized entries**
- * (`entry.timer_state !== "finalized"`) open {@link SaveTimerModal} seeded from the draft row,
- * while finalized entries open {@link EditTimeEntryModal}. Both "edit" and
- * "finalize draft" funnel through `onEdit`.
+ * `useUserStore`). `onEdit` (offered by {@link TimeEntryRowMenu} only for
+ * `finalized`/`parked` rows — never `paused`/`running`, which are still
+ * segment-governed) is dispatched by entry type: **finalized entries** open
+ * the full {@link EditTimeEntryModal} (task/role reassignment included);
+ * **parked entries** open the reduced {@link EditDraftEntryModal} (time
+ * fields + comment only, no task/role) — either way the edit is a plain field
+ * PATCH that never changes `timer_state`. Draft rows (`timer_state !==
+ * "finalized"`) additionally expose a "Speichern" action (`onSaveDraft`) that
+ * opens {@link SaveTimerModal} seeded from the row to finalize it.
  *
  * Single-row delete hits `DELETE /api/time-entries/:id` and surfaces a toast
  * with a "Rückgängig" action that calls `POST /api/time-entries/:id/undo` using
@@ -60,24 +73,29 @@ interface TimeEntriesTableProps {
  *
  * Below the table, a footer row renders a page-size picker (25/50/100, gated on
  * `useHydration()` to avoid an SSR mismatch with the persisted `pageSize`) and a
- * Mantine `Pagination` control (hidden once everything fits on one page). Both
- * drive `useTimeEntriesStore`'s `setPage`/`setPageSize`, which refetch server-side;
- * `selectedIds` is cleared whenever the page or page size changes.
+ * Mantine `Pagination` control (hidden once the filtered set fits on one page).
+ * Both drive `useTimeEntriesStore`'s `setPage`/`setPageSize` — purely in-memory,
+ * no refetch. `selectedIds` is cleared whenever the page, page size, or filters
+ * change; a page number past the end of the filtered set (e.g. after a filter
+ * narrows the results, or a delete empties the last page) is clamped back.
  *
- * Reads from: `useTimeEntriesStore`, `useUserStore`, `useMondayStore`
- * (session token), `useToast`.
+ * Reads from: `useTimeEntriesStore`, `useFilteredTimeEntries`, `useUserStore`,
+ * `useMondayStore` (session token), `useToast`.
  *
  * @param props - Component props (only `onRefetch` is used; see the prop docs).
- * @returns The table plus its modals, delete dialog, and bulk-action panel.
+ * @returns The toolbar, table, footer, plus modals/delete dialog/bulk-action panel.
  */
 export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
-	const { timeEntries, loading, error, page, pageSize, total, setPage, setPageSize } = useTimeEntriesStore();
+	const { loading, error, page, pageSize, setPage, setPageSize, filters } = useTimeEntriesStore();
+	const { pageEntries, pageCount, filterOptions } = useFilteredTimeEntries();
 	const isHydrated = useHydration();
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showSaveModal, setShowSaveModal] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<TimeEntry | null>(null);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+	const [showEditDraftModal, setShowEditDraftModal] = useState(false);
+	const [editingDraftEntry, setEditingDraftEntry] = useState<TimeEntry | null>(null);
 	const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 	const [deleteCount, setDeleteCount] = useState(0);
 	const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
@@ -86,15 +104,21 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 
-	// Rows shown on a page/page-size change are no longer the ones selection was
-	// computed against — clear it rather than acting on stale row ids.
+	// Rows shown on a page/page-size/filter change are no longer the ones
+	// selection was computed against — clear it rather than acting on stale row ids.
 	useEffect(() => {
 		setSelectedIds([]);
-	}, [page, pageSize]);
+	}, [page, pageSize, filters]);
+
+	// A filter/pageSize change (or a delete emptying the current page) can leave
+	// `page` past the end of the filtered result set — clamp it back.
+	useEffect(() => {
+		if (page > pageCount) setPage(pageCount);
+	}, [page, pageCount, setPage]);
 
 	const handleSelectAll = (checked: boolean) => {
 		if (checked) {
-			const ownEntryIds = timeEntries.filter((entry) => entry.user_id === userId).map((entry) => entry.id);
+			const ownEntryIds = pageEntries.filter((entry) => entry.user_id === userId).map((entry) => entry.id);
 			setSelectedIds(ownEntryIds);
 		} else {
 			setSelectedIds([]);
@@ -120,9 +144,13 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	};
 
 	// Edit handlers
+	// "Bearbeiten" is only offered (see TimeEntryRowMenu) for finalized or parked
+	// entries — paused/running rows are still segment-governed and excluded there —
+	// so this only ever needs to distinguish those two cases.
 	const handleEdit = (entry: TimeEntry) => {
-		if (entry.timer_state !== "finalized") {
-			handleOpenSaveModal(entry);
+		if (entry.timer_state === "parked") {
+			setEditingDraftEntry(entry);
+			setShowEditDraftModal(true);
 		} else {
 			setEditingEntry(entry);
 			setShowEditModal(true);
@@ -132,6 +160,11 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const handleCloseEditModal = () => {
 		setShowEditModal(false);
 		setEditingEntry(null);
+	};
+
+	const handleCloseEditDraftModal = () => {
+		setShowEditDraftModal(false);
+		setEditingDraftEntry(null);
 	};
 
 	const handleEditSaved = () => {
@@ -243,6 +276,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	const columns = getDashboardColumns({
 		onEdit: handleEdit,
 		onDelete: handleDelete,
+		onSaveDraft: handleOpenSaveModal,
 		onSelectRow: handleRowSelect,
 		onSelectAll: handleSelectAll,
 		selectedIds,
@@ -257,10 +291,12 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 	return (
 		<>
 			<Flex direction="column" style={{ flex: 1, minHeight: 0, width: "100%" }}>
-				<TimeEntryTable timeEntries={timeEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
+				<TimeEntriesToolbar filterOptions={filterOptions} />
+
+				<TimeEntryTable timeEntries={pageEntries} columns={columns} loading={loading} error={error} selectedIds={selectedIds} scrollable />
 
 				<Flex justify="space-between" align="center" px="md" py="sm" style={{ flexShrink: 0 }}>
-					<Pagination total={Math.ceil(total / pageSize)} value={page} onChange={setPage} boundaries={1} />
+					{pageCount > 1 ? <Pagination total={pageCount} value={page} onChange={setPage} boundaries={1} /> : <div />}
 					<Flex align="center" gap={8}>
 						<Input.Label mb={0} size="xs">
 							Pro Seite
@@ -284,9 +320,9 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 									itemName: selectedDraft.item_name || "",
 									parentItemId: selectedDraft.parent_item_id || undefined,
 									parentItemName: selectedDraft.parent_item_name || undefined,
-									roleId: selectedDraft.role_id || "",
-									roleName: selectedDraft.role_name || "",
 								},
+								roleId: selectedDraft.role_id || "",
+								roleName: selectedDraft.role_name || "",
 								comment: selectedDraft.comment || "",
 								date: selectedDraft.start_time ? new Date(selectedDraft.start_time) : new Date(),
 								duration: secondsToDuration(selectedDraft.duration ?? 0),
@@ -297,6 +333,7 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 				}
 			/>
 			{editingEntry && <EditTimeEntryModal show={showEditModal} onClose={handleCloseEditModal} entry={editingEntry} onSaved={handleEditSaved} />}
+			{editingDraftEntry && <EditDraftEntryModal show={showEditDraftModal} onClose={handleCloseEditDraftModal} entry={editingDraftEntry} onSaved={handleEditSaved} />}
 			<DeleteConfirmationDialog show={showDeleteConfirmation} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} count={deleteCount} />
 			<BulkActionButtons selectedIds={selectedIds} onBulkDelete={handleBulkDelete} onClearSelection={() => setSelectedIds([])} />
 		</>

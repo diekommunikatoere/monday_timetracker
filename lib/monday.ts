@@ -1,9 +1,10 @@
 // lib/monday.ts — monday.com GraphQL API client: boards, items, subitems, user details, linked items.
 
-import { ApiClient, ClientError } from "@mondaydotcomorg/api";
+import { ClientError } from "@mondaydotcomorg/api";
 import { NextRequest } from "next/server";
 import { cacheHelper } from "./redis";
 import { upsertMondayBoard, upsertMondayItem, upsertMondayItemsBatch } from "./database";
+import { createMondayClient } from "./monday/client";
 
 // Cache TTL constants (in seconds)
 const CACHE_TTL = {
@@ -60,6 +61,7 @@ type ItemsPageResponse = {
 			id: string;
 			title: string;
 			position: string;
+			color: string | null;
 			items_page: {
 				cursor: string | null;
 				items: SimpleItem[];
@@ -138,6 +140,7 @@ type BoardOption = { value: string; label: string };
  */
 type TaskGroup = {
 	label: string;
+	color: string | null;
 	options: Array<{
 		id: string;
 		value: string;
@@ -157,6 +160,7 @@ type GroupItems = {
 	groupId: string;
 	groupTitle: string;
 	groupPosition: string; // Numeric string; used for sort ordering
+	groupColor: string | null;
 	items: SimpleItem[];
 };
 
@@ -178,7 +182,7 @@ if (!token) {
 }
 
 // Create client instance once
-const client = new ApiClient({ token, apiVersion: "2025-10" });
+const client = createMondayClient();
 
 /**
  * Resolves a list of monday.com board IDs to their names, for use in board-selection UIs.
@@ -248,6 +252,116 @@ export async function getConnectedBoards(boardIds: string[]): Promise<Array<Boar
 		console.error("Error in getConnectedBoards:", error);
 		throw new Error("Failed to fetch connected boards");
 	}
+}
+
+/**
+ * One workspace's worth of boards, grouped for the admin board picker.
+ *
+ * @property workspaceId   - monday workspace ID, or `"__default__"` for boards with no workspace.
+ * @property workspaceName - Display name; `"Hauptbereich"` for the default bucket.
+ * @property boards        - Boards in this workspace, alphabetically sorted.
+ */
+export interface WorkspaceBoardGroup {
+	workspaceId: string;
+	workspaceName: string;
+	boards: Array<{ value: string; label: string; kind: string }>;
+}
+
+const ALL_BOARDS_CACHE_KEY = "monday:all_boards_grouped";
+const ALL_BOARDS_CACHE_TTL = 60 * 15; // 15 minutes
+
+/**
+ * Fetches every active board across all workspaces in the account, grouped by
+ * workspace, for the admin "Boards verwalten" picker.
+ *
+ * Pages through monday's `boards` query with `page:` (not cursor-based, unlike
+ * {@link getBoardTasks}'s `items_page`) until an empty page is returned. Filters
+ * to `state: active` and `type: "board"` — monday's `BoardObjectType` is one of
+ * `board` / `custom_object` / `document` / `sub_items_board`, so restricting to
+ * `board` keeps real boards (of any `board_kind`, including `share`) while
+ * excluding sub-items boards, workdocs, and custom objects in a single pass with
+ * no per-board sub-query.
+ *
+ * Results are cached in Redis under `monday:all_boards_grouped` for 15 minutes.
+ * As a side-effect, every discovered board is upserted into the local
+ * `monday_board` dimension table (fire-and-forget).
+ *
+ * @returns Workspace-grouped board options, sorted by workspace name then board name.
+ */
+export async function getAllBoardsGroupedByWorkspace(): Promise<WorkspaceBoardGroup[]> {
+	const cached = await cacheHelper.get<WorkspaceBoardGroup[]>(ALL_BOARDS_CACHE_KEY);
+	if (cached) {
+		return cached;
+	}
+
+	type BoardsPageResponse = {
+		boards: Array<{
+			id: string;
+			name: string;
+			type: string;
+			board_kind: string;
+			workspace: { id: string; name: string } | null;
+		}>;
+		error?: APIError;
+	};
+
+	const query = `
+		query ($page: Int!) {
+			boards(limit: 100, page: $page, state: active) {
+				id
+				name
+				type
+				board_kind
+				workspace {
+					id
+					name
+				}
+			}
+		}
+	`;
+
+	const allBoards: BoardsPageResponse["boards"] = [];
+	let page = 1;
+	// monday's `boards` query paginates with `page:`, not a cursor — loop until an empty page.
+	while (true) {
+		const response: BoardsPageResponse = await client.request(query, { page });
+
+		if (response.error) {
+			throw new Error(response.error?.message || "Failed to fetch boards");
+		}
+
+		const pageBoards = response.boards || [];
+		if (pageBoards.length === 0) break;
+
+		// Only real boards belong in the picker; `type` excludes sub-items boards, workdocs, and custom objects.
+		allBoards.push(...pageBoards.filter((b) => b.type === "board"));
+
+		if (pageBoards.length < 100) break;
+		page += 1;
+	}
+
+	// Upsert boards into dimension table (fire-and-forget)
+	Promise.all(allBoards.map((b) => upsertMondayBoard(b.id.toString(), b.name))).catch((err) => console.error("[getAllBoardsGroupedByWorkspace] Background upsert error:", err));
+
+	const DEFAULT_WORKSPACE_ID = "__default__";
+	const groups = new Map<string, WorkspaceBoardGroup>();
+
+	for (const board of allBoards) {
+		const workspaceId = board.workspace?.id?.toString() || DEFAULT_WORKSPACE_ID;
+		const workspaceName = board.workspace?.name || "Hauptbereich";
+
+		if (!groups.has(workspaceId)) {
+			groups.set(workspaceId, { workspaceId, workspaceName, boards: [] });
+		}
+		groups.get(workspaceId)!.boards.push({ value: board.id.toString(), label: board.name, kind: board.board_kind });
+	}
+
+	const result = Array.from(groups.values())
+		.map((group) => ({ ...group, boards: group.boards.sort((a, b) => a.label.localeCompare(b.label)) }))
+		.sort((a, b) => a.workspaceName.localeCompare(b.workspaceName));
+
+	await cacheHelper.set(ALL_BOARDS_CACHE_KEY, result, ALL_BOARDS_CACHE_TTL);
+	return result;
 }
 
 /**
@@ -347,6 +461,7 @@ export async function getBoardTasks(
 				groups {
 					id
 					title
+					color
 					position
 					items_page(limit: 200) {
 						cursor
@@ -413,6 +528,7 @@ export async function getBoardTasks(
 				groupId: group.id,
 				groupTitle: group.title,
 				groupPosition: group.position,
+				groupColor: group.color || null,
 				items: [...group.items_page.items],
 			});
 
@@ -737,6 +853,7 @@ export async function getBoardTasks(
 
 			return {
 				label: group.groupTitle || "Default Group",
+				color: group.groupColor,
 				position: group.groupPosition,
 				options: sortedOptions,
 			};
@@ -746,7 +863,7 @@ export async function getBoardTasks(
 			// Sort groups by board position (numeric string comparison)
 			return a.position.localeCompare(b.position, undefined, { numeric: true });
 		})
-		.map(({ label, options }) => ({ label, options })); // Remove position from final output to match TaskGroup type
+		.map(({ label, color, options }) => ({ label, color, options })); // Remove position from final output to match TaskGroup type
 
 	const result = { groups: groupedOptions };
 
@@ -840,6 +957,8 @@ export async function getMondayContext(request: NextRequest) {
  *          All `photo_urls` values are `null` if the user has no avatar.
  */
 export async function getUserDetails(userId: string): Promise<{
+	name: string | null;
+	email: string | null;
 	teams: Array<{ id: string; name: string }>;
 	photo_urls: {
 		original: string | null;
@@ -851,6 +970,8 @@ export async function getUserDetails(userId: string): Promise<{
 }> {
 	if (!userId) {
 		return {
+			name: null,
+			email: null,
 			teams: [],
 			photo_urls: { original: null, small: null, thumb: null, thumb_small: null, tiny: null },
 		};
@@ -861,6 +982,8 @@ export async function getUserDetails(userId: string): Promise<{
 
 	// Try cache first
 	const cached = await cacheHelper.get<{
+		name: string | null;
+		email: string | null;
 		teams: Array<{ id: string; name: string }>;
 		photo_urls: any;
 	}>(cacheKey);
@@ -874,15 +997,19 @@ export async function getUserDetails(userId: string): Promise<{
 	const query = `
 		query {
 			users(ids: [${userId}]) {
+				name
+				email
 				teams {
 					id
 					name
 				}
-				photo_original
-				photo_small
-				photo_thumb
-				photo_thumb_small
-				photo_tiny
+				photo_url {
+					original
+					small
+					thumb
+					thumb_small
+					tiny
+				}
 			}
 		}
 	`;
@@ -896,6 +1023,8 @@ export async function getUserDetails(userId: string): Promise<{
 		}
 
 		const users = response.users || [];
+		let name: string | null = null;
+		let email: string | null = null;
 		let teams: Array<{ id: string; name: string }> = [];
 		let photo_urls = {
 			original: null,
@@ -906,19 +1035,21 @@ export async function getUserDetails(userId: string): Promise<{
 		};
 
 		if (users.length > 0) {
+			name = users[0].name ?? null;
+			email = users[0].email ?? null;
 			if (users[0].teams) {
 				teams = users[0].teams;
 			}
 			photo_urls = {
-				original: users[0].photo_original,
-				small: users[0].photo_small,
-				thumb: users[0].photo_thumb,
-				thumb_small: users[0].photo_thumb_small,
-				tiny: users[0].photo_tiny,
+				original: users[0].photo_url?.original ?? null,
+				small: users[0].photo_url?.small ?? null,
+				thumb: users[0].photo_url?.thumb ?? null,
+				thumb_small: users[0].photo_url?.thumb_small ?? null,
+				tiny: users[0].photo_url?.tiny ?? null,
 			};
 		}
 
-		const result = { teams, photo_urls };
+		const result = { name, email, teams, photo_urls };
 
 		// Cache the result
 		await cacheHelper.set(cacheKey, result, CACHE_TTL.USER_TEAMS);
@@ -928,6 +1059,8 @@ export async function getUserDetails(userId: string): Promise<{
 	} catch (error) {
 		console.error("Error in getUserDetails:", error);
 		return {
+			name: null,
+			email: null,
 			teams: [],
 			photo_urls: { original: null, small: null, thumb: null, thumb_small: null, tiny: null },
 		};

@@ -176,7 +176,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 					<Accordion multiple value={open || []} onChange={(values) => setOpen(values.length > 0 ? values : null)} disableChevronRotation classNames={styles} p="sm">
 						{groupedEntries.map((group) => (
 							<Accordion.Item key={group.userId} value={group.userId}>
-								<Accordion.Control chevron={open && open.includes(group.userId) ? <Icon name={"collapse"} size={16} color="var(--color--icon)" /> : <Icon name={"expand"} size={16} color="var(--color--icon)" />}>
+								<Accordion.Control chevron={open && open.includes(group.userId) ? <Icon name={"collapse_all"} size={21} color="var(--color--icon)" /> : <Icon name={"expand_all"} size={21} color="var(--color--icon)" />}>
 									<Group justify="space-between" pr="md">
 										<Flex direction="row" align="center" gap="sm">
 											<Avatar src={group.userPhotoUrl} alt={group.userName} radius="xl" size="sm">
@@ -184,7 +184,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 											</Avatar>
 											<Text fw={600}>{group.userName}</Text>
 										</Flex>
-										<Badge variant="light" size="lg" style={{ pointerEvents: "none" }}>
+										<Badge variant="light" size="md" style={{ pointerEvents: "none" }} classNames={{ label: styles.badgeLabel }}>
 											{formatDuration(group.totalDuration)}
 										</Badge>
 									</Group>

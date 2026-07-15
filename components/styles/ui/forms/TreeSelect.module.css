@@ -1,0 +1,80 @@
+.tree-select {
+	/* Base tree-select styling */
+	--input-bg: var(--color--input-background);
+	--input-bd: var(--color--input-border);
+	color: var(--color--input-text);
+
+	&:disabled,
+	&[data-disabled="true"] {
+		--input-disabled-bg: var(--color--input-background-disabled);
+		--input-disabled-bd: var(--color--input-border-disabled);
+		color: var(--color--input-text-disabled);
+	}
+}
+
+.selectOption {
+	border-radius: var(--mantine-radius-sm);
+	padding-block: 0.25rem;
+
+	&[aria-selected="true"] {
+		background-color: var(--color--background-secondary);
+		font-weight: 600;
+
+		&:hover {
+			background-color: var(--color--background-secondary-hover);
+		}
+	}
+
+	&[data-combobox-selected] {
+		background-color: var(--color--background-secondary);
+		font-weight: 600;
+	}
+
+	&:hover {
+		background-color: var(--color--background-secondary-hover);
+	}
+
+	svg {
+		fill: var(--color--primary-500);
+		opacity: 1;
+	}
+
+	span {
+		border-color: var(--color--border-layout);
+	}
+
+	span[role="button"] {
+		background-color: var(--color--button-tertiary-bg);
+		color: var(--color--text-on-tertiary);
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--button-tertiary-bg-hover);
+		}
+
+		svg path {
+			fill: var(--color--icon-on-tertiary);
+		}
+
+		&:disabled,
+		&[data-disabled] {
+			background-color: var(--color--background-disabled);
+			color: var(--color--text-disabled);
+
+			svg path {
+				fill: var(--color--text-disabled);
+			}
+		}
+	}
+}
+
+.tree-select--error {
+	--input-bd: var(--color--error-500);
+}
+
+.tree-select--warning {
+	--input-bd: var(--color--secondary-500);
+}
+
+.tree-select--success {
+	--input-bd: var(--color--success-500);
+}

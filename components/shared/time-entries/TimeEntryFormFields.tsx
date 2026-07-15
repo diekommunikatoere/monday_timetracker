@@ -1,8 +1,8 @@
 "use client";
 
-import { Flex, TextInput, Tooltip } from "@mantine/core";
-import { TimeInput } from "@mantine/dates";
-import { Button, ButtonGroup, DatePicker, Icon, IconButton, Select } from "@/components";
+import { Flex, Tooltip } from "@mantine/core";
+import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, TimeInput } from "@/components";
+import { RoleSelector } from "./RoleSelector";
 
 import styles from "@/components/styles/features/time-entries/TimeEntryForm.module.css";
 
@@ -48,7 +48,7 @@ export type TimeEntryQuickAdjust = {
  * @property onEndTimeNowClick     - Optional; when provided, renders a "now" icon button that sets the end time (works even while the end input is read-only).
  * @property quickAdjustments      - Optional `{ add?, subtract?, onAdjust }` to render quick-add / quick-subtract button groups; buttons pass their {@link TimeEntryQuickAdjust.minutes} to `onAdjust`. Disabled while `durationLocked`.
  * @property taskSelector         - Optional `{ show, node }`; when `show` is true, `node` is inserted into the form (e.g. a monday task picker).
- * @property roleSelector         - Optional `{ show, roles, selectedRoleId, onRoleChange, loading? }`; when `show` is true, renders a searchable role `Select`.
+ * @property roleSelector         - Optional `{ show, roles, selectedRoleId, onRoleChange, loading?, required? }`; when `show` is true, renders a {@link RoleSelector}.
  */
 export interface TimeEntryFormFieldsProps {
 	// Core fields
@@ -92,6 +92,7 @@ export interface TimeEntryFormFieldsProps {
 		selectedRoleId: string;
 		onRoleChange: (roleId: string) => void;
 		loading?: boolean;
+		required?: boolean;
 	};
 }
 
@@ -108,7 +109,7 @@ function LockButton({ active, onToggle, tooltip, ariaLabel, disabled }: { active
 	return (
 		<Tooltip label={tooltip} position="top" withArrow>
 			<IconButton variant="filled" colorVariant={active ? "primary" : "tertiary"} onClick={onToggle} disabled={disabled} aria-label={ariaLabel}>
-				<Icon name={active ? "lock" : "unlock"} size={16} color={active ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
+				<Icon name={active ? "lock" : "lock_open"} size={18} color={active ? "var(--color--text-on-primary)" : "var(--color--text-secondary)"} />
 			</IconButton>
 		</Tooltip>
 	);
@@ -150,8 +151,8 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={
 						onStartTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen">
-									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen" disabled={startInputDisabled}>
+									<Icon name="schedule" size={18} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
@@ -169,8 +170,8 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					leftSection={
 						onEndTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen">
-									<Icon name="clock" size={16} color="var(--color--text-secondary)" />
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen" disabled={endInputDisabled}>
+									<Icon name="schedule" size={18} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
@@ -191,9 +192,10 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 						if (newDate) onDateChange(new Date(newDate));
 					}}
 					valueFormat="DD.MM.YYYY"
-					leftSection={<Icon name="calendar" size={16} color="var(--color--text-placeholder)" />}
+					leftSection={<Icon name="calendar_today" size={18} color="var(--color--text-placeholder)" />}
 					leftSectionPointerEvents="none"
 					style={{ flex: 1 }}
+					highlightToday
 				/>
 			</Flex>
 
@@ -241,10 +243,10 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 			{taskSelector?.show ? taskSelector.node : null}
 
 			{/* Role selector */}
-			{roleSelector?.show && <Select label="Rolle" placeholder="Rolle auswählen..." data={roleSelector.roles} value={roleSelector.selectedRoleId} onChange={(val) => roleSelector.onRoleChange(val || "")} disabled={roleSelector.loading} searchable />}
+			{roleSelector?.show && <RoleSelector roles={roleSelector.roles} selectedRoleId={roleSelector.selectedRoleId} onChange={roleSelector.onRoleChange} loading={roleSelector.loading} required={roleSelector.required} />}
 
 			{/* Comment */}
-			<TextInput label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
+			<Input label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
 		</Flex>
 	);
 }

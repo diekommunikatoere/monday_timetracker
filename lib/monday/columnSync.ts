@@ -18,10 +18,11 @@
  * live in `./utils` and are re-exported here for consumer convenience.
  */
 
-import { ApiClient, ClientError } from "@mondaydotcomorg/api";
+import { ClientError } from "@mondaydotcomorg/api";
 import { cacheHelper } from "../redis";
 import { SyncPurpose, TimeFormat } from "@/types/database";
 import { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose } from "./utils";
+import { createMondayClient } from "./client";
 
 // Re-export shared utilities for convenience
 export { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose };
@@ -36,7 +37,7 @@ if (!token) {
 }
 
 // Create client instance once
-const client = new ApiClient({ token, apiVersion: "2025-10" });
+const client = createMondayClient();
 
 // ============================================
 // Type Definitions

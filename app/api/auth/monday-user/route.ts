@@ -17,16 +17,15 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 		}
 
-		const { email, name } = await request.json();
-
-		// Fetch user's details (teams and photos) from Monday
-		const { teams, photo_urls } = await getUserDetails(session.userId);
+		// Fetch user's details (name, email, teams, photos) from Monday directly —
+		// avoids relying on the deprecated client-side `monday.api()` GraphQL call.
+		const { name, email, teams, photo_urls } = await getUserDetails(session.userId);
 		const teamIds = teams.map((team) => team.id);
 
 		// This uses supabaseAdmin from server.ts - safe on server
 		const userProfile = await findOrCreateUserByMondayId(session.userId, session.accountId, email, name, teamIds, photo_urls, session.isAdmin);
 
-		return NextResponse.json({ userProfile });
+		return NextResponse.json({ userProfile, mondayUser: { name, email, photo_urls } });
 	} catch (error) {
 		console.error("Error in monday-user API:", error);
 		return NextResponse.json({ error: "Failed to authenticate user" }, { status: 500 });

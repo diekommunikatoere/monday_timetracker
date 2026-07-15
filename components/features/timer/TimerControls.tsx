@@ -39,7 +39,7 @@ export function TimerControls({ status, hasSession, hasComment, isSaving, onPlay
 	const disabledColor = "var(--color--text-disabled)";
 
 	// Determine which icon to show for play/pause button
-	const PlayPauseIcon = isRunning ? <Icon name="pause" color={activeColor} size={21} /> : <Icon name="play" color={activeColor} size={21} />;
+	const PlayPauseIcon = isRunning ? <Icon name="pause" size={21} /> : <Icon name="play_arrow" size={21} />;
 
 	return (
 		<Flex direction="row" align="center" justify="center" gap="4px">
@@ -50,7 +50,7 @@ export function TimerControls({ status, hasSession, hasComment, isSaving, onPlay
 			</Tooltip>
 			<Tooltip label="Speichern" position="top" withArrow>
 				<IconButton variant="filled" colorVariant="primary" size="lg" onClick={onSave} disabled={!hasSession || isSaving} loading={isSaving}>
-					<Icon name="save" color={hasSession ? activeColor : disabledColor} size={21} />
+					<Icon name="save" size={21} />
 				</IconButton>
 			</Tooltip>
 		</Flex>

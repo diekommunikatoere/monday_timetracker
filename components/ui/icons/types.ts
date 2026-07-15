@@ -27,6 +27,7 @@ export interface IconProps {
 	color?: string;
 	weight?: "default" | "bold";
 	filled?: boolean;
+	opsz?: number;
 	className?: string;
 }
 

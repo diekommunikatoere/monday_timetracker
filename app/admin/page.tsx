@@ -2,20 +2,88 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
-import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Box } from "@mantine/core";
-import { Button, IconButton, IconLink, LoadingState, ErrorState } from "@/components";
-import { Icon } from "@/components";
+import { Accordion, TextInput, NumberInput, Switch, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Checkbox, ScrollArea } from "@mantine/core";
+import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
-import type { Role, BoardConfig } from "@/types/database";
+import type { Role } from "@/types/database";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import "@/public/css/components/AdminPage.css";
 
+const DEFAULT_WORKSPACE_ID = "__default__";
+
+interface WorkspaceBoardGroup {
+	workspaceId: string;
+	workspaceName: string;
+	boards: Array<{ value: string; label: string; kind: string }>;
+}
+
+interface PickerBoardOption {
+	value: string;
+	label: string;
+	workspaceId: string;
+	workspaceName: string;
+}
+
+interface DisplayBoardRow {
+	board_id: string;
+	board_name: string;
+	workspace_id: string | null;
+	workspace_name: string;
+	sync_enabled: boolean;
+	config_status: "GREEN" | "YELLOW";
+}
+
+/** Draggable row in the "Boards verwalten" sortable list. */
+function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemove: (boardId: string) => void }) {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.board_id });
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.5 : 1,
+	};
+
+	return (
+		<div ref={setNodeRef} style={style} className="board-row">
+			<button type="button" className="board-row-handle" aria-label="Board verschieben" {...attributes} {...listeners}>
+				<Icon name="menu" size={18} />
+			</button>
+			<div className="board-row-info">
+				<span className="board-row-name">{board.board_name}</span>
+				<span className="board-row-workspace">{board.workspace_name}</span>
+			</div>
+			<div className="board-row-actions">
+				{board.sync_enabled && board.config_status === "YELLOW" && (
+					<Tooltip label="Sync aktiv, aber keine Budget-verwendet-Spalte zugeordnet">
+						<Badge size="xs" color="yellow" variant="light">
+							Sync unvollständig
+						</Badge>
+					</Tooltip>
+				)}
+				<span className={`board-sync-badge ${board.sync_enabled ? "enabled" : "disabled"}`}>{board.sync_enabled ? "Sync aktiv" : "Sync inaktiv"}</span>
+				<Tooltip label="Board-Einstellungen">
+					<IconLink variant="filled" color="var(--color--background-secondary)" href={`/admin/boards/${board.board_id}`}>
+						<Icon name="settings" size={20} color="var(--color--text-primary)" />
+					</IconLink>
+				</Tooltip>
+				<Tooltip label="Board entfernen">
+					<IconButton variant="filled" color="var(--color--primary)" onClick={() => onRemove(board.board_id)}>
+						<Icon name="delete" size={20} color="var(--color--text-on-primary)" />
+					</IconButton>
+				</Tooltip>
+			</div>
+		</div>
+	);
+}
+
 export default function AdminPage() {
-	const [activeTab, setActiveTab] = useState<string | null>("roles");
 	const [roles, setRoles] = useState<Role[]>([]);
-	const [boards, setBoards] = useState<BoardConfig[]>([]);
+	const [allBoardConfigs, setAllBoardConfigs] = useState<any[]>([]);
+	const [pickerGroups, setPickerGroups] = useState<WorkspaceBoardGroup[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -31,23 +99,17 @@ export default function AdminPage() {
 	});
 	const [savingRole, setSavingRole] = useState(false);
 
-	// Board modal state
-	const [boardModalOpen, setBoardModalOpen] = useState(false);
-	const [editingBoard, setEditingBoard] = useState<BoardConfig | null>(null);
-	const [boardForm, setBoardForm] = useState({
-		board_id: "",
-		board_name: "",
-		sync_enabled: true,
-		sync_on_finalize: true,
-		sync_budget_used: true,
-		linked_board_id: "",
-		sync_linked_items: true,
-	});
-	const [savingBoard, setSavingBoard] = useState(false);
-	const [syncingBoards, setSyncingBoards] = useState<Record<string, boolean>>({});
+	// Board picker modal state
+	const [pickerOpen, setPickerOpen] = useState(false);
+	const [pickerLoading, setPickerLoading] = useState(false);
+	const [pickerSearch, setPickerSearch] = useState("");
+	const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set());
+	const [savingBoards, setSavingBoards] = useState(false);
+
+	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
 	// Monday context
-	const { rawContext, sessionToken, initializeMondayContext, isLoading: mondayLoading, error: mondayError } = useMondayStore();
+	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError, sessionToken } = useMondayStore();
 	const isAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
 
 	// Initialize Monday context on mount
@@ -68,17 +130,17 @@ export default function AdminPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch roles");
+				throw new Error(data.error || "Rollen konnten nicht geladen werden");
 			}
 
 			setRoles(data.roles || []);
 		} catch (err) {
 			console.error("Error fetching roles:", err);
-			setError(err instanceof Error ? err.message : "Failed to fetch roles");
+			setError(err instanceof Error ? err.message : "Rollen konnten nicht geladen werden");
 		}
 	}, [sessionToken]);
 
-	// Fetch board configs
+	// Fetch board configs (all rows; display list is derived client-side)
 	const fetchBoards = useCallback(async () => {
 		if (!sessionToken) return;
 
@@ -91,13 +153,42 @@ export default function AdminPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch board configurations");
+				throw new Error(data.error || "Board-Konfigurationen konnten nicht geladen werden");
 			}
 
-			setBoards(data.boards || []);
+			setAllBoardConfigs(data.boards || []);
 		} catch (err) {
 			console.error("Error fetching boards:", err);
-			setError(err instanceof Error ? err.message : "Failed to fetch board configurations");
+			setError(err instanceof Error ? err.message : "Board-Konfigurationen konnten nicht geladen werden");
+		}
+	}, [sessionToken]);
+
+	// Fetch all monday boards grouped by workspace, for the picker + workspace-name lookup
+	const fetchPickerGroups = useCallback(async () => {
+		if (!sessionToken) return;
+
+		setPickerLoading(true);
+		try {
+			const response = await fetch("/api/admin/monday/boards", {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Monday-Boards konnten nicht geladen werden");
+			}
+
+			setPickerGroups(data.groups || []);
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Monday-Boards konnten nicht geladen werden",
+				color: "red",
+			});
+		} finally {
+			setPickerLoading(false);
 		}
 	}, [sessionToken]);
 
@@ -107,13 +198,13 @@ export default function AdminPage() {
 
 		const loadData = async () => {
 			setLoading(true);
-			await Promise.all([fetchRoles(), fetchBoards()]);
+			await Promise.all([fetchRoles(), fetchBoards(), fetchPickerGroups()]);
 			setLoading(false);
 		};
 		loadData();
-	}, [fetchRoles, fetchBoards, sessionToken]);
+	}, [fetchRoles, fetchBoards, fetchPickerGroups, sessionToken]);
 
-	// Sort by status and then alphabetically
+	// Sort roles by status and then alphabetically
 	const sortedRoles = useMemo(
 		() =>
 			[...roles].sort((a, b) => {
@@ -123,19 +214,184 @@ export default function AdminPage() {
 		[roles],
 	);
 
-	// Sort boards by sync status and then alphabetically
-	const sortedBoards = useMemo(
-		() =>
-			[...boards].sort((a, b) => {
-				const aEnabled = a.sync_enabled ?? false;
-				const bEnabled = b.sync_enabled ?? false;
-				if (aEnabled !== bEnabled) return aEnabled ? -1 : 1;
-				const aName = (a as any).monday_board?.name || a.board_id;
-				const bName = (b as any).monday_board?.name || b.board_id;
-				return aName.localeCompare(bName);
-			}),
-		[boards],
+	const workspaceNameById = useMemo(() => {
+		const map: Record<string, string> = {};
+		pickerGroups.forEach((group) => {
+			map[group.workspaceId] = group.workspaceName;
+		});
+		return map;
+	}, [pickerGroups]);
+
+	// The enabled, ordered "Boards verwalten" list, derived from the raw board_config rows
+	const displayBoards: DisplayBoardRow[] = useMemo(() => {
+		return allBoardConfigs
+			.filter((b: any) => b.display_enabled)
+			.sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+			.map((b: any) => {
+				const workspaceId: string | null = b.monday_board?.workspace_id ?? null;
+				return {
+					board_id: b.board_id,
+					board_name: b.monday_board?.name || b.board_id,
+					workspace_id: workspaceId,
+					workspace_name: (workspaceId && workspaceNameById[workspaceId]) || "Hauptbereich",
+					sync_enabled: !!b.sync_enabled,
+					config_status: (b.config_status as "GREEN" | "YELLOW") || "GREEN",
+				};
+			});
+	}, [allBoardConfigs, workspaceNameById]);
+
+	const allPickerBoardsById = useMemo(() => {
+		const map = new Map<string, PickerBoardOption>();
+		pickerGroups.forEach((group) => {
+			group.boards.forEach((b) => {
+				map.set(b.value, { value: b.value, label: b.label, workspaceId: group.workspaceId, workspaceName: group.workspaceName });
+			});
+		});
+		return map;
+	}, [pickerGroups]);
+
+	// Picker groups filtered to boards not already enabled, and matching the search term
+	const filteredPickerGroups = useMemo(() => {
+		const enabledIds = new Set(displayBoards.map((b) => b.board_id));
+		const term = pickerSearch.trim().toLowerCase();
+
+		return pickerGroups
+			.map((group) => ({
+				...group,
+				boards: group.boards.filter((b) => !enabledIds.has(b.value) && (!term || b.label.toLowerCase().includes(term) || group.workspaceName.toLowerCase().includes(term))),
+			}))
+			.filter((group) => group.boards.length > 0);
+	}, [pickerGroups, displayBoards, pickerSearch]);
+
+	// Board display handlers
+	const saveDisplayBoards = useCallback(
+		async (list: DisplayBoardRow[]) => {
+			if (!sessionToken) return;
+			setSavingBoards(true);
+			try {
+				const response = await fetch("/api/admin/boards/display", {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${sessionToken}`,
+					},
+					body: JSON.stringify({
+						boards: list.map((b) => ({ board_id: b.board_id, board_name: b.board_name, workspace_id: b.workspace_id })),
+					}),
+				});
+
+				const data = await response.json();
+
+				if (!response.ok) {
+					throw new Error(data.error || "Board-Auswahl konnte nicht gespeichert werden");
+				}
+
+				notifications.show({
+					title: "Gespeichert",
+					message: "Board-Auswahl aktualisiert.",
+					color: "green",
+				});
+			} catch (err) {
+				notifications.show({
+					title: "Fehler",
+					message: err instanceof Error ? err.message : "Board-Auswahl konnte nicht gespeichert werden",
+					color: "red",
+				});
+			} finally {
+				await fetchBoards();
+				setSavingBoards(false);
+			}
+		},
+		[sessionToken, fetchBoards],
 	);
+
+	const handleOpenPicker = () => {
+		setPickerSearch("");
+		setPickerSelectedIds(new Set());
+		setPickerOpen(true);
+		fetchPickerGroups();
+	};
+
+	const togglePickerSelection = (boardId: string) => {
+		setPickerSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(boardId)) {
+				next.delete(boardId);
+			} else {
+				next.add(boardId);
+			}
+			return next;
+		});
+	};
+
+	const handleAddSelectedBoards = () => {
+		const toAdd = Array.from(pickerSelectedIds)
+			.map((id) => allPickerBoardsById.get(id))
+			.filter((b): b is PickerBoardOption => !!b && !displayBoards.some((d) => d.board_id === b.value));
+
+		if (toAdd.length === 0) {
+			setPickerOpen(false);
+			return;
+		}
+
+		const newList: DisplayBoardRow[] = [
+			...displayBoards,
+			...toAdd.map((b) => ({
+				board_id: b.value,
+				board_name: b.label,
+				workspace_id: b.workspaceId === DEFAULT_WORKSPACE_ID ? null : b.workspaceId,
+				workspace_name: b.workspaceName,
+				sync_enabled: true,
+				config_status: "YELLOW" as const,
+			})),
+		];
+
+		// Optimistic local update so the list reflects the change immediately
+		setAllBoardConfigs((prev) => {
+			const existingIds = new Set(prev.map((b: any) => b.board_id));
+			const additions = toAdd
+				.filter((b) => !existingIds.has(b.value))
+				.map((b, idx) => ({
+					board_id: b.value,
+					sync_enabled: true,
+					display_enabled: true,
+					sort_order: displayBoards.length + idx,
+					config_status: "YELLOW",
+					monday_board: { name: b.label, workspace_id: b.workspaceId === DEFAULT_WORKSPACE_ID ? null : b.workspaceId },
+				}));
+			return [...prev, ...additions];
+		});
+
+		setPickerOpen(false);
+		setPickerSelectedIds(new Set());
+		saveDisplayBoards(newList);
+	};
+
+	const handleRemoveBoard = (boardId: string) => {
+		const newList = displayBoards.filter((b) => b.board_id !== boardId);
+
+		setAllBoardConfigs((prev) => prev.map((b: any) => (b.board_id === boardId ? { ...b, display_enabled: false, sort_order: 0 } : b)));
+
+		saveDisplayBoards(newList);
+	};
+
+	const handleDragEnd = (event: DragEndEvent) => {
+		const { active, over } = event;
+		if (!over || active.id === over.id) return;
+
+		const oldIndex = displayBoards.findIndex((b) => b.board_id === active.id);
+		const newIndex = displayBoards.findIndex((b) => b.board_id === over.id);
+		if (oldIndex === -1 || newIndex === -1) return;
+
+		const reordered = arrayMove(displayBoards, oldIndex, newIndex);
+
+		setAllBoardConfigs((prev) => {
+			const sortIndex = new Map(reordered.map((b, idx) => [b.board_id, idx]));
+			return prev.map((b: any) => (sortIndex.has(b.board_id) ? { ...b, sort_order: sortIndex.get(b.board_id) } : b));
+		});
+
+		saveDisplayBoards(reordered);
+	};
 
 	// Role handlers
 	const handleOpenRoleModal = (role?: Role) => {
@@ -164,8 +420,8 @@ export default function AdminPage() {
 	const handleSaveRole = async () => {
 		if (!roleForm.name.trim()) {
 			notifications.show({
-				title: "Validation Error",
-				message: "Role name is required",
+				title: "Validierungsfehler",
+				message: "Rollenname ist erforderlich",
 				color: "red",
 			});
 			return;
@@ -188,12 +444,12 @@ export default function AdminPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to save role");
+				throw new Error(data.error || "Rolle konnte nicht gespeichert werden");
 			}
 
 			notifications.show({
-				title: "Success",
-				message: editingRole ? "Role updated successfully" : "Role created successfully",
+				title: "Erfolg",
+				message: editingRole ? "Rolle erfolgreich aktualisiert" : "Rolle erfolgreich erstellt",
 				color: "green",
 			});
 
@@ -201,8 +457,8 @@ export default function AdminPage() {
 			fetchRoles();
 		} catch (err) {
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to save role",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Rolle konnte nicht gespeichert werden",
 				color: "red",
 			});
 		} finally {
@@ -211,7 +467,7 @@ export default function AdminPage() {
 	};
 
 	const handleDeleteRole = async (role: Role) => {
-		if (!confirm(`Are you sure you want to deactivate the role "${role.name}"?`)) {
+		if (!confirm(`Möchten Sie die Rolle "${role.name}" wirklich deaktivieren?`)) {
 			return;
 		}
 
@@ -226,174 +482,22 @@ export default function AdminPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to delete role");
+				throw new Error(data.error || "Rolle konnte nicht deaktiviert werden");
 			}
 
 			notifications.show({
-				title: "Success",
-				message: "Role deactivated successfully",
+				title: "Erfolg",
+				message: "Rolle erfolgreich deaktiviert",
 				color: "green",
 			});
 
 			fetchRoles();
 		} catch (err) {
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to delete role",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Rolle konnte nicht deaktiviert werden",
 				color: "red",
 			});
-		}
-	};
-
-	// Board handlers
-	const handleOpenBoardModal = (board?: BoardConfig) => {
-		if (board) {
-			setEditingBoard(board);
-			setBoardForm({
-				board_id: board.board_id,
-				board_name: (board as any).monday_board?.name || "Unbenanntes Board",
-				sync_enabled: board.sync_enabled || false,
-				sync_on_finalize: board.sync_on_finalize || false,
-				sync_budget_used: board.sync_budget_used || false,
-				linked_board_id: board.linked_board_id || "",
-				sync_linked_items: board.sync_linked_items || false,
-			});
-		} else {
-			setEditingBoard(null);
-			setBoardForm({
-				board_id: "",
-				board_name: "",
-				sync_enabled: true,
-				sync_on_finalize: true,
-				sync_budget_used: true,
-				linked_board_id: "",
-				sync_linked_items: true,
-			});
-		}
-		setBoardModalOpen(true);
-	};
-
-	const handleSaveBoard = async () => {
-		if (!boardForm.board_id.trim() || !boardForm.board_name.trim()) {
-			notifications.show({
-				title: "Validation Error",
-				message: "Board ID and name are required",
-				color: "red",
-			});
-			return;
-		}
-
-		setSavingBoard(true);
-		try {
-			const method = editingBoard ? "PATCH" : "POST";
-
-			const response = await fetch("/api/admin/boards", {
-				method,
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${sessionToken}`,
-				},
-				body: JSON.stringify(boardForm),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to save board configuration");
-			}
-
-			notifications.show({
-				title: "Success",
-				message: editingBoard ? "Board configuration updated" : "Board configuration created",
-				color: "green",
-			});
-
-			setBoardModalOpen(false);
-			fetchBoards();
-		} catch (err) {
-			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to save board configuration",
-				color: "red",
-			});
-		} finally {
-			setSavingBoard(false);
-		}
-	};
-
-	const handleDeleteBoard = async (board: BoardConfig) => {
-		const boardName = (board as any).monday_board?.name || board.board_id;
-		if (!confirm(`Are you sure you want to delete the configuration for "${boardName}"?`)) {
-			return;
-		}
-
-		try {
-			const response = await fetch(`/api/admin/boards?boardId=${board.board_id}`, {
-				method: "DELETE",
-				headers: {
-					Authorization: `Bearer ${sessionToken}`,
-				},
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to delete board configuration");
-			}
-
-			notifications.show({
-				title: "Success",
-				message: "Board configuration deleted",
-				color: "green",
-			});
-
-			fetchBoards();
-		} catch (err) {
-			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to delete board configuration",
-				color: "red",
-			});
-		}
-	};
-
-	const handleSyncBoard = async (boardId: string) => {
-		setSyncingBoards((prev) => ({ ...prev, [boardId]: true }));
-		try {
-			const headers: Record<string, string> = {
-				Authorization: `Bearer ${sessionToken}`,
-			};
-			if (rawContext) {
-				headers["monday-context"] = JSON.stringify(rawContext);
-			}
-
-			const response = await fetch(`/api/sync/board/${boardId}`, {
-				method: "POST",
-				headers,
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to trigger sync");
-			}
-
-			notifications.show({
-				title: "Sync Started",
-				message: `Sync triggered for ${data.itemsToSync || "all"} items. This may take a moment.`,
-				color: "blue",
-			});
-
-			// Refresh boards to get updated sync status
-			fetchBoards();
-		} catch (err) {
-			notifications.show({
-				title: "Sync Error",
-				message: err instanceof Error ? err.message : "Failed to trigger sync",
-				color: "red",
-			});
-		} finally {
-			setSyncingBoards((prev) => ({ ...prev, [boardId]: false }));
 		}
 	};
 
@@ -438,240 +542,173 @@ export default function AdminPage() {
 		<div id="admin-app">
 			<header className="admin-header">
 				<Flex align="center" gap={16}>
-					<Logo size={{ width: 180, height: 32 }} style="brand" />
+					<Logo size={{ height: 27 }} style="brand" />
 					<Text size="lg" fw={600} c="dimmed">
-						/ Admin Settings
+						/ Admin-Einstellungen
 					</Text>
 				</Flex>
 			</header>
 
 			{error && <div className="admin-error">{error}</div>}
 
-			<Tabs value={activeTab} onChange={setActiveTab} className="admin-tabs">
-				<Tabs.List>
-					<Tabs.Tab value="roles">Roles</Tabs.Tab>
-					<Tabs.Tab value="boards">Board Configurations</Tabs.Tab>
-				</Tabs.List>
+			{/* Boards verwalten */}
+			<div className="admin-section">
+				<div className="admin-section-header">
+					<div>
+						<h2>Boards verwalten</h2>
+						<p className="admin-section-description">Boards für die Zeiterfassung freigeben und ihre Reihenfolge in der Board-Auswahl festlegen.</p>
+					</div>
+					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={handleOpenPicker}>
+						Board hinzufügen/aktivieren
+					</Button>
+				</div>
 
-				{/* Roles Tab */}
-				<Tabs.Panel value="roles" pt="md">
-					<div className="admin-section">
-						<div className="admin-section-header">
-							<div>
-								<h2>Role Management</h2>
-								<p className="admin-section-description">Define roles and their default hourly rates for time tracking.</p>
-							</div>
-							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenRoleModal()}>
-								Add Role
-							</Button>
-						</div>
-
-						{loading ? (
-							<div className="admin-loading">
-								<Loader />
-							</div>
-						) : roles.length === 0 ? (
-							<div className="empty-state">
-								<div className="empty-state-title">No roles defined</div>
-								<p className="empty-state-description">Create your first role to start tracking time by role.</p>
-								<Button onClick={() => handleOpenRoleModal()}>Create Role</Button>
-							</div>
-						) : (
-							<div className="role-grid">
-								{sortedRoles.map((role) => (
-									<div key={role.id} className="role-card">
-										<div className="role-card-header">
-											<div className="role-card-title">
-												<div className="role-color-indicator" style={{ backgroundColor: role.color_hex || "#0073ea" }} />
-												<span className="role-card-name">{role.name}</span>
-											</div>
-											<span className={`role-card-status ${role.is_active ? "active" : "inactive"}`}>{role.is_active ? "Active" : "Inactive"}</span>
-										</div>
-										<div className="role-card-details">
-											<div className="role-detail-row">
-												<span className="role-detail-label">Description</span>
-												<span className="role-detail-value">{role.description}</span>
-											</div>
-											<div className="role-detail-row">
-												<span className="role-detail-label">Hourly Rate</span>
-												<span className="role-detail-value">{role.hourly_rate.toFixed(2)} €</span>
-											</div>
-										</div>
-										<div className="role-card-actions">
-											<Tooltip label="Edit role">
-												<IconButton variant="light" onClick={() => handleOpenRoleModal(role)}>
-													<Icon name="edit" size={21} />
-												</IconButton>
-											</Tooltip>
-											<Tooltip label={role.is_active ? "Deactivate role" : "Role is inactive"}>
-												<IconButton color={role.is_active ? "var(--color--success-950)" : "var(--color--secondary-900)"} onClick={() => handleDeleteRole(role)} disabled={!role.is_active}>
-													<Icon name={role.is_active ? "toggleOn" : "toggleOff"} size={21} filled={role.is_active} color={role.is_active ? "var(--color--success-500)" : "var(--color--text-primary)"} />
-												</IconButton>
-											</Tooltip>
-										</div>
-									</div>
+				{loading ? (
+					<div className="admin-loading">
+						<Loader />
+					</div>
+				) : displayBoards.length === 0 ? (
+					<div className="empty-state">
+						<div className="empty-state-title">Keine Boards aktiviert</div>
+						<p className="empty-state-description">Aktivieren Sie ein Board, damit es in der Zeiterfassung ausgewählt werden kann.</p>
+						<Button onClick={handleOpenPicker}>Board hinzufügen/aktivieren</Button>
+					</div>
+				) : (
+					<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+						<SortableContext items={displayBoards.map((b) => b.board_id)} strategy={verticalListSortingStrategy}>
+							<div className="board-sortable-list" aria-busy={savingBoards}>
+								{displayBoards.map((board) => (
+									<SortableBoardRow key={board.board_id} board={board} onRemove={handleRemoveBoard} />
 								))}
 							</div>
-						)}
+						</SortableContext>
+					</DndContext>
+				)}
+			</div>
+
+			{/* Rollen */}
+			<div className="admin-section">
+				<div className="admin-section-header">
+					<div>
+						<h2>Rollen</h2>
+						<p className="admin-section-description">Rollen und ihre Standard-Stundensätze für die Zeiterfassung definieren.</p>
 					</div>
-				</Tabs.Panel>
+					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenRoleModal()}>
+						Rolle hinzufügen
+					</Button>
+				</div>
 
-				{/* Boards Tab */}
-				<Tabs.Panel value="boards" pt="md">
-					<div className="admin-section">
-						<div className="admin-section-header">
-							<div>
-								<h2>Board Configurations</h2>
-								<p className="admin-section-description">Configure which boards sync time data to monday.com columns.</p>
-							</div>
-						</div>
-
-						{loading ? (
-							<div className="admin-loading">
-								<Loader />
-							</div>
-						) : boards.length === 0 ? (
-							<div className="empty-state">
-								<div className="empty-state-title">No boards configured</div>
-								<p className="empty-state-description">Add a board configuration to start syncing time data.</p>
-								<Button onClick={() => handleOpenBoardModal()}>Add Board Configuration</Button>
-							</div>
-						) : (
-							<div className="board-grid">
-								{sortedBoards.map((board) => (
-									<div key={board.board_id} className="board-card">
-										<div className="board-card-header">
-											<Flex align="center" gap="xs">
-												<div
-													className="status-indicator"
-													style={{
-														width: 10,
-														height: 10,
-														borderRadius: "50%",
-														backgroundColor: (board as any).sync_enabled ? "var(--color--success-500)" : "var(--color--error-500)",
-													}}
-												/>
-												<span className="board-card-name">{(board as any).monday_board?.name || board.board_id}</span>
-											</Flex>
-											<span className={`board-sync-badge ${board.sync_enabled ? "enabled" : "disabled"}`}>{board.sync_enabled ? "Sync Enabled" : "Sync Disabled"}</span>
-										</div>
-										<div className="board-card-details">
-											<div className="board-detail-row">
-												<span className="board-detail-label">Board ID</span>
-												<span className="board-detail-value">{board.board_id}</span>
-											</div>
-											<div className="board-detail-row">
-												<span className="board-detail-label">Last Synced</span>
-												{(board as any).last_sync ? <span className="board-detail-value">{new Date((board as any).last_sync).toLocaleString()}</span> : <span className="board-detail-value">/</span>}
-											</div>
-											{/* {(board as any).validation_errors?.length > 0 && (
-												<div className="board-detail-row" style={{ marginTop: 4 }}>
-													<Flex gap={4} wrap="wrap">
-														{(board as any).validation_errors.map((err: string) => (
-															<Badge key={err} color="red" size="xs" variant="light">
-																{err}
-															</Badge>
-														))}
-													</Flex>
-												</div>
-											)} */}
-											<div className="board-sync-options">
-												{board.sync_on_finalize && (
-													<Badge size="xs" variant="light">
-														Sync on Finalize
-													</Badge>
-												)}
-												{board.sync_budget_used && (
-													<Badge size="xs" variant="light">
-														Budget Used
-													</Badge>
-												)}
-											</div>
-										</div>
-										<div className="board-card-actions">
-											<Tooltip label="Synchronize board">
-												<IconButton variant="filled" color="var(--color--background-secondary)" onClick={() => handleSyncBoard(board.board_id)} loading={syncingBoards[board.board_id]}>
-													<Icon name="refresh" size={21} color={"var(--color--text-primary)"} />
-												</IconButton>
-											</Tooltip>
-											<Tooltip label="Edit board details">
-												<IconButton variant="filled" color="var(--color--background-secondary)" onClick={() => handleOpenBoardModal(board)}>
-													<Icon name="edit" size={21} color={"var(--color--text-primary)"} />
-												</IconButton>
-											</Tooltip>
-											<Tooltip label="Board settings">
-												<IconLink variant="filled" color="var(--color--background-secondary)" href={`/admin/boards/${board.board_id}`}>
-													<Icon name="settings" size={21} color={"var(--color--text-primary)"} />
-												</IconLink>
-											</Tooltip>
-											<Tooltip label="Delete board configuration">
-												<IconButton variant="filled" color="var(--color--primary)" onClick={() => handleDeleteBoard(board)}>
-													<Icon name="delete" size={21} color={"var(--color--text-on-primary)"} />
-												</IconButton>
-											</Tooltip>
-										</div>
+				{loading ? (
+					<div className="admin-loading">
+						<Loader />
+					</div>
+				) : roles.length === 0 ? (
+					<div className="empty-state">
+						<div className="empty-state-title">Keine Rollen definiert</div>
+						<p className="empty-state-description">Erstellen Sie Ihre erste Rolle, um Zeit nach Rolle zu erfassen.</p>
+						<Button onClick={() => handleOpenRoleModal()}>Rolle erstellen</Button>
+					</div>
+				) : (
+					<div className="role-grid">
+						{sortedRoles.map((role) => (
+							<div key={role.id} className="role-card">
+								<div className="role-card-header">
+									<div className="role-card-title">
+										<div className="role-color-indicator" style={{ backgroundColor: role.color_hex || "#0073ea" }} />
+										<span className="role-card-name">{role.name}</span>
 									</div>
-								))}
+									<span className={`role-card-status ${role.is_active ? "active" : "inactive"}`}>{role.is_active ? "Aktiv" : "Inaktiv"}</span>
+								</div>
+								<div className="role-card-details">
+									<div className="role-detail-row">
+										<span className="role-detail-label">Beschreibung</span>
+										<span className="role-detail-value">{role.description}</span>
+									</div>
+									<div className="role-detail-row">
+										<span className="role-detail-label">Stundensatz</span>
+										<span className="role-detail-value">{role.hourly_rate.toFixed(2)} €</span>
+									</div>
+								</div>
+								<div className="role-card-actions">
+									<Tooltip label="Rolle bearbeiten">
+										<IconButton colorVariant="primary-muted" onClick={() => handleOpenRoleModal(role)}>
+											<Icon name="edit" size={21} />
+										</IconButton>
+									</Tooltip>
+								</div>
 							</div>
-						)}
+						))}
 					</div>
-				</Tabs.Panel>
-			</Tabs>
+				)}
+			</div>
 
-			{/* Role Modal */}
-			<Modal opened={roleModalOpen} onClose={() => setRoleModalOpen(false)} title={editingRole ? "Edit Role" : "Create Role"} size="md">
+			{/* Board Picker Modal */}
+			<Modal opened={pickerOpen} onClose={() => setPickerOpen(false)} title="Boards hinzufügen/aktivieren" size="lg">
 				<Stack gap="md">
-					<TextInput label="Role Name" placeholder="e.g., Developer, Designer" value={roleForm.name} onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} required />
+					<Input placeholder="Board suchen…" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} leftSection={<Icon name="search" size={18} />} clearable onClear={() => setPickerSearch("")} />
 
-					<Textarea label="Description" placeholder="Brief description of this role" value={roleForm.description} onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })} />
+					{pickerLoading ? (
+						<div className="admin-loading">
+							<Loader size="sm" />
+						</div>
+					) : filteredPickerGroups.length === 0 ? (
+						<Text size="sm" c="dimmed">
+							Keine weiteren Boards gefunden.
+						</Text>
+					) : (
+						<ScrollArea h={360}>
+							<Accordion variant="separated" chevronPosition="right">
+								{filteredPickerGroups.map((group) => (
+									<Accordion.Item key={group.workspaceId} value={group.workspaceId}>
+										<Accordion.Control>{group.workspaceName}</Accordion.Control>
+										<Accordion.Panel>
+											<div className="board-picker-checkboxes">
+												{group.boards.map((board) => (
+													<Checkbox key={board.value} label={board.label} checked={pickerSelectedIds.has(board.value)} onChange={() => togglePickerSelection(board.value)} />
+												))}
+											</div>
+										</Accordion.Panel>
+									</Accordion.Item>
+								))}
+							</Accordion>
+						</ScrollArea>
+					)}
 
-					<NumberInput label="Default Hourly Rate (€)" placeholder="0.00" value={roleForm.hourly_rate} onChange={(val) => setRoleForm({ ...roleForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
-
-					<ColorInput label="Color" value={roleForm.color_hex} onChange={(val) => setRoleForm({ ...roleForm, color_hex: val })} format="hex" swatches={["#0073ea", "#00c875", "#fdab3d", "#e2445c", "#a25ddc", "#037f4c", "#579bfc", "#ff5ac4", "#cab641", "#784bd1"]} />
-
-					<Switch label="Active" checked={roleForm.is_active} onChange={(e) => setRoleForm({ ...roleForm, is_active: e.currentTarget.checked })} />
-
-					<Group justify="flex-end" mt="md">
-						<Button variant="default" onClick={() => setRoleModalOpen(false)}>
-							Cancel
-						</Button>
-						<Button onClick={handleSaveRole} loading={savingRole}>
-							{editingRole ? "Update Role" : "Create Role"}
-						</Button>
+					<Group justify="space-between" mt="md">
+						<Text size="sm" c="dimmed">
+							{pickerSelectedIds.size} ausgewählt
+						</Text>
+						<Group>
+							<Button variant="default" onClick={() => setPickerOpen(false)}>
+								Abbrechen
+							</Button>
+							<Button onClick={handleAddSelectedBoards} disabled={pickerSelectedIds.size === 0}>
+								Hinzufügen
+							</Button>
+						</Group>
 					</Group>
 				</Stack>
 			</Modal>
 
-			{/* Board Modal */}
-			<Modal opened={boardModalOpen} onClose={() => setBoardModalOpen(false)} title={editingBoard ? "Edit Board Configuration" : "Add Board Configuration"} size="lg">
+			{/* Role Modal */}
+			<Modal opened={roleModalOpen} onClose={() => setRoleModalOpen(false)} title={editingRole ? "Rolle bearbeiten" : "Rolle erstellen"} size="md">
 				<Stack gap="md">
-					<Group grow>
-						<TextInput label="Board ID" placeholder="e.g., 1234567890" value={boardForm.board_id} onChange={(e) => setBoardForm({ ...boardForm, board_id: e.target.value })} required disabled={!!editingBoard} />
+					<TextInput label="Rollenname" placeholder="z. B. Entwickler, Designer" value={roleForm.name} onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} required />
 
-						<TextInput label="Board Name" placeholder="e.g., Project Board" value={boardForm.board_name} onChange={(e) => setBoardForm({ ...boardForm, board_name: e.target.value })} required />
-					</Group>
+					<Textarea label="Beschreibung" placeholder="Kurze Beschreibung dieser Rolle" value={roleForm.description} onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })} />
 
-					<Box className="form-section">
-						<Text className="form-section-title">Sync Options</Text>
-						<Stack gap="sm">
-							<Switch label="Enable Sync" description="Master toggle for all sync operations" checked={boardForm.sync_enabled} onChange={(e) => setBoardForm({ ...boardForm, sync_enabled: e.currentTarget.checked })} />
+					<NumberInput label="Standard-Stundensatz (€)" placeholder="0,00" value={roleForm.hourly_rate} onChange={(val) => setRoleForm({ ...roleForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
 
-							<Switch label="Sync on Finalize" description="Automatically sync when time entries are finalized" checked={boardForm.sync_on_finalize} onChange={(e) => setBoardForm({ ...boardForm, sync_on_finalize: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
+					<ColorInput label="Farbe" value={roleForm.color_hex} onChange={(val) => setRoleForm({ ...roleForm, color_hex: val })} format="hex" swatches={["#0073ea", "#00c875", "#fdab3d", "#e2445c", "#a25ddc", "#037f4c", "#579bfc", "#ff5ac4", "#cab641", "#784bd1"]} />
 
-							<Switch label="Sync Budget Used" description="Sync total expenditure (Total Cost) to a separate column" checked={boardForm.sync_budget_used} onChange={(e) => setBoardForm({ ...boardForm, sync_budget_used: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
-
-							<Switch label="Sync Linked Items" description="Trigger sync for items on a linked board" checked={boardForm.sync_linked_items} onChange={(e) => setBoardForm({ ...boardForm, sync_linked_items: e.currentTarget.checked })} disabled={!boardForm.sync_enabled} />
-
-							{boardForm.sync_linked_items && <TextInput label="Linked Board ID" placeholder="e.g., 987654321" value={boardForm.linked_board_id} onChange={(e) => setBoardForm({ ...boardForm, linked_board_id: e.target.value })} description="The board where linked items (e.g. Budgets) are located" />}
-						</Stack>
-					</Box>
+					<Switch label="Aktiv" checked={roleForm.is_active} onChange={(e) => setRoleForm({ ...roleForm, is_active: e.currentTarget.checked })} />
 
 					<Group justify="flex-end" mt="md">
-						<Button variant="default" onClick={() => setBoardModalOpen(false)}>
-							Cancel
+						<Button variant="default" onClick={() => setRoleModalOpen(false)}>
+							Abbrechen
 						</Button>
-						<Button onClick={handleSaveBoard} loading={savingBoard}>
-							{editingBoard ? "Update Configuration" : "Add Configuration"}
+						<Button onClick={handleSaveRole} loading={savingRole}>
+							{editingRole ? "Rolle aktualisieren" : "Rolle erstellen"}
 						</Button>
 					</Group>
 				</Stack>

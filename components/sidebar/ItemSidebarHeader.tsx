@@ -2,9 +2,10 @@
 // Top bar of the monday item-sidebar widget: brand logo + "add time" button.
 "use client";
 
-import { Flex } from "@mantine/core";
+import { Flex, Tooltip } from "@mantine/core";
 import { Logo, Button, Icon } from "@/components";
 import { useUserStore } from "@/stores/userStore";
+import { APP_VERSION } from "@/lib/version";
 
 /**
  * Props for {@link ItemSidebarHeader}.
@@ -35,8 +36,10 @@ export function ItemSidebarHeader({ onManualEntryClick }: ItemSidebarHeaderProps
 	return (
 		<header>
 			<Flex justify="space-between" align="center" p="sm">
-				<Logo size={{ width: 120, height: 24 }} style={logoStyle} />
-				<Button leftSection={<Icon name="add" size={18} color="var(--color--icon-on-primary)" weight="bold" />} onClick={onManualEntryClick}>
+				<Tooltip label={`v${APP_VERSION}`} position="bottom">
+					<Logo size={{ height: 24 }} style={logoStyle} loading="eager" />
+				</Tooltip>
+				<Button leftSection={<Icon name="add" size={21} color="var(--color--icon-on-primary)" weight="bold" />} onClick={onManualEntryClick}>
 					Zeit eintragen
 				</Button>
 			</Flex>

@@ -12,9 +12,7 @@ import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields"
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { useRoles } from "../shared/hooks/useRoles";
 import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
-import mondaySdk from "monday-sdk-js";
-
-const monday = mondaySdk();
+import { getMondaySdk } from "@/lib/monday-browser-sdk";
 
 /**
  * Props for {@link ItemManualEntryModal}.
@@ -43,8 +41,7 @@ export interface ItemManualEntryModalProps {
 	boardName: string;
 	parentItemId?: string;
 	parentItemName?: string;
-	roleId: string;
-	roleName: string;
+	roleId?: string;
 }
 
 /**
@@ -71,7 +68,7 @@ export interface ItemManualEntryModalProps {
  * @param props - Component props.
  * @returns A {@link Modal} titled "Zeit eintragen" with the form fields and save/cancel buttons.
  */
-export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId, roleName }: ItemManualEntryModalProps) {
+export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName, boardName, parentItemId, parentItemName, roleId }: ItemManualEntryModalProps) {
 	const { values, anchor, durationLocked, handlers } = useTimeEntryForm({ initialAnchor: "end" });
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -82,7 +79,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 
 	// Synchronize selectedRoleId with prop if it changes
 	useEffect(() => {
-		if (roleId && (selectedRoleId === "00000000-0000-0000-0000-000000000000" || selectedRoleId === "")) {
+		if (roleId && selectedRoleId === "") {
 			setSelectedRoleId(roleId);
 		}
 	}, [roleId]);
@@ -114,7 +111,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 		setError(null);
 
 		try {
-			const context = rawContext || (await monday.get("context"));
+			const context = rawContext || (await getMondaySdk().get("context"));
 			const startTimeIso = combineDateAndTime(values.date, values.startTime);
 			const endTimeIso = combineDateAndTime(values.date, values.endTime);
 

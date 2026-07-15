@@ -185,7 +185,6 @@ export async function GET(request: NextRequest, { params }: Props) {
 			config: boardConfig
 				? {
 						syncEnabled: boardConfig.syncEnabled,
-						syncOnFinalize: boardConfig.syncOnFinalize,
 					}
 				: null,
 			statistics: {

@@ -27,7 +27,6 @@
 	#appHeader {
 		justify-content: flex-start;
 		flex-wrap: nowrap;
-		padding: 32px;
 
 		.header-left-section {
 			flex: unset;

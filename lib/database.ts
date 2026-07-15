@@ -71,13 +71,19 @@ export interface DimensionMetadata {
  * by the sync logic. The `insertTimeEntry` / `updateTimeEntry` callers enforce
  * this guard by checking `parent_item_id` before calling.
  *
- * @param id   - The monday board ID string.
- * @param name - Display name for the board.
+ * @param id          - The monday board ID string.
+ * @param name        - Display name for the board.
+ * @param workspaceId - Optional monday workspace ID; omitted keys are left untouched on conflict.
  */
-export async function upsertMondayBoard(id: string, name: string) {
+export async function upsertMondayBoard(id: string, name: string, workspaceId?: string | null) {
 	if (!id || !name) return;
 
-	const { error } = await supabaseAdmin.from("monday_board").upsert({ id, name, updated_at: new Date().toISOString() }, { onConflict: "id" });
+	const payload: { id: string; name: string; updated_at: string; workspace_id?: string | null } = { id, name, updated_at: new Date().toISOString() };
+	if (workspaceId !== undefined) {
+		payload.workspace_id = workspaceId;
+	}
+
+	const { error } = await supabaseAdmin.from("monday_board").upsert(payload, { onConflict: "id" });
 
 	if (error) {
 		console.error(`Error upserting monday_board ${id}:`, error);
@@ -105,7 +111,7 @@ export async function upsertMondayBoard(id: string, name: string) {
 export async function getTasksFromDB(boardId: string) {
 	console.log(`[getTasksFromDB] Fetching tasks for board ${boardId}`);
 	// Step 1: Get all synced groups for this board, ordered by their board position
-	const { data: allGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position, sync_enabled").eq("board_id", boardId).order("position", { ascending: true });
+	const { data: allGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position, color, sync_enabled").eq("board_id", boardId).order("position", { ascending: true });
 
 	if (groupsError) {
 		console.error(`Error fetching groups for board ${boardId}:`, groupsError);
@@ -125,7 +131,7 @@ export async function getTasksFromDB(boardId: string) {
 	}
 
 	const syncedGroupIds = syncedGroups.map((g) => g.id);
-	const groupInfoMap = new Map(syncedGroups.map((g) => [g.id, { title: g.title, position: g.position }]));
+	const groupInfoMap = new Map(syncedGroups.map((g) => [g.id, { title: g.title, position: g.position, color: g.color }]));
 
 	// Step 2: Get all active items (parents and subitems) from synced groups using the view
 	// First, let's see how many items are in the board total vs synced
@@ -172,6 +178,7 @@ export async function getTasksFromDB(boardId: string) {
 		group: {
 			id: item.group_id,
 			title: groupInfoMap.get(item.group_id)?.title || "Unknown Group",
+			color: groupInfoMap.get(item.group_id)?.color || null,
 			position: groupInfoMap.get(item.group_id)?.position || null,
 		},
 		parent_item: item.parent_item_id
@@ -499,46 +506,58 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
 }
 
 /**
- * Fetch a page of time entries for a single user in display-ready shape.
+ * Fetch **all** of a single user's time entries in display-ready shape, for
+ * client-side search/filter/pagination (see `stores/timeEntriesStore.ts` and
+ * `components/dashboard/hooks/useFilteredTimeEntries.ts`).
  *
  * Delegates to the `get_user_time_entries` Postgres RPC, which JOINs dimension
  * tables and returns the flattened {@link FrontendTimeEntry} shape (with
- * `board_name`, `item_name`, `role_name`, etc.) — not raw DB rows. Results are
- * **not** cached here (per-user + per-page keys aren't worth caching).
+ * `board_name`, `item_name`, `role_name`, etc.) — not raw DB rows. The RPC caps
+ * a single call at 1 000 rows (the PostgREST/RPC limit), so this function loops
+ * over `p_offset` — using the `total_count` column from the first batch to know
+ * when to stop — and concatenates every batch. Results are **not** cached here
+ * (per-user keys aren't worth caching; the whole set is invalidated on every
+ * write anyway).
  *
  * The RPC excludes the live running timer server-side (`timer_state <>
  * 'running'`) but still includes other non-finalized entries (paused/parked
  * drafts) — the entries table uses `timer_state` to render draft-row styling.
- * Each row also carries a `total_count` column (the filtered total, identical
- * on every row via `COUNT(*) OVER()`); it's ignored by the {@link TimeEntry}
- * type and surfaced separately as `total` on the return value.
+ * Each row also carries a `total_count` column (identical on every row via
+ * `COUNT(*) OVER()`); it's only used internally to drive the loop and is
+ * otherwise ignored by the {@link TimeEntry} type.
  *
- * @param userId       - Internal `user_profiles.id` UUID; passed as `p_user_id` to the RPC.
- * @param opts.page     - 1-based page number. Defaults to `1`.
- * @param opts.pageSize - Rows per page, passed as `p_limit`. Defaults to `50`.
- * @returns `{ entries, total }` — the requested page and the total row count across all pages (`0` when there are no rows).
+ * @param userId - Internal `user_profiles.id` UUID; passed as `p_user_id` to the RPC.
+ * @returns All of the user's entries (newest first, per the RPC's `ORDER BY start_time DESC`).
  */
-export async function getUserTimeEntries(userId: string, opts?: { page?: number; pageSize?: number }): Promise<{ entries: TimeEntryWithRole[]; total: number }> {
-	const page = opts?.page ?? 1;
-	const pageSize = opts?.pageSize ?? 50;
-	const offset = (page - 1) * pageSize;
+export async function getAllUserTimeEntries(userId: string): Promise<{ entries: TimeEntryWithRole[] }> {
+	const BATCH_SIZE = 1000; // PostgREST/RPC row cap per call
+	const rows: any[] = [];
+	let offset = 0;
+	let total = Infinity;
 
-	// Fetch from database using RPC to get joined names
-	const { data, error } = await supabaseAdmin.rpc("get_user_time_entries", {
-		p_user_id: userId,
-		p_limit: pageSize,
-		p_offset: offset,
-	} as any);
+	while (rows.length < total) {
+		const { data, error } = await supabaseAdmin.rpc("get_user_time_entries", {
+			p_user_id: userId,
+			p_limit: BATCH_SIZE,
+			p_offset: offset,
+		} as any);
 
-	if (error) {
-		console.error("Error fetching user time entries:", error);
-		throw error;
+		if (error) {
+			console.error("Error fetching user time entries:", error);
+			throw error;
+		}
+
+		const batch = (data ?? []) as any[];
+		if (batch.length === 0) break;
+
+		rows.push(...batch);
+		total = batch[0]?.total_count ?? rows.length;
+		offset += batch.length;
+
+		if (batch.length < BATCH_SIZE) break; // last batch was short — no more rows
 	}
 
-	const rows = (data ?? []) as any[];
-	const total = rows[0]?.total_count ?? 0;
-
-	return { entries: rows as TimeEntryWithRole[], total };
+	return { entries: rows as TimeEntryWithRole[] };
 }
 
 // =====================================

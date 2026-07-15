@@ -1,9 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useMondayStore } from "./mondayStore";
-import mondaySdk from "monday-sdk-js";
-
-const monday = mondaySdk();
+import { getMondaySdk } from "@/lib/monday-browser-sdk";
 
 /** Raw theme value as reported by the monday context. */
 export type MondayTheme = "black" | "light" | "dark";
@@ -92,7 +90,7 @@ export const useUserStore = create<UserState>()(
 			 * lighter alternative to the full `mondayStore` boot flow.
 			 */
 			setMondayUser: async () => {
-				const context = await monday.get("context");
+				const context = await getMondaySdk().get("context");
 
 				// Extract theme from context
 				const mondayTheme = (context?.data?.theme as MondayTheme) || "black";
@@ -144,7 +142,7 @@ export const useUserStore = create<UserState>()(
 					if (!sessionToken) return;
 
 					// Get fresh context for authentication header
-					const context = await monday.get("context");
+					const context = await getMondaySdk().get("context");
 
 					await fetch("/api/user/theme", {
 						method: "POST",

@@ -1,21 +1,42 @@
 .input {
 	/* Base input styling */
+	--input-bg: var(--color--input-background);
+	--input-bd: var(--color--input-border);
+	color: var(--color--input-text);
+
+	&:disabled,
+	&[data-disabled="true"] {
+		--input-disabled-bg: var(--color--input-background-disabled);
+		--input-disabled-bd: var(--color--input-border-disabled);
+		color: var(--color--input-text-disabled);
+	}
 }
 
 .input--error {
-	border-color: var(--color--error-500);
+	--input-bd: var(--color--error-500);
 }
 
 .input--warning {
-	border-color: var(--color--secondary-500);
+	--input-bd: var(--color--secondary-500);
 }
 
 .input--success {
-	border-color: var(--color--success-500);
+	--input-bd: var(--color--success-500);
 }
 
 .textarea {
 	/* Base textarea styling */
+	/* Base input styling */
+	--input-bg: var(--color--input-background);
+	--input-bd: var(--color--input-border);
+	color: var(--color--input-text);
+
+	&:disabled,
+	&[data-disabled="true"] {
+		--input-disabled-bg: var(--color--input-background-disabled);
+		--input-disabled-bd: var(--color--input-border-disabled);
+		color: var(--color--input-text-disabled);
+	}
 }
 
 .textarea--error {

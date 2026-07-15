@@ -23,9 +23,8 @@
  * - {@link syncItemColumns}   — sync all configured columns for an item directly.
  */
 
-import { ApiClient, ClientError } from "@mondaydotcomorg/api";
+import { ClientError } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { findLinkedItems } from "./monday";
 import type { SyncPurpose, TimeFormat, SyncColumnType, GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
 
 // Types
@@ -100,26 +99,18 @@ export interface RoleTimeBreakdown {
  * `monday_board` for the display name). This shape is used throughout this module
  * rather than the raw DB `BoardConfig` alias from `@/types/database`.
  *
- * @property boardId          - monday board ID (string representation of the numeric ID).
- * @property boardName        - Display name from `monday_board.name`; falls back to `"Unbenanntes Board"`.
- * @property syncEnabled      - Master switch; when `false`, all sync calls are no-ops.
- * @property syncOnFinalize   - Whether {@link syncAfterFinalize} should actually sync (checked by {@link shouldSyncOnFinalize}).
- * @property syncBudgetUsed   - Whether `budget_used` column mappings are active.
- * @property linkedBoardId    - ID of a second board whose items roll up into this board's totals; `null` if no roll-up.
- * @property syncLinkedItems  - Legacy flag; linked-item sync is now effectively always on when `linkedBoardId` is set (MON-228).
- * @property budgetColumnId   - ID of the monday column from which the budget amount is read.
- * @property budgetColumnType - Column type of the budget source column (see {@link BudgetColumnType}); stored as raw `string` here.
+ * Budget source and linked-board roll-up now live on monday's own mirror
+ * columns, so `sync_enabled` is the only sync gate left — `budget_used` is the
+ * one remaining computed write-back (see `syncColumn`'s `budget_used` case).
+ *
+ * @property boardId     - monday board ID (string representation of the numeric ID).
+ * @property boardName   - Display name from `monday_board.name`; falls back to `"Unbenanntes Board"`.
+ * @property syncEnabled - Master switch; when `false`, all sync calls are no-ops.
  */
 export interface BoardConfig {
 	boardId: string;
 	boardName: string;
 	syncEnabled: boolean;
-	syncOnFinalize: boolean;
-	syncBudgetUsed: boolean;
-	linkedBoardId: string | null;
-	syncLinkedItems: boolean;
-	budgetColumnId: string | null;
-	budgetColumnType: string | null;
 }
 
 /**
@@ -154,7 +145,7 @@ const token = process.env.MONDAY_API_TOKEN;
 if (!token) {
 	console.warn("MONDAY_API_TOKEN is not set - column sync will be disabled");
 }
-const client = token ? new ApiClient({ token, apiVersion: "2025-10" }) : null;
+const client = token ? createMondayClient() : null;
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -335,13 +326,7 @@ export async function getBoardConfig(boardId: string): Promise<BoardConfig | nul
 	return {
 		boardId: data.board_id,
 		boardName: (data as any).monday_board?.name || "Unbenanntes Board",
-		syncEnabled: data.sync_enabled,
-		syncOnFinalize: data.sync_on_finalize,
-		syncBudgetUsed: data.sync_budget_used,
-		linkedBoardId: data.linked_board_id,
-		syncLinkedItems: data.sync_linked_items,
-		budgetColumnId: data.budget_column_id,
-		budgetColumnType: data.budget_column_type,
+		syncEnabled: !!(data as any).sync_enabled,
 	};
 }
 
@@ -375,28 +360,18 @@ export async function getColumnMappings(boardId: string): Promise<ColumnMapping[
 }
 
 /**
- * Return the total tracked time for a monday item (and optionally its linked items).
+ * Return the total tracked time for a monday item.
  *
- * Calls the `get_item_total_time` Postgres RPC. When {@link BoardConfig.syncLinkedItems}
- * is set and a `linkedBoardId` is configured, linked item IDs are resolved via
- * {@link findLinkedItems} and included in the RPC call for a roll-up total.
+ * Calls the `get_item_total_time` Postgres RPC.
  *
  * @param itemId  - The monday item ID.
- * @param boardId - The monday board containing the item.
+ * @param boardId - The monday board containing the item (unused; kept for call-site symmetry with the other `getItem*` helpers).
  * @param userId  - Optional: filter to a specific user's entries only.
  * @returns Total tracked time in **seconds**, or `0` on error.
  */
 export async function getItemTotalTime(itemId: string, boardId: string, userId?: string): Promise<number> {
-	// Find linked items to include in the total (roll-up)
-	let itemIds = [itemId];
-	const boardConfig = await getBoardConfig(boardId);
-	if (boardConfig?.syncLinkedItems && boardConfig.linkedBoardId) {
-		const linkedIds = await findLinkedItems(boardId, itemId, boardConfig.linkedBoardId);
-		itemIds = [...itemIds, ...linkedIds];
-	}
-
 	const { data, error } = await supabaseAdmin.rpc("get_item_total_time", {
-		p_item_ids: itemIds,
+		p_item_ids: [itemId],
 		p_user_id: userId || null,
 	} as any);
 
@@ -409,28 +384,19 @@ export async function getItemTotalTime(itemId: string, boardId: string, userId?:
 }
 
 /**
- * Return per-role time breakdown for a monday item (and optionally its linked items).
+ * Return per-role time breakdown for a monday item.
  *
  * Calls the `get_item_time_by_role` Postgres RPC, then enriches each row with the
- * role's `color_hex` from the `role` table. Linked-item roll-up follows the same
- * logic as {@link getItemTotalTime}.
+ * role's `color_hex` from the `role` table.
  *
  * @param itemId  - The monday item ID.
- * @param boardId - The monday board containing the item.
+ * @param boardId - The monday board containing the item (unused; kept for call-site symmetry with the other `getItem*` helpers).
  * @param userId  - Optional: filter to a specific user's entries only.
  * @returns Array of {@link RoleTimeBreakdown} (one per role with tracked time); empty on error.
  */
 export async function getItemTimeByRole(itemId: string, boardId: string, userId?: string): Promise<RoleTimeBreakdown[]> {
-	// Find linked items to include in the breakdown (roll-up)
-	let itemIds = [itemId];
-	const boardConfig = await getBoardConfig(boardId);
-	if (boardConfig?.syncLinkedItems && boardConfig.linkedBoardId) {
-		const linkedIds = await findLinkedItems(boardId, itemId, boardConfig.linkedBoardId);
-		itemIds = [...itemIds, ...linkedIds];
-	}
-
 	const { data, error } = (await supabaseAdmin.rpc("get_item_time_by_role", {
-		p_item_ids: itemIds,
+		p_item_ids: [itemId],
 		p_user_id: userId || null,
 	} as any)) as { data: GetItemTimeByRoleResult[] | null; error: any };
 
@@ -554,8 +520,7 @@ export async function getBudgetFromColumn(boardId: string, itemId: string, colum
  * Compute the remaining budget for a monday item via the `calculate_remaining_budget` RPC.
  *
  * The RPC computes `total_cost` (tracked time × effective hourly rate) and subtracts
- * it from `budgetAmount` to yield `remaining_budget`. Linked-item roll-up is applied
- * in the same way as {@link getItemTotalTime}.
+ * it from `budgetAmount` to yield `remaining_budget`.
  *
  * The `budgetAmount` is typically obtained from {@link getBudgetFromColumn}; pass `0`
  * when no budget column is configured (the RPC will still return cost figures).
@@ -567,17 +532,9 @@ export async function getBudgetFromColumn(boardId: string, itemId: string, colum
  * @returns {@link CalculateRemainingBudgetResult} with cost and remaining figures, or `null` on error.
  */
 export async function calculateRemainingBudget(boardId: string, itemId: string, budgetAmount: number, userId?: string): Promise<CalculateRemainingBudgetResult | null> {
-	// Find linked items to include in the calculation (roll-up)
-	let itemIds = [itemId];
-	const boardConfig = await getBoardConfig(boardId);
-	if (boardConfig?.syncLinkedItems && boardConfig.linkedBoardId) {
-		const linkedIds = await findLinkedItems(boardId, itemId, boardConfig.linkedBoardId);
-		itemIds = [...itemIds, ...linkedIds];
-	}
-
 	const { data, error } = (await supabaseAdmin.rpc("calculate_remaining_budget", {
 		p_board_id: boardId,
-		p_item_ids: itemIds,
+		p_item_ids: [itemId],
 		p_budget_amount: budgetAmount,
 		p_user_id: userId || null,
 	} as any)) as { data: CalculateRemainingBudgetResult[] | null; error: any };
@@ -780,15 +737,9 @@ async function syncColumn(boardId: string, itemId: string, columnMapping: Column
 			}
 
 			case "remaining_budget": {
-				// Get budget from the configured budget column
-				let budgetAmount = 0;
-				if (boardConfig.budgetColumnId) {
-					const budget = await getBudgetFromColumn(boardId, itemId, boardConfig.budgetColumnId);
-					budgetAmount = budget || 0;
-					console.log(`[ColumnSync] Fetched budget amount from column ${boardConfig.budgetColumnId}: ${budgetAmount}`);
-				}
-
-				const budgetResult = await calculateRemainingBudget(boardId, itemId, budgetAmount);
+				// Legacy purpose; the budget source column is no longer configured on
+				// board_config (monday mirror columns handle budget amounts now).
+				const budgetResult = await calculateRemainingBudget(boardId, itemId, 0);
 				if (budgetResult) {
 					value = budgetResult.remaining_budget.toFixed(2);
 					console.log(`[ColumnSync] Calculated remaining_budget: ${value} (Total Cost: ${budgetResult.total_cost})`);
@@ -800,15 +751,9 @@ async function syncColumn(boardId: string, itemId: string, columnMapping: Column
 			}
 
 			case "budget_used": {
-				// Get budget from the configured budget column (needed for RPC)
-				let budgetAmount = 0;
-				if (boardConfig.budgetColumnId) {
-					const budget = await getBudgetFromColumn(boardId, itemId, boardConfig.budgetColumnId);
-					budgetAmount = budget || 0;
-					console.log(`[ColumnSync] Fetched budget amount for budget_used calculation: ${budgetAmount}`);
-				}
-
-				const budgetResult = await calculateRemainingBudget(boardId, itemId, budgetAmount);
+				// budgetAmount only affects remaining_budget; total_cost (what we write here)
+				// doesn't depend on it, so 0 is safe now that no budget column is configured.
+				const budgetResult = await calculateRemainingBudget(boardId, itemId, 0);
 				if (budgetResult) {
 					value = budgetResult.total_cost.toFixed(2);
 					console.log(`[ColumnSync] Calculated budget_used (Total Cost): ${value}`);
@@ -865,10 +810,6 @@ async function syncColumn(boardId: string, itemId: string, columnMapping: Column
  * table, the call is transparently re-dispatched to the parent. This ensures
  * sub-item time always accumulates to the parent's columns.
  *
- * **Linked-board roll-up (MON-228):** after syncing the primary item, linked items
- * on `boardConfig.linkedBoardId` are found via {@link findLinkedItems} and synced
- * recursively (with `isRecursiveCall = true` to prevent further recursion).
- *
  * **Guard conditions** that return an empty success result without syncing:
  * - No `board_config` row for `boardId`.
  * - `boardConfig.syncEnabled` is `false`.
@@ -878,7 +819,7 @@ async function syncColumn(boardId: string, itemId: string, columnMapping: Column
  * @param boardId         - The monday board the item belongs to.
  * @param triggeredBy     - Actor string forwarded to `sync_log` (e.g. user ID or `"cron"`).
  * @param timeEntryId     - `time_entry.id` that caused this sync, forwarded to `sync_log`.
- * @param isRecursiveCall - Set to `true` internally to prevent infinite linked-board recursion.
+ * @param isRecursiveCall - Unused; retained for call-site compatibility with historical linked-board recursion (now removed — mirror columns handle roll-ups).
  * @returns {@link ItemSyncResult} with per-column outcomes and overall success flag.
  */
 export async function syncItemColumns(itemId: string, boardId: string, triggeredBy?: string, timeEntryId?: string, isRecursiveCall = false): Promise<ItemSyncResult> {
@@ -931,67 +872,22 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
 
 	console.log(`[ColumnSync] Found ${columnMappings.length} column mappings for board ${boardId}`);
 
-	// Filter mappings based on board config settings
-	const enabledMappings = columnMappings.filter((mapping) => {
-		let isEnabled = false;
-		switch (mapping.syncPurpose) {
-			case "budget_used":
-				isEnabled = boardConfig.syncBudgetUsed;
-				break;
-			default:
-				// Other purposes are now considered legacy or always enabled if mapped
-				isEnabled = true;
-		}
-		if (!isEnabled) {
-			console.log(`[ColumnSync] Sync purpose ${mapping.syncPurpose} is disabled in board config for board ${boardId}`);
-		}
-		return isEnabled;
-	});
-
-	console.log(`[ColumnSync] ${enabledMappings.length} mappings are enabled for sync on board ${boardId}`);
-
-	// Sync each column
-	for (const mapping of enabledMappings) {
+	// Sync each configured column — sync_enabled (checked above) is the only board-level gate left.
+	for (const mapping of columnMappings) {
 		const result = await syncColumn(boardId, itemId, mapping, boardConfig, triggeredBy, timeEntryId);
 		results.push(result);
 	}
 
-	const result: ItemSyncResult = {
+	return {
 		itemId,
 		boardId,
 		results,
 		overallSuccess: results.every((r) => r.success),
 	};
-
-	// Recursive sync for linked items (if enabled and not already in a recursive call)
-	// MON-228: syncLinkedItems is now effectively mandatory if linkedBoardId is set
-	const shouldSyncLinked = !isRecursiveCall && boardConfig.linkedBoardId && (boardConfig.syncLinkedItems || true);
-
-	console.log(`[ColumnSync] Checking for recursive sync: isRecursiveCall=${isRecursiveCall}, syncLinkedItems=${boardConfig.syncLinkedItems}, linkedBoardId=${boardConfig.linkedBoardId}`);
-	if (shouldSyncLinked && boardConfig.linkedBoardId) {
-		try {
-			console.log(`[ColumnSync] Searching for linked items on board ${boardConfig.linkedBoardId} for item ${itemId}`);
-			const linkedItemIds = await findLinkedItems(boardId, itemId, boardConfig.linkedBoardId);
-			if (linkedItemIds.length > 0) {
-				console.log(`[ColumnSync] Found ${linkedItemIds.length} linked items on board ${boardConfig.linkedBoardId} for item ${itemId}: ${linkedItemIds.join(", ")}`);
-				for (const linkedId of linkedItemIds) {
-					console.log(`[ColumnSync] Triggering recursive sync for linked item ${linkedId} on board ${boardConfig.linkedBoardId}`);
-					// Trigger sync for linked item, ensuring isRecursiveCall = true to prevent further recursion
-					await syncItemColumns(linkedId, boardConfig.linkedBoardId, triggeredBy, timeEntryId, true);
-				}
-			} else {
-				console.log(`[ColumnSync] No linked items found on board ${boardConfig.linkedBoardId} for item ${itemId}`);
-			}
-		} catch (error) {
-			console.error(`[ColumnSync] Error in recursive sync for item ${itemId}:`, error);
-		}
-	}
-
-	return result;
 }
 
 /**
- * Return `true` if the board's config has both `sync_enabled` and `sync_on_finalize` set.
+ * Return `true` if the board's config has `sync_enabled` set.
  *
  * Used as a fast gate in {@link syncAfterFinalize} before doing any heavier work.
  * Returns `false` when no config exists for `boardId`.
@@ -1001,7 +897,7 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
  */
 export async function shouldSyncOnFinalize(boardId: string): Promise<boolean> {
 	const boardConfig = await getBoardConfig(boardId);
-	return (boardConfig?.syncEnabled && boardConfig?.syncOnFinalize) || false;
+	return boardConfig?.syncEnabled || false;
 }
 
 /**
@@ -1084,6 +980,7 @@ interface SyncQueueItem {
 
 // Import cacheHelper for Redis operations
 import { cacheHelper } from "@/lib/redis";
+import { createMondayClient } from "./monday/client";
 
 const SYNC_QUEUE_PREFIX = "sync_queue:";
 const SYNC_QUEUE_TTL = 15; // seconds

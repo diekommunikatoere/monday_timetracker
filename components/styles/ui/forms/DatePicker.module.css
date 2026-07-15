@@ -1,5 +1,15 @@
 .date-picker {
 	/* Base date picker styling */
+	--input-bg: var(--color--input-background);
+	--input-bd: var(--color--input-border);
+	color: var(--color--input-text);
+
+	&:disabled,
+	&[data-disabled="true"] {
+		--input-disabled-bg: var(--color--input-background-disabled);
+		--input-disabled-bd: var(--color--input-border-disabled);
+		color: var(--color--input-text-disabled);
+	}
 }
 
 .date-picker--error {

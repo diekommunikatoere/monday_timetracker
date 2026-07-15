@@ -6,15 +6,17 @@ import { TimeEntryRowMenu } from "../TimeEntryRowMenu";
 /**
  * Props for {@link TaskCell}.
  *
- * @property entry    - The {@link TimeEntry} to render; reads `item_name`, `task_name`, `parent_item_name`, and `timer_state`.
- * @property onEdit   - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the edit action.
- * @property onDelete - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the delete action.
- * @property style    - Optional inline style for the wrapping `Flex`.
+ * @property entry       - The {@link TimeEntry} to render; reads `item_name`, `task_name`, `parent_item_name`, and `timer_state`.
+ * @property onEdit      - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the edit action.
+ * @property onDelete    - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the delete action.
+ * @property onSaveDraft - Optional; forwarded to the embedded {@link TimeEntryRowMenu} as the save-draft (finalize) action.
+ * @property style       - Optional inline style for the wrapping `Flex`.
  */
 interface TaskCellProps {
 	entry: TimeEntry;
 	onEdit?: (entry: TimeEntry) => void;
 	onDelete?: (entry: TimeEntry) => void;
+	onSaveDraft?: (entry: TimeEntry) => void;
 	style?: React.CSSProperties;
 }
 
@@ -30,7 +32,7 @@ interface TaskCellProps {
  * @param props - {@link TaskCellProps}.
  * @returns A `Flex` row with task text and a row-actions menu.
  */
-export function TaskCell({ entry, onEdit, onDelete, style }: TaskCellProps) {
+export function TaskCell({ entry, onEdit, onDelete, onSaveDraft, style }: TaskCellProps) {
 	return (
 		<Flex align="center" justify="space-between" gap="xs" style={style}>
 			<Flex justify={"start"} align={"center"} columnGap="xs" rowGap="2px" wrap="wrap">
@@ -46,7 +48,7 @@ export function TaskCell({ entry, onEdit, onDelete, style }: TaskCellProps) {
 					{entry.parent_item_name || ""}
 				</Text>
 			</Flex>
-			<TimeEntryRowMenu entry={entry} onEdit={onEdit} onDelete={onDelete} />
+			<TimeEntryRowMenu entry={entry} onEdit={onEdit} onDelete={onDelete} onSaveDraft={onSaveDraft} />
 		</Flex>
 	);
 }

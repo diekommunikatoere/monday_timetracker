@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import mondaySdk from "monday-sdk-js";
+import { getMondaySdk } from "@/lib/monday-browser-sdk";
 import { useUserStore, MondayTheme, mapMondayThemeToAppTheme } from "./userStore";
-
-const monday = mondaySdk();
 
 /**
  * The monday SDK bridge and the app's boot store. Holds the raw monday context
@@ -24,9 +22,10 @@ interface MondayState {
 	mondayTheme: MondayTheme | null;
 
 	/**
-	 * Boot the app: fetch context + the `me` query + session token in parallel,
-	 * populate `userStore`, authenticate against `/api/auth/monday-user`, and wire
-	 * up the context listener. Idempotent once initialized (unless a prior error).
+	 * Boot the app: fetch context + session token in parallel, populate `userStore`,
+	 * authenticate against `/api/auth/monday-user` (which also resolves the monday
+	 * user's name/email/photos server-side), and wire up the context listener.
+	 * Idempotent once initialized (unless a prior error).
 	 */
 	initializeMondayContext: () => Promise<void>;
 	setRawContext: (context: any) => void;
@@ -55,8 +54,9 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 		try {
 			set({ isLoading: true, error: null });
 
-			// OPTIMIZATION: Fetch context, user data, and session token in PARALLEL
-			const [contextResult, userResult, sessionTokenResult] = await Promise.all([monday.get("context"), monday.api(`query { me { id name email photo_original photo_small photo_thumb photo_thumb_small photo_tiny } }`), monday.get("sessionToken")]);
+			// OPTIMIZATION: Fetch context and session token in PARALLEL
+			const monday = getMondaySdk();
+			const [contextResult, sessionTokenResult] = await Promise.all([monday.get("context"), monday.get("sessionToken")]);
 
 			if (!contextResult?.data?.user) {
 				throw new Error("No user found in Monday.com context");
@@ -74,21 +74,15 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 
 			set({ rawContext: contextResult, sessionToken, isInitialized: true });
 
-			// Update user store with Monday user info
+			// Update user store with Monday user info. `email`/`name`/`photoUrls` are
+			// filled in below once `/api/auth/monday-user` resolves them server-side
+			// (avoids the deprecated client-side `monday.api()` GraphQL call).
 			const mondayUser = {
 				id: contextResult.data.user.id,
 				accountId: contextResult.data.account.id,
-				email: userResult?.data?.me?.email || null,
-				name: userResult?.data?.me?.name || null,
-				photoUrls: userResult?.data?.me
-					? {
-							original: userResult.data.me.photo_original,
-							small: userResult.data.me.photo_small,
-							thumb: userResult.data.me.photo_thumb,
-							thumb_small: userResult.data.me.photo_thumb_small,
-							tiny: userResult.data.me.photo_tiny,
-						}
-					: null,
+				email: null as string | null,
+				name: null as string | null,
+				photoUrls: null as any,
 				isAdmin: contextResult.data.user.isAdmin || false,
 				isGuest: contextResult.data.user.isGuest || false,
 				isViewOnly: contextResult.data.user.isViewOnly || false,
@@ -100,8 +94,9 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 
 			useUserStore.setState({ mondayUser });
 
-			// Authenticate user through API route (creates/finds Supabase user)
-			// Note: This still needs to be sequential as it depends on the mondayUser data
+			// Authenticate user through API route (creates/finds Supabase user).
+			// This also resolves the user's name/email/photos server-side via
+			// `getUserDetails` in `lib/monday.ts`.
 			const authStartTime = Date.now();
 			const response = await fetch("/api/auth/monday-user", {
 				method: "POST",
@@ -109,20 +104,22 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${sessionToken}`,
 				},
-				body: JSON.stringify({
-					email: mondayUser.email,
-					name: mondayUser.name,
-				}),
 			});
 
 			if (!response.ok) {
 				throw new Error("Failed to authenticate user");
 			}
 
-			const { userProfile } = await response.json();
+			const { userProfile, mondayUser: mondayUserDetails } = await response.json();
 
-			// Update user store with Supabase user
+			// Update user store with Supabase user + the server-resolved monday user details
 			useUserStore.setState({
+				mondayUser: {
+					...mondayUser,
+					email: mondayUserDetails?.email ?? null,
+					name: mondayUserDetails?.name ?? null,
+					photoUrls: mondayUserDetails?.photo_urls ?? null,
+				},
 				supabaseUser: userProfile,
 				authenticated: true,
 			});
@@ -162,7 +159,7 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 		}
 		set({ isListenerSetup: true });
 
-		monday.listen("context", (res: any) => {
+		getMondaySdk().listen("context", (res: any) => {
 			const contextData = res?.data;
 			if (!contextData) {
 				return;

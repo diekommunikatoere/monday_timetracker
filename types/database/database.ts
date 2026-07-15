@@ -17,41 +17,32 @@ export type Database = {
       board_config: {
         Row: {
           board_id: string
-          budget_column_id: string | null
-          budget_column_type: string | null
           created_at: string
+          display_enabled: boolean
           id: string
-          linked_board_id: string | null
-          sync_budget_used: boolean | null
+          settings: Json
+          sort_order: number
           sync_enabled: boolean | null
-          sync_linked_items: boolean | null
-          sync_on_finalize: boolean | null
           updated_at: string
         }
         Insert: {
           board_id: string
-          budget_column_id?: string | null
-          budget_column_type?: string | null
           created_at?: string
+          display_enabled?: boolean
           id?: string
-          linked_board_id?: string | null
-          sync_budget_used?: boolean | null
+          settings?: Json
+          sort_order?: number
           sync_enabled?: boolean | null
-          sync_linked_items?: boolean | null
-          sync_on_finalize?: boolean | null
           updated_at?: string
         }
         Update: {
           board_id?: string
-          budget_column_id?: string | null
-          budget_column_type?: string | null
           created_at?: string
+          display_enabled?: boolean
           id?: string
-          linked_board_id?: string | null
-          sync_budget_used?: boolean | null
+          settings?: Json
+          sort_order?: number
           sync_enabled?: boolean | null
-          sync_linked_items?: boolean | null
-          sync_on_finalize?: boolean | null
           updated_at?: string
         }
         Relationships: [
@@ -714,47 +705,90 @@ export type Database = {
           purged_time_entries: number
         }[]
       }
-      timer_finalize: {
-        Args: {
-          p_board_id?: string
-          p_board_name?: string
-          p_comment?: string
-          p_duration?: number
-          p_end_time?: string
-          p_entry_id: string
-          p_item_id?: string
-          p_item_name?: string
-          p_parent_item_id?: string
-          p_parent_item_name?: string
-          p_role_id?: string
-          p_start_time?: string
-          p_task_name?: string
-          p_user_id: string
-        }
-        Returns: {
-          board_id: string | null
-          comment: string | null
-          created_at: string
-          deleted_at: string | null
-          deleted_by: string | null
-          duration: number | null
-          end_time: string | null
-          id: string
-          item_id: string | null
-          role_id: string | null
-          start_time: string
-          synced_to_monday: boolean
-          timer_state: Database["public"]["Enums"]["timer_state"]
-          updated_at: string
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "time_entry"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+      timer_finalize:
+        | {
+            Args: {
+              p_board_id?: string
+              p_board_name?: string
+              p_comment?: string
+              p_duration?: number
+              p_end_time?: string
+              p_entry_id: string
+              p_item_id?: string
+              p_item_name?: string
+              p_parent_item_id?: string
+              p_parent_item_name?: string
+              p_role_id?: string
+              p_start_time?: string
+              p_task_name?: string
+              p_user_id: string
+            }
+            Returns: {
+              board_id: string | null
+              comment: string | null
+              created_at: string
+              deleted_at: string | null
+              deleted_by: string | null
+              duration: number | null
+              end_time: string | null
+              id: string
+              item_id: string | null
+              role_id: string | null
+              start_time: string
+              synced_to_monday: boolean
+              timer_state: Database["public"]["Enums"]["timer_state"]
+              updated_at: string
+              user_id: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "time_entry"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: {
+              p_board_id?: string
+              p_board_name?: string
+              p_comment?: string
+              p_duration?: number
+              p_end_time?: string
+              p_entry_id: string
+              p_item_id?: string
+              p_item_name?: string
+              p_keep_draft?: boolean
+              p_parent_item_id?: string
+              p_parent_item_name?: string
+              p_role_id?: string
+              p_start_time?: string
+              p_task_name?: string
+              p_user_id: string
+            }
+            Returns: {
+              board_id: string | null
+              comment: string | null
+              created_at: string
+              deleted_at: string | null
+              deleted_by: string | null
+              duration: number | null
+              end_time: string | null
+              id: string
+              item_id: string | null
+              role_id: string | null
+              start_time: string
+              synced_to_monday: boolean
+              timer_state: Database["public"]["Enums"]["timer_state"]
+              updated_at: string
+              user_id: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "time_entry"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       timer_park: {
         Args: { p_comment?: string; p_entry_id: string; p_user_id: string }
         Returns: {

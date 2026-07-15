@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Logo } from "@/components/Logo";
-import { Tabs, TextInput, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
+import { Icon, Input, Logo } from "@/components";
+import { Tabs, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
 import { Button, IconButton } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
@@ -13,38 +13,6 @@ import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpos
 import { isTimePurpose } from "@/lib/monday/utils";
 
 import "@/public/css/components/AdminPage.css";
-
-// Icons
-const IconPlus = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-	</svg>
-);
-
-const IconEdit = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-	</svg>
-);
-
-const IconTrash = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M3 4h10M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M4 4l1 9a1 1 0 001 1h4a1 1 0 001-1l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-	</svg>
-);
-
-const IconArrowLeft = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-	</svg>
-);
-
-const IconSync = () => (
-	<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-		<path d="M2 8a6 6 0 0110.89-3.477M14 8a6 6 0 01-10.89 3.477" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-		<path d="M14 2v4h-4M2 14v-4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-	</svg>
-);
 
 interface MondayColumn {
 	id: string;
@@ -694,7 +662,7 @@ export default function BoardConfigPage() {
 		<div id="admin-app">
 			<header className="admin-header">
 				<Flex align="center" gap={16}>
-					<Button variant="subtle" leftSection={<IconArrowLeft />} onClick={() => router.back()}>
+					<Button leftSection={<Icon name="chevron_left" size={21} />} onClick={() => router.back()}>
 						Back
 					</Button>
 					<Logo size={{ width: 150, height: 26 }} style="brand" />
@@ -705,7 +673,7 @@ export default function BoardConfigPage() {
 				<Anchor component={Link} href="/admin">
 					Admin
 				</Anchor>
-				<Anchor component={Link} href="/admin?tab=boards">
+				<Anchor component={Link} href="/admin">
 					Boards
 				</Anchor>
 				<Text>{(boardConfig as any).monday_board?.name || (boardConfig as any).board_name || boardConfig.board_id}</Text>
@@ -745,7 +713,7 @@ export default function BoardConfigPage() {
 								<h2>Column Mappings</h2>
 								<p className="admin-section-description">Configure which monday.com columns receive synced time data.</p>
 							</div>
-							<Button leftSection={<IconPlus />} onClick={() => handleOpenColumnModal()}>
+							<Button leftSection={<Icon name="add" size={21} />} onClick={() => handleOpenColumnModal()}>
 								Add Column Mapping
 							</Button>
 						</div>
@@ -788,10 +756,10 @@ export default function BoardConfigPage() {
 											<Table.Td>
 												<Group gap="xs">
 													<IconButton variant="light" onClick={() => handleOpenColumnModal(column)}>
-														<IconEdit />
+														<Icon name="edit" size={21} />
 													</IconButton>
 													<IconButton variant="light" color="red" onClick={() => handleDeleteColumn(column)}>
-														<IconTrash />
+														<Icon name="delete" size={21} />
 													</IconButton>
 												</Group>
 											</Table.Td>
@@ -881,7 +849,7 @@ export default function BoardConfigPage() {
 								<h2>Role Rate Overrides</h2>
 								<p className="admin-section-description">Override default hourly rates for specific roles on this board.</p>
 							</div>
-							<Button leftSection={<IconPlus />} onClick={() => handleOpenOverrideModal()} disabled={availableRolesForOverride.length === 0}>
+							<Button leftSection={<Icon name="add" size={21} />} onClick={() => handleOpenOverrideModal()} disabled={availableRolesForOverride.length === 0}>
 								Add Rate Override
 							</Button>
 						</div>
@@ -890,7 +858,6 @@ export default function BoardConfigPage() {
 							<div className="empty-state">
 								<div className="empty-state-title">No rate overrides</div>
 								<p className="empty-state-description">All roles use their default hourly rates. Add an override to customize rates for this board.</p>
-								{availableRolesForOverride.length > 0 && <Button onClick={() => handleOpenOverrideModal()}>Add Rate Override</Button>}
 							</div>
 						) : (
 							<Table>
@@ -924,10 +891,10 @@ export default function BoardConfigPage() {
 											<Table.Td>
 												<Group gap="xs">
 													<IconButton variant="light" onClick={() => handleOpenOverrideModal(override)}>
-														<IconEdit />
+														<Icon name="edit" size={21} />
 													</IconButton>
 													<IconButton variant="light" color="red" onClick={() => handleDeleteOverride(override)}>
-														<IconTrash />
+														<Icon name="delete" size={21} />
 													</IconButton>
 												</Group>
 											</Table.Td>
@@ -996,7 +963,7 @@ export default function BoardConfigPage() {
 
 								{syncProgress > 0 && <Progress value={syncProgress} mb="md" animated={syncing} color={syncProgress === 100 ? "green" : "blue"} />}
 
-								<Button leftSection={<IconSync />} onClick={handleBulkSync} loading={syncing} disabled={!boardConfig.sync_enabled || columns.length === 0}>
+								<Button leftSection={<Icon name="sync" size={21} />} onClick={handleBulkSync} loading={syncing} disabled={!boardConfig.sync_enabled || columns.length === 0}>
 									{syncing ? "Syncing..." : "Sync All Items"}
 								</Button>
 
@@ -1084,7 +1051,7 @@ export default function BoardConfigPage() {
 						/>
 					)}
 
-					{editingColumn && <TextInput label="Column" value={`${columnForm.column_name} (${columnForm.column_type})`} disabled />}
+					{editingColumn && <Input label="Column" value={`${columnForm.column_name} (${columnForm.column_type})`} disabled />}
 
 					<Switch label="Enable sync" description="Toggle sync for this column mapping" checked={columnForm.sync_enabled} onChange={(e) => setColumnForm({ ...columnForm, sync_enabled: e.currentTarget.checked })} />
 
@@ -1123,7 +1090,7 @@ export default function BoardConfigPage() {
 						/>
 					)}
 
-					{editingOverride && <TextInput label="Role" value={editingOverride.role?.name || "Unknown Role"} disabled />}
+					{editingOverride && <Input label="Role" value={editingOverride.role?.name || "Unknown Role"} disabled />}
 
 					<NumberInput label="Override Hourly Rate (€)" description="This rate will be used instead of the default for this board" placeholder="0.00" value={overrideForm.hourly_rate} onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
 
