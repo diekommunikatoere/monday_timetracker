@@ -22,3 +22,6 @@ export * from "./ui/modals/ModalHeader";
 export * from "./ui/modals/ModalBody";
 export * from "./ui/modals/ModalFooter";
 export { Logo } from "./Logo";
+
+export { default as ErrorState } from "./shared/viewStates/ErrorState";
+export { default as LoadingState } from "./shared/viewStates/LoadingState";

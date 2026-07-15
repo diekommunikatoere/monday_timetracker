@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Logo } from "@/components/Logo";
 import { Accordion, TextInput, NumberInput, Switch, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Checkbox, ScrollArea } from "@mantine/core";
-import { Button, IconButton, IconLink, Icon, Input } from "@/components";
+import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
 import { notifications } from "@mantine/notifications";
 import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -504,15 +504,27 @@ export default function AdminPage() {
 	// Show loading state while initializing
 	if (mondayLoading) {
 		return (
-			<div className="admin-loading">
-				<Loader size="lg" />
+			<div id="admin-app">
+				<header className="admin-header">
+					<Flex align="center" gap={16}>
+						<Logo size={{ width: 180, height: 32 }} style="brand" />
+						<Text size="lg" fw={600} c="dimmed">
+							/ Admin Settings
+						</Text>
+					</Flex>
+				</header>
+				<LoadingState />
 			</div>
 		);
 	}
 
 	// Show error if Monday initialization failed
 	if (mondayError) {
-		return <div className="admin-error">Fehler: {mondayError}</div>;
+		return (
+			<div className="admin-error">
+				<ErrorState message={mondayError} />
+			</div>
+		);
 	}
 
 	// Check admin access
@@ -520,8 +532,7 @@ export default function AdminPage() {
 		return (
 			<div id="admin-app">
 				<div className="admin-error">
-					<Text fw={600}>Zugriff verweigert</Text>
-					<Text size="sm">Für diese Seite werden Administratorrechte benötigt.</Text>
+					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
 				</div>
 			</div>
 		);
