@@ -111,7 +111,7 @@ export async function upsertMondayBoard(id: string, name: string, workspaceId?: 
 export async function getTasksFromDB(boardId: string) {
 	console.log(`[getTasksFromDB] Fetching tasks for board ${boardId}`);
 	// Step 1: Get all synced groups for this board, ordered by their board position
-	const { data: allGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position, sync_enabled").eq("board_id", boardId).order("position", { ascending: true });
+	const { data: allGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position, color, sync_enabled").eq("board_id", boardId).order("position", { ascending: true });
 
 	if (groupsError) {
 		console.error(`Error fetching groups for board ${boardId}:`, groupsError);
@@ -131,7 +131,7 @@ export async function getTasksFromDB(boardId: string) {
 	}
 
 	const syncedGroupIds = syncedGroups.map((g) => g.id);
-	const groupInfoMap = new Map(syncedGroups.map((g) => [g.id, { title: g.title, position: g.position }]));
+	const groupInfoMap = new Map(syncedGroups.map((g) => [g.id, { title: g.title, position: g.position, color: g.color }]));
 
 	// Step 2: Get all active items (parents and subitems) from synced groups using the view
 	// First, let's see how many items are in the board total vs synced
@@ -178,6 +178,7 @@ export async function getTasksFromDB(boardId: string) {
 		group: {
 			id: item.group_id,
 			title: groupInfoMap.get(item.group_id)?.title || "Unknown Group",
+			color: groupInfoMap.get(item.group_id)?.color || null,
 			position: groupInfoMap.get(item.group_id)?.position || null,
 		},
 		parent_item: item.parent_item_id

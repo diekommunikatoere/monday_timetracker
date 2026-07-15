@@ -61,6 +61,7 @@ type ItemsPageResponse = {
 			id: string;
 			title: string;
 			position: string;
+			color: string | null;
 			items_page: {
 				cursor: string | null;
 				items: SimpleItem[];
@@ -139,6 +140,7 @@ type BoardOption = { value: string; label: string };
  */
 type TaskGroup = {
 	label: string;
+	color: string | null;
 	options: Array<{
 		id: string;
 		value: string;
@@ -158,6 +160,7 @@ type GroupItems = {
 	groupId: string;
 	groupTitle: string;
 	groupPosition: string; // Numeric string; used for sort ordering
+	groupColor: string | null;
 	items: SimpleItem[];
 };
 
@@ -458,6 +461,7 @@ export async function getBoardTasks(
 				groups {
 					id
 					title
+					color
 					position
 					items_page(limit: 200) {
 						cursor
@@ -524,6 +528,7 @@ export async function getBoardTasks(
 				groupId: group.id,
 				groupTitle: group.title,
 				groupPosition: group.position,
+				groupColor: group.color || null,
 				items: [...group.items_page.items],
 			});
 
@@ -848,6 +853,7 @@ export async function getBoardTasks(
 
 			return {
 				label: group.groupTitle || "Default Group",
+				color: group.groupColor,
 				position: group.groupPosition,
 				options: sortedOptions,
 			};
@@ -857,7 +863,7 @@ export async function getBoardTasks(
 			// Sort groups by board position (numeric string comparison)
 			return a.position.localeCompare(b.position, undefined, { numeric: true });
 		})
-		.map(({ label, options }) => ({ label, options })); // Remove position from final output to match TaskGroup type
+		.map(({ label, color, options }) => ({ label, color, options })); // Remove position from final output to match TaskGroup type
 
 	const result = { groups: groupedOptions };
 

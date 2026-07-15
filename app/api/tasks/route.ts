@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
 						groupsMap.set(groupId, {
 							label: task.group.title,
 							position: task.group.position,
+							color: task.group.color,
 							options: [],
 						});
 					}
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
 						})
 						.map((group) => ({
 							label: group.label,
+							color: group.color,
 							options: group.options.sort((a: any, b: any) => a.label.localeCompare(b.label)), // Sort items within group alphabetically
 						})),
 					source: "db",

@@ -96,6 +96,7 @@ type DropdownOption = {
 type TaskGroupsResponse = {
 	groups: {
 		label: string;
+		color: string;
 		options: {
 			value: string;
 			label: string;
@@ -105,6 +106,13 @@ type TaskGroupsResponse = {
 		}[];
 	}[];
 };
+
+/**
+ * `TreeNodeData` has no `color` field, so group nodes carry it as an extra
+ * property on top of the Mantine shape — read it back with this type in
+ * {@link TaskItemSelector}'s `renderNode`.
+ */
+type ColorTreeNodeData = TreeNodeData & { color?: string };
 
 /**
  * Two-step selector for choosing a board and a task for a time entry. Boards
@@ -484,7 +492,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			return { treeData: [] as TreeNodeData[], valueMeta: meta, expansionMap: expansion };
 		}
 
-		const groups: TreeNodeData[] = [];
+		const groups: ColorTreeNodeData[] = [];
 
 		tasksData.groups.forEach((group, gi) => {
 			const groupValue = `group:${gi}:${group.label}`;
@@ -548,7 +556,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			});
 
 			if (itemNodes.length > 0) {
-				groups.push({ value: groupValue, label: group.label, children: itemNodes });
+				const groupNode: ColorTreeNodeData = { value: groupValue, color: group.color, label: group.label, children: itemNodes };
+				groups.push(groupNode);
 			}
 		});
 
@@ -732,16 +741,18 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Add Checkmark before label if item is selected
 	const renderTaskNode: TreeSelectProps["renderNode"] = useCallback(
 		({ node, hasChildren, expanded }) => {
-			const isGroupOrJob = node.value.startsWith("group:") || node.value.startsWith("job:");
+			const isGroup = node.value.startsWith("group:");
 			const isSelected = selectedTask?.value === node.value;
+			const groupColor = isGroup ? (node as ColorTreeNodeData).color : undefined;
 			return (
-				<Flex align="center" gap="4px" {...node}>
+				<Flex align="center" gap="4px">
 					{hasChildren && (
 						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
 							<Icon name={expanded ? "collapse_all" : "expand_all"} size={12} color="var(--color--text-secondary)" />
 						</IconButton>
 					)}
 					{isSelected && <Icon name="check" size={16} color="var(--color--primary-500)" weight="bold" />}
+					{isGroup && <span style={{ height: ".25em", width: ".25em", display: "inline-block", borderRadius: "50%", backgroundColor: groupColor, margin: "4px" }} />}
 					<span style={{ fontStyle: expanded ? "italic" : "normal" }}>{node.label}</span>
 				</Flex>
 			);
