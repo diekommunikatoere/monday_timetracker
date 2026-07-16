@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import TimerContainer from "@/components/features/timer/TimerContainer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex, Tooltip } from "@mantine/core";
+import { Flex, Tooltip, Text } from "@mantine/core";
 import { useModalStore } from "@/stores/modalStore";
 import { useUserStore } from "@/stores/userStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { ManualTimeEntryModal } from "@/components/features/timer";
 import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
@@ -39,12 +40,22 @@ import "@/public/css/components/AppHeader.css";
  *          timer, followed by the manual-entry, save, and empty-comment modals.
  */
 export function TimerDashboardHeader(variant?) {
+	const { allEntries } = useTimeEntriesStore();
+	const userId = useUserStore((state) => state.supabaseUser?.id);
 	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
 	const { showTimerSave, closeTimerSave, showEmptyCommentConfirmation, closeEmptyCommentConfirmation } = useModalStore((s) => s);
 	const { actions, state } = useTimerContext();
 	const appTheme = useUserStore((state) => state.appTheme);
+	const [totalHoursToday, setTotalHoursToday] = useState(0);
 
 	const logoStyle = appTheme === "light" ? "brand" : "light";
+
+	useEffect(() => {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const totalSecondsToday = allEntries.filter((entry) => entry.user_id === userId && new Date(entry.start_time) >= today).reduce((sum, entry) => sum + (entry.duration ?? 0), 0);
+		setTotalHoursToday(totalSecondsToday / 3600); // Convert seconds to hours
+	}, [allEntries, userId]);
 
 	const handleManualTimeModalOpen = useCallback(() => {
 		setShowManualSaveModal(true);
@@ -72,6 +83,15 @@ export function TimerDashboardHeader(variant?) {
 					</Flex>
 
 					<ThemeToggle />
+					<Flex align="center" gap={8} style={{ backgroundColor: "var(--color--background-secondary)", padding: ".5rem 1rem", borderRadius: 4 }} wrap="wrap">
+						{/* Total hours today */}
+						<Text size="sm" fw={600} ta="center">
+							Heute:
+						</Text>
+						<Text size="sm" fw={600} ff="mono" ta="center">
+							{totalHoursToday.toFixed(2)} h
+						</Text>
+					</Flex>
 				</Flex>
 				<TimerContainer />
 			</header>

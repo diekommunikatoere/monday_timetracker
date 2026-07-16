@@ -2,7 +2,7 @@
 	position: relative;
 	display: flex;
 	align-items: center;
-	column-gap: 32px;
+	column-gap: 16px;
 	row-gap: 16px;
 	width: 100%;
 	padding: 16px;
@@ -18,12 +18,20 @@
 
 		.logo-container {
 			flex: 1;
-			justify-content: flex-start;
+			justify-content: center;
+			flex-wrap: wrap;
 		}
 	}
 }
 
-@media (min-width: 820px) {
+@media (min-width: 300px) {
+	#appHeader .header-left-section .logo-container {
+		flex-wrap: nowrap;
+		justify-content: flex-start;
+	}
+}
+
+@media (min-width: 900px) {
 	#appHeader {
 		justify-content: flex-start;
 		flex-wrap: nowrap;
@@ -31,7 +39,6 @@
 		.header-left-section {
 			flex: unset;
 			min-width: unset;
-			flex-wrap: nowrap;
 		}
 	}
 }
