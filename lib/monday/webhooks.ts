@@ -75,9 +75,7 @@ export async function registerBoardWebhooks(boardId: string, token: string) {
 					event,
 				});
 
-				console.log(`Successfully registered webhook for event ${event} on board ${boardId}:`, JSON.stringify(createResponse));
-
-				const webhookId = createResponse.data?.data?.create_webhook?.id;
+				const webhookId = createResponse.create_webhook?.id;
 				if (webhookId) {
 					// 3. Store in DB
 					await supabaseAdmin.from("monday_webhook").upsert({
