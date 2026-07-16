@@ -26,6 +26,11 @@ interface RoleOverrideWithRole extends BoardRoleOverride {
 	role: Role;
 }
 
+interface WebhookStatus {
+	event: string;
+	id: string | null;
+}
+
 interface SyncStats {
 	last24Hours: {
 		successCount: number;
@@ -47,12 +52,16 @@ export default function BoardConfigPage() {
 	const router = useRouter();
 	const boardId = params.boardId as string;
 
-	const [activeTab, setActiveTab] = useState<string | null>("columns");
+	const [activeTab, setActiveTab] = useState<string | null>("general");
 	const [boardConfig, setBoardConfig] = useState<BoardConfig | null>(null);
+	const [boardConfigLoading, setBoardConfigLoading] = useState(true);
 	const [columns, setColumns] = useState<ColumnSyncConfig[]>([]);
 	const [roleOverrides, setRoleOverrides] = useState<RoleOverrideWithRole[]>([]);
 	const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
 	const [mondayColumns, setMondayColumns] = useState<MondayColumn[]>([]);
+	const [webhooks, setWebhooks] = useState<WebhookStatus[]>([]);
+	const [webhooksLoading, setWebhooksLoading] = useState(false);
+	const [registeringWebhooks, setRegisteringWebhooks] = useState(false);
 	const [groups, setGroups] = useState<MondayGroup[]>([]);
 	const [groupsLoading, setGroupsLoading] = useState(false);
 	const [loading, setLoading] = useState(true);
@@ -109,17 +118,17 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch board configuration");
+				throw new Error(data.error || "Board-Konfiguration konnte nicht geladen werden");
 			}
 
 			if (data.boards && data.boards.length > 0) {
 				setBoardConfig(data.boards[0]);
 			} else {
-				setError("Board configuration not found");
+				setError("Board-Konfiguration nicht gefunden");
 			}
 		} catch (err) {
 			console.error("Error fetching board config:", err);
-			setError(err instanceof Error ? err.message : "Failed to fetch board configuration");
+			setError(err instanceof Error ? err.message : "Board-Konfiguration konnte nicht geladen werden");
 		}
 	}, [boardId, sessionToken]);
 
@@ -135,13 +144,13 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch column configurations");
+				throw new Error(data.error || "Spalten-Konfigurationen konnten nicht geladen werden");
 			}
 
 			setColumns(data.columns || []);
 		} catch (err) {
 			console.error("Error fetching columns:", err);
-			setError(err instanceof Error ? err.message : "Failed to fetch column configurations");
+			setError(err instanceof Error ? err.message : "Spalten-Konfigurationen konnten nicht geladen werden");
 		}
 	}, [boardId, sessionToken]);
 
@@ -157,13 +166,13 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch role overrides");
+				throw new Error(data.error || "Rollen-Überschreibungen konnten nicht geladen werden");
 			}
 
 			setRoleOverrides(data.overrides || []);
 		} catch (err) {
 			console.error("Error fetching role overrides:", err);
-			setError(err instanceof Error ? err.message : "Failed to fetch role overrides");
+			setError(err instanceof Error ? err.message : "Rollen-Überschreibungen konnten nicht geladen werden");
 		}
 	}, [boardId, sessionToken]);
 
@@ -179,7 +188,7 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch roles");
+				throw new Error(data.error || "Rollen konnten nicht geladen werden");
 			}
 
 			setAvailableRoles(data.roles || []);
@@ -200,7 +209,7 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch monday.com columns");
+				throw new Error(data.error || "monday.com-Spalten konnten nicht geladen werden");
 			}
 
 			setMondayColumns(data.columns || []);
@@ -222,21 +231,88 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to fetch groups");
+				throw new Error(data.error || "Gruppen konnten nicht geladen werden");
 			}
 
 			setGroups(data.groups || []);
 		} catch (err) {
 			console.error("Error fetching groups:", err);
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to fetch groups",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Gruppen konnten nicht geladen werden",
 				color: "red",
 			});
 		} finally {
 			setGroupsLoading(false);
 		}
 	}, [boardId, sessionToken]);
+
+	// Fetch webhooks
+	const fetchWebhooks = useCallback(async () => {
+		if (!sessionToken) return;
+		try {
+			setWebhooksLoading(true);
+			const response = await fetch(`/api/admin/boards/${boardId}/webhooks`, {
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Webhooks konnten nicht geladen werden");
+			}
+
+			setWebhooks(data.webhooks || []);
+		} catch (err) {
+			console.error("Error fetching webhooks:", err);
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Webhooks konnten nicht geladen werden",
+				color: "red",
+			});
+		} finally {
+			setWebhooksLoading(false);
+		}
+	}, [boardId, sessionToken]);
+
+	// Register any webhooks missing for this board, then refresh their status
+	const handleRegisterWebhooks = async () => {
+		if (!sessionToken) return;
+		try {
+			setRegisteringWebhooks(true);
+			const response = await fetch(`/api/admin/boards/${boardId}/webhooks`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+				},
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Webhooks konnten nicht registriert werden");
+			}
+
+			notifications.show({
+				title: "Erfolg",
+				message: "Fehlende Webhooks wurden registriert",
+				color: "green",
+			});
+
+			await fetchWebhooks();
+		} catch (err) {
+			console.error("Error registering webhooks:", err);
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Webhooks konnten nicht registriert werden",
+				color: "red",
+			});
+		} finally {
+			setRegisteringWebhooks(false);
+		}
+	};
 
 	// Fetch sync stats
 	const fetchSyncStats = useCallback(async () => {
@@ -276,12 +352,64 @@ export default function BoardConfigPage() {
 		}
 	}, [activeTab, fetchSyncStats, mondayContext]);
 
+	// Load webhooks when tab changes to webhooks
+	useEffect(() => {
+		if (activeTab === "webhooks") {
+			fetchWebhooks();
+		}
+	}, [activeTab, fetchWebhooks]);
+
 	// Load groups when tab changes to groups
 	useEffect(() => {
 		if (activeTab === "groups") {
 			fetchGroups();
 		}
 	}, [activeTab, fetchGroups]);
+
+	// Handle board config update
+	const updateBoardConfig = async (updatedConfig: Partial<BoardConfig>) => {
+		if (!sessionToken) return;
+
+		const newConfig = {
+			...boardConfig,
+			...updatedConfig,
+			settings: {
+				...(boardConfig?.settings as Record<string, unknown> | undefined),
+				...(updatedConfig.settings as Record<string, unknown> | undefined),
+			},
+		};
+
+		try {
+			setBoardConfigLoading(true);
+
+			const response = await fetch(`/api/admin/boards?boardId=${boardId}`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify(newConfig),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				setBoardConfigLoading(false);
+				throw new Error(data.error || "Board-Konfiguration konnte nicht aktualisiert werden");
+			}
+
+			setBoardConfig(newConfig as BoardConfig);
+		} catch (err) {
+			console.error("Error updating board config:", err);
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Board-Konfiguration konnte nicht aktualisiert werden",
+				color: "red",
+			});
+		} finally {
+			setBoardConfigLoading(false);
+		}
+	};
 
 	// Toggle group sync handler
 	const handleToggleGroupSync = async (groupId: string, currentSyncEnabled: boolean) => {
@@ -302,24 +430,26 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to update group sync status");
+				throw new Error(data.error || "Gruppen-Sync-Status konnte nicht aktualisiert werden");
 			}
 
 			// Update local state
 			setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, sync_enabled: !currentSyncEnabled } : g)));
 
 			notifications.show({
-				title: "Success",
-				message: `Group ${!currentSyncEnabled ? "enabled" : "disabled"} for sync`,
+				title: "Erfolg",
+				message: `Gruppe für Sync ${!currentSyncEnabled ? "aktiviert" : "deaktiviert"}`,
 				color: "green",
 			});
 		} catch (err) {
 			console.error("Error toggling group sync:", err);
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to update group sync status",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Gruppen-Sync-Status konnte nicht aktualisiert werden",
 				color: "red",
 			});
+		} finally {
+			setGroupsLoading(false);
 		}
 	};
 
@@ -327,8 +457,8 @@ export default function BoardConfigPage() {
 	const handleBulkSync = async () => {
 		if (!mondayContext || !sessionToken) {
 			notifications.show({
-				title: "Error",
-				message: "Authentication not ready",
+				title: "Fehler",
+				message: "Authentifizierung nicht bereit",
 				color: "red",
 			});
 			return;
@@ -353,14 +483,14 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to sync board");
+				throw new Error(data.error || "Board-Synchronisierung fehlgeschlagen");
 			}
 
 			setSyncProgress(100);
 			setSyncResults(data.results || []);
 
 			notifications.show({
-				title: data.success ? "Sync Complete" : "Sync Completed with Errors",
+				title: data.success ? "Sync abgeschlossen" : "Sync mit Fehlern abgeschlossen",
 				message: data.message,
 				color: data.success ? "green" : "yellow",
 			});
@@ -369,8 +499,8 @@ export default function BoardConfigPage() {
 			fetchSyncStats();
 		} catch (err) {
 			notifications.show({
-				title: "Sync Failed",
-				message: err instanceof Error ? err.message : "Failed to sync board",
+				title: "Sync fehlgeschlagen",
+				message: err instanceof Error ? err.message : "Board-Synchronisierung fehlgeschlagen",
 				color: "red",
 			});
 		} finally {
@@ -423,8 +553,8 @@ export default function BoardConfigPage() {
 	const handleSaveColumn = async () => {
 		if (!columnForm.column_id || !columnForm.column_name) {
 			notifications.show({
-				title: "Validation Error",
-				message: "Please select a column",
+				title: "Validierungsfehler",
+				message: "Bitte eine Spalte auswählen",
 				color: "red",
 			});
 			return;
@@ -446,12 +576,12 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to save column configuration");
+				throw new Error(data.error || "Spalten-Konfiguration konnte nicht gespeichert werden");
 			}
 
 			notifications.show({
-				title: "Success",
-				message: editingColumn ? "Column configuration updated" : "Column configuration created",
+				title: "Erfolg",
+				message: editingColumn ? "Spalten-Konfiguration aktualisiert" : "Spalten-Konfiguration erstellt",
 				color: "green",
 			});
 
@@ -459,8 +589,8 @@ export default function BoardConfigPage() {
 			fetchColumns();
 		} catch (err) {
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to save column configuration",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Spalten-Konfiguration konnte nicht gespeichert werden",
 				color: "red",
 			});
 		} finally {
@@ -469,7 +599,7 @@ export default function BoardConfigPage() {
 	};
 
 	const handleDeleteColumn = async (column: ColumnSyncConfig) => {
-		if (!confirm(`Are you sure you want to remove the sync configuration for "${column.column_name}"?`)) {
+		if (!confirm(`Möchtest du die Sync-Konfiguration für "${column.column_name}" wirklich entfernen?`)) {
 			return;
 		}
 
@@ -484,20 +614,20 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to delete column configuration");
+				throw new Error(data.error || "Spalten-Konfiguration konnte nicht gelöscht werden");
 			}
 
 			notifications.show({
-				title: "Success",
-				message: "Column configuration removed",
+				title: "Erfolg",
+				message: "Spalten-Konfiguration entfernt",
 				color: "green",
 			});
 
 			fetchColumns();
 		} catch (err) {
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to delete column configuration",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Spalten-Konfiguration konnte nicht gelöscht werden",
 				color: "red",
 			});
 		}
@@ -526,8 +656,8 @@ export default function BoardConfigPage() {
 	const handleSaveOverride = async () => {
 		if (!overrideForm.role_id) {
 			notifications.show({
-				title: "Validation Error",
-				message: "Please select a role",
+				title: "Validierungsfehler",
+				message: "Bitte eine Rolle auswählen",
 				color: "red",
 			});
 			return;
@@ -549,12 +679,12 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to save role override");
+				throw new Error(data.error || "Rollen-Überschreibung konnte nicht gespeichert werden");
 			}
 
 			notifications.show({
-				title: "Success",
-				message: editingOverride ? "Role override updated" : "Role override created",
+				title: "Erfolg",
+				message: editingOverride ? "Rollen-Überschreibung aktualisiert" : "Rollen-Überschreibung erstellt",
 				color: "green",
 			});
 
@@ -562,8 +692,8 @@ export default function BoardConfigPage() {
 			fetchRoleOverrides();
 		} catch (err) {
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to save role override",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Rollen-Überschreibung konnte nicht gespeichert werden",
 				color: "red",
 			});
 		} finally {
@@ -572,7 +702,7 @@ export default function BoardConfigPage() {
 	};
 
 	const handleDeleteOverride = async (override: RoleOverrideWithRole) => {
-		if (!confirm(`Are you sure you want to remove the rate override for "${override.role?.name}"?`)) {
+		if (!confirm(`Möchtest du die Satzüberschreibung für "${override.role?.name}" wirklich entfernen?`)) {
 			return;
 		}
 
@@ -587,20 +717,20 @@ export default function BoardConfigPage() {
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to delete role override");
+				throw new Error(data.error || "Rollen-Überschreibung konnte nicht gelöscht werden");
 			}
 
 			notifications.show({
-				title: "Success",
-				message: "Role override removed",
+				title: "Erfolg",
+				message: "Rollen-Überschreibung entfernt",
 				color: "green",
 			});
 
 			fetchRoleOverrides();
 		} catch (err) {
 			notifications.show({
-				title: "Error",
-				message: err instanceof Error ? err.message : "Failed to delete role override",
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Rollen-Überschreibung konnte nicht gelöscht werden",
 				color: "red",
 			});
 		}
@@ -611,17 +741,17 @@ export default function BoardConfigPage() {
 
 	// Purpose display names
 	const purposeLabels: Record<SyncPurpose, string> = {
-		total_time: "Total Time (Legacy)",
-		time_by_role: "Time by Role (Legacy)",
-		remaining_budget: "Remaining Budget (Legacy)",
-		budget_used: "Budget Used",
+		total_time: "Gesamtzeit (Legacy)",
+		time_by_role: "Zeit nach Rolle (Legacy)",
+		remaining_budget: "Restbudget (Legacy)",
+		budget_used: "Genutztes Budget",
 	};
 
 	// Format display names
 	const formatLabels: Record<TimeFormat, string> = {
-		hours: "Hours (e.g., 2.5)",
-		seconds: "Seconds (e.g., 9000)",
-		"hh:mm": "HH:MM (e.g., 02:30)",
+		hours: "Stunden (z. B. 2,5)",
+		seconds: "Sekunden (z. B. 9000)",
+		"hh:mm": "HH:MM (z. B. 02:30)",
 	};
 
 	// Show loading state while initializing
@@ -635,7 +765,7 @@ export default function BoardConfigPage() {
 
 	// Show error if Monday initialization failed
 	if (mondayError) {
-		return <div className="admin-error">Error: {mondayError}</div>;
+		return <div className="admin-error">Fehler: {mondayError}</div>;
 	}
 
 	// Check admin access
@@ -643,8 +773,8 @@ export default function BoardConfigPage() {
 		return (
 			<div id="admin-app">
 				<div className="admin-error">
-					<Text fw={600}>Access Denied</Text>
-					<Text size="sm">You need admin privileges to access this page.</Text>
+					<Text fw={600}>Zugriff verweigert</Text>
+					<Text size="sm">Du benötigst Administratorrechte, um auf diese Seite zuzugreifen.</Text>
 				</div>
 			</div>
 		);
@@ -653,7 +783,7 @@ export default function BoardConfigPage() {
 	if (!boardConfig) {
 		return (
 			<div id="admin-app">
-				<div className="admin-error">Board configuration not found</div>
+				<div className="admin-error">Board-Konfiguration nicht gefunden</div>
 			</div>
 		);
 	}
@@ -663,9 +793,9 @@ export default function BoardConfigPage() {
 			<header className="admin-header">
 				<Flex align="center" gap={16}>
 					<Button leftSection={<Icon name="chevron_left" size={21} />} onClick={() => router.back()}>
-						Back
+						Zurück
 					</Button>
-					<Logo size={{ width: 150, height: 26 }} style="brand" />
+					<Logo size={{ width: 150, height: 26 }} style="brand" loading="eager" />
 				</Flex>
 			</header>
 
@@ -688,52 +818,134 @@ export default function BoardConfigPage() {
 							{(boardConfig as any).board_name || boardConfig.board_id}
 						</Text>
 						<Text size="sm" c="dimmed">
-							Board ID: {boardConfig.board_id}
+							Board-ID: {boardConfig.board_id}
 						</Text>
 					</div>
 					<Badge size="lg" color={boardConfig.sync_enabled ? "green" : "gray"}>
-						{boardConfig.sync_enabled ? "Sync Enabled" : "Sync Disabled"}
+						{boardConfig.sync_enabled ? "Sync aktiv" : "Sync inaktiv"}
 					</Badge>
 				</Flex>
 			</div>
 
 			<Tabs value={activeTab} onChange={setActiveTab} className="admin-tabs">
 				<Tabs.List>
-					<Tabs.Tab value="columns">Column Mappings</Tabs.Tab>
-					<Tabs.Tab value="groups">Groups</Tabs.Tab>
-					<Tabs.Tab value="roles">Role Rate Overrides</Tabs.Tab>
-					<Tabs.Tab value="sync">Sync Operations</Tabs.Tab>
+					<Tabs.Tab value="general">Allgemein</Tabs.Tab>
+					<Tabs.Tab value="webhooks">Webhooks</Tabs.Tab>
+					<Tabs.Tab value="columns">Spalten</Tabs.Tab>
+					<Tabs.Tab value="groups">Gruppen</Tabs.Tab>
+					<Tabs.Tab value="roles">Rollen</Tabs.Tab>
+					<Tabs.Tab value="sync">Synchronisierung</Tabs.Tab>
 				</Tabs.List>
+
+				{/* General Settings Tab */}
+				<Tabs.Panel value="general" pt="md">
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Allgemeine Einstellungen</h2>
+								<p className="admin-section-description">Legt fest, wie die Synchronisierung für dieses Board funktioniert.</p>
+							</div>
+						</div>
+
+						<Stack gap="md">
+							<Switch
+								label="Jobs auswählbar"
+								checked={boardConfig.settings?.["jobs_selectable"]}
+								onChange={(event) => {
+									console.log(boardConfig.settings?.["jobs_selectable"]);
+									console.log("Toggling jobs_selectable:", event.currentTarget.checked);
+									console.log("Current boardConfig:", boardConfig);
+
+									updateBoardConfig({
+										settings: {
+											jobs_selectable: event.currentTarget.checked,
+										},
+									});
+								}}
+							/>
+						</Stack>
+					</div>
+				</Tabs.Panel>
+
+				{/* Webhooks Tab */}
+				<Tabs.Panel value="webhooks" pt="md">
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Webhooks</h2>
+								<p className="admin-section-description">Legt fest, welche Webhooks für die Synchronisierung von Aufgaben und Zeitdaten verwendet werden.</p>
+							</div>
+							<Button leftSection={<Icon name="sync" size={21} />} onClick={handleRegisterWebhooks} loading={registeringWebhooks} disabled={webhooksLoading || webhooks.every((w) => w.id)}>
+								Fehlende Webhooks registrieren
+							</Button>
+						</div>
+
+						{webhooksLoading ? (
+							<div className="admin-loading">
+								<Loader size="sm" />
+								<Text size="sm" c="dimmed" ml="xs">
+									Webhooks werden geladen...
+								</Text>
+							</div>
+						) : webhooks.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">Keine Webhooks gefunden</div>
+								<p className="empty-state-description">Dieses Board hat keine Webhooks, oder sie wurden noch nicht geladen. Webhooks werden von monday.com abgerufen, sobald du diesen Tab öffnest.</p>
+							</div>
+						) : (
+							<Table>
+								<Table.Thead>
+									<Table.Tr>
+										<Table.Th>Event</Table.Th>
+										<Table.Th>Webhook-ID</Table.Th>
+										<Table.Th>Status</Table.Th>
+									</Table.Tr>
+								</Table.Thead>
+								<Table.Tbody>
+									{webhooks.map((webhook) => (
+										<Table.Tr key={webhook.event}>
+											<Table.Td>{webhook.event}</Table.Td>
+											<Table.Td>{webhook.id ?? "–"}</Table.Td>
+											<Table.Td>
+												<Badge color={webhook.id ? "green" : "gray"}>{webhook.id ? "Eingerichtet" : "Fehlt"}</Badge>
+											</Table.Td>
+										</Table.Tr>
+									))}
+								</Table.Tbody>
+							</Table>
+						)}
+					</div>
+				</Tabs.Panel>
 
 				{/* Column Mappings Tab */}
 				<Tabs.Panel value="columns" pt="md">
 					<div className="admin-section">
 						<div className="admin-section-header">
 							<div>
-								<h2>Column Mappings</h2>
-								<p className="admin-section-description">Configure which monday.com columns receive synced time data.</p>
+								<h2>Spalten-Zuordnungen</h2>
+								<p className="admin-section-description">Legt fest, welche monday.com-Spalten synchronisierte Zeitdaten erhalten.</p>
 							</div>
 							<Button leftSection={<Icon name="add" size={21} />} onClick={() => handleOpenColumnModal()}>
-								Add Column Mapping
+								Spalten-Zuordnung hinzufügen
 							</Button>
 						</div>
 
 						{columns.length === 0 ? (
 							<div className="empty-state">
-								<div className="empty-state-title">No column mappings</div>
-								<p className="empty-state-description">Add a column mapping to sync time data to a monday.com column.</p>
-								<Button onClick={() => handleOpenColumnModal()}>Add Column Mapping</Button>
+								<div className="empty-state-title">Keine Spalten-Zuordnungen</div>
+								<p className="empty-state-description">Füge eine Spalten-Zuordnung hinzu, um Zeitdaten mit einer monday.com-Spalte zu synchronisieren.</p>
+								<Button onClick={() => handleOpenColumnModal()}>Spalten-Zuordnung hinzufügen</Button>
 							</div>
 						) : (
 							<Table>
 								<Table.Thead>
 									<Table.Tr>
-										<Table.Th>Column</Table.Th>
-										<Table.Th>Type</Table.Th>
-										<Table.Th>Sync Purpose</Table.Th>
+										<Table.Th>Spalte</Table.Th>
+										<Table.Th>Typ</Table.Th>
+										<Table.Th>Sync-Zweck</Table.Th>
 										<Table.Th>Format</Table.Th>
 										<Table.Th>Status</Table.Th>
-										<Table.Th>Actions</Table.Th>
+										<Table.Th>Aktionen</Table.Th>
 									</Table.Tr>
 								</Table.Thead>
 								<Table.Tbody>
@@ -751,7 +963,7 @@ export default function BoardConfigPage() {
 											<Table.Td>{purposeLabels[column.sync_purpose]}</Table.Td>
 											<Table.Td>{formatLabels[column.time_format]}</Table.Td>
 											<Table.Td>
-												<Badge color={column.sync_enabled ? "green" : "gray"}>{column.sync_enabled ? "Enabled" : "Disabled"}</Badge>
+												<Badge color={column.sync_enabled ? "green" : "gray"}>{column.sync_enabled ? "Aktiviert" : "Deaktiviert"}</Badge>
 											</Table.Td>
 											<Table.Td>
 												<Group gap="xs">
@@ -776,8 +988,8 @@ export default function BoardConfigPage() {
 					<div className="admin-section">
 						<div className="admin-section-header">
 							<div>
-								<h2>Groups</h2>
-								<p className="admin-section-description">Control which groups are synced for the task selector. Disabled groups will not appear in the task dropdown.</p>
+								<h2>Gruppen</h2>
+								<p className="admin-section-description">Legt fest, welche Gruppen für die Aufgabenauswahl synchronisiert werden. Deaktivierte Gruppen erscheinen nicht im Aufgaben-Dropdown.</p>
 							</div>
 						</div>
 
@@ -785,22 +997,22 @@ export default function BoardConfigPage() {
 							<div className="admin-loading">
 								<Loader size="sm" />
 								<Text size="sm" c="dimmed" ml="xs">
-									Loading groups...
+									Gruppen werden geladen...
 								</Text>
 							</div>
 						) : groups.length === 0 ? (
 							<div className="empty-state">
-								<div className="empty-state-title">No groups found</div>
-								<p className="empty-state-description">This board has no groups, or they haven't been loaded yet. Groups will be fetched from monday.com when you open this tab.</p>
+								<div className="empty-state-title">Keine Gruppen gefunden</div>
+								<p className="empty-state-description">Dieses Board hat keine Gruppen, oder sie wurden noch nicht geladen. Gruppen werden von monday.com abgerufen, sobald du diesen Tab öffnest.</p>
 							</div>
 						) : (
 							<Table>
 								<Table.Thead>
 									<Table.Tr>
-										<Table.Th>Group</Table.Th>
+										<Table.Th>Gruppe</Table.Th>
 										<Table.Th>Position</Table.Th>
-										<Table.Th>Sync Status</Table.Th>
-										<Table.Th>Actions</Table.Th>
+										<Table.Th>Sync-Status</Table.Th>
+										<Table.Th>Aktionen</Table.Th>
 									</Table.Tr>
 								</Table.Thead>
 								<Table.Tbody>
@@ -828,10 +1040,10 @@ export default function BoardConfigPage() {
 												<Text size="sm">{group.position || "-"}</Text>
 											</Table.Td>
 											<Table.Td>
-												<Badge color={group.sync_enabled ? "green" : "gray"}>{group.sync_enabled ? "Synced" : "Not Synced"}</Badge>
+												<Badge color={group.sync_enabled ? "green" : "gray"}>{group.sync_enabled ? "Synchronisiert" : "Nicht synchronisiert"}</Badge>
 											</Table.Td>
 											<Table.Td>
-												<Switch label={group.sync_enabled ? "Enabled" : "Disabled"} checked={group.sync_enabled} onChange={() => handleToggleGroupSync(group.id, group.sync_enabled)} />
+												<Switch label={group.sync_enabled ? "Aktiviert" : "Deaktiviert"} checked={group.sync_enabled} onChange={() => handleToggleGroupSync(group.id, group.sync_enabled)} />
 											</Table.Td>
 										</Table.Tr>
 									))}
@@ -846,28 +1058,28 @@ export default function BoardConfigPage() {
 					<div className="admin-section">
 						<div className="admin-section-header">
 							<div>
-								<h2>Role Rate Overrides</h2>
-								<p className="admin-section-description">Override default hourly rates for specific roles on this board.</p>
+								<h2>Satzüberschreibungen für Rollen</h2>
+								<p className="admin-section-description">Überschreibe die Standard-Stundensätze für bestimmte Rollen auf diesem Board.</p>
 							</div>
 							<Button leftSection={<Icon name="add" size={21} />} onClick={() => handleOpenOverrideModal()} disabled={availableRolesForOverride.length === 0}>
-								Add Rate Override
+								Satzüberschreibung hinzufügen
 							</Button>
 						</div>
 
 						{roleOverrides.length === 0 ? (
 							<div className="empty-state">
-								<div className="empty-state-title">No rate overrides</div>
-								<p className="empty-state-description">All roles use their default hourly rates. Add an override to customize rates for this board.</p>
+								<div className="empty-state-title">Keine Satzüberschreibungen</div>
+								<p className="empty-state-description">Alle Rollen verwenden ihre Standard-Stundensätze. Füge eine Überschreibung hinzu, um die Sätze für dieses Board anzupassen.</p>
 							</div>
 						) : (
 							<Table>
 								<Table.Thead>
 									<Table.Tr>
-										<Table.Th>Role</Table.Th>
-										<Table.Th>Default Rate</Table.Th>
-										<Table.Th>Override Rate</Table.Th>
+										<Table.Th>Rolle</Table.Th>
+										<Table.Th>Standardsatz</Table.Th>
+										<Table.Th>Überschreibungssatz</Table.Th>
 										<Table.Th>Status</Table.Th>
-										<Table.Th>Actions</Table.Th>
+										<Table.Th>Aktionen</Table.Th>
 									</Table.Tr>
 								</Table.Thead>
 								<Table.Tbody>
@@ -876,7 +1088,7 @@ export default function BoardConfigPage() {
 											<Table.Td>
 												<Flex align="center" gap="xs">
 													<div style={{ width: 12, height: 12, borderRadius: "50%", backgroundColor: override.role?.color_hex || "#0073ea" }} />
-													<Text fw={500}>{override.role?.name || "Unknown Role"}</Text>
+													<Text fw={500}>{override.role?.name || "Unbekannte Rolle"}</Text>
 												</Flex>
 											</Table.Td>
 											<Table.Td>
@@ -886,7 +1098,7 @@ export default function BoardConfigPage() {
 												<Text fw={600}>€{override.hourly_rate.toFixed(2)}</Text>
 											</Table.Td>
 											<Table.Td>
-												<Badge color={override.is_enabled ? "green" : "gray"}>{override.is_enabled ? "Active" : "Inactive"}</Badge>
+												<Badge color={override.is_enabled ? "green" : "gray"}>{override.is_enabled ? "Aktiv" : "Inaktiv"}</Badge>
 											</Table.Td>
 											<Table.Td>
 												<Group gap="xs">
@@ -911,8 +1123,8 @@ export default function BoardConfigPage() {
 					<div className="admin-section">
 						<div className="admin-section-header">
 							<div>
-								<h2>Sync Operations</h2>
-								<p className="admin-section-description">Manually sync time data to monday.com columns or view sync statistics.</p>
+								<h2>Sync-Vorgänge</h2>
+								<p className="admin-section-description">Synchronisiere Zeitdaten manuell mit monday.com-Spalten oder sieh dir die Sync-Statistiken an.</p>
 							</div>
 						</div>
 
@@ -921,7 +1133,7 @@ export default function BoardConfigPage() {
 							{syncStats && (
 								<Card withBorder padding="lg">
 									<Text fw={600} mb="md">
-										Sync Statistics (Last 24 Hours)
+										Sync-Statistiken (letzte 24 Stunden)
 									</Text>
 									<Group gap="xl">
 										<div>
@@ -929,7 +1141,7 @@ export default function BoardConfigPage() {
 												{syncStats.last24Hours.successCount}
 											</Text>
 											<Text size="sm" c="dimmed">
-												Successful Syncs
+												Erfolgreiche Syncs
 											</Text>
 										</div>
 										<div>
@@ -937,7 +1149,7 @@ export default function BoardConfigPage() {
 												{syncStats.last24Hours.failureCount}
 											</Text>
 											<Text size="sm" c="dimmed">
-												Failed Syncs
+												Fehlgeschlagene Syncs
 											</Text>
 										</div>
 										<div>
@@ -945,7 +1157,7 @@ export default function BoardConfigPage() {
 												{syncStats.itemsWithTimeEntries}
 											</Text>
 											<Text size="sm" c="dimmed">
-												Items with Time Entries
+												Aufgaben mit Zeiteinträgen
 											</Text>
 										</div>
 									</Group>
@@ -955,27 +1167,27 @@ export default function BoardConfigPage() {
 							{/* Bulk Sync */}
 							<Card withBorder padding="lg">
 								<Text fw={600} mb="sm">
-									Bulk Sync All Items
+									Alle Aufgaben synchronisieren
 								</Text>
 								<Text size="sm" c="dimmed" mb="md">
-									Sync time data for all items on this board that have time entries. This will update all configured columns based on your column mappings.
+									Synchronisiert Zeitdaten für alle Aufgaben auf diesem Board, die Zeiteinträge haben. Dabei werden alle konfigurierten Spalten gemäß deinen Spalten-Zuordnungen aktualisiert.
 								</Text>
 
 								{syncProgress > 0 && <Progress value={syncProgress} mb="md" animated={syncing} color={syncProgress === 100 ? "green" : "blue"} />}
 
 								<Button leftSection={<Icon name="sync" size={21} />} onClick={handleBulkSync} loading={syncing} disabled={!boardConfig.sync_enabled || columns.length === 0}>
-									{syncing ? "Syncing..." : "Sync All Items"}
+									{syncing ? "Synchronisiere..." : "Alle Aufgaben synchronisieren"}
 								</Button>
 
 								{!boardConfig.sync_enabled && (
 									<Text size="sm" c="red" mt="sm">
-										Sync is disabled for this board. Enable it in the board settings to use this feature.
+										Sync ist für dieses Board deaktiviert. Aktiviere es in den Board-Einstellungen, um diese Funktion zu nutzen.
 									</Text>
 								)}
 
 								{columns.length === 0 && boardConfig.sync_enabled && (
 									<Text size="sm" c="orange" mt="sm">
-										No column mappings configured. Add column mappings to sync data.
+										Keine Spalten-Zuordnungen konfiguriert. Füge Spalten-Zuordnungen hinzu, um Daten zu synchronisieren.
 									</Text>
 								)}
 							</Card>
@@ -984,15 +1196,15 @@ export default function BoardConfigPage() {
 							{syncResults && syncResults.length > 0 && (
 								<Card withBorder padding="lg">
 									<Text fw={600} mb="md">
-										Last Sync Results
+										Letzte Sync-Ergebnisse
 									</Text>
 									<Table>
 										<Table.Thead>
 											<Table.Tr>
-												<Table.Th>Item ID</Table.Th>
+												<Table.Th>Aufgaben-ID</Table.Th>
 												<Table.Th>Status</Table.Th>
-												<Table.Th>Columns Updated</Table.Th>
-												<Table.Th>Errors</Table.Th>
+												<Table.Th>Aktualisierte Spalten</Table.Th>
+												<Table.Th>Fehler</Table.Th>
 											</Table.Tr>
 										</Table.Thead>
 										<Table.Tbody>
@@ -1002,7 +1214,7 @@ export default function BoardConfigPage() {
 														<Text size="sm">{result.itemId}</Text>
 													</Table.Td>
 													<Table.Td>
-														<Badge color={result.success ? "green" : "red"}>{result.success ? "Success" : "Failed"}</Badge>
+														<Badge color={result.success ? "green" : "red"}>{result.success ? "Erfolg" : "Fehlgeschlagen"}</Badge>
 													</Table.Td>
 													<Table.Td>{result.columnsUpdated}</Table.Td>
 													<Table.Td>
@@ -1012,7 +1224,7 @@ export default function BoardConfigPage() {
 															</Text>
 														) : (
 															<Text size="xs" c="dimmed">
-																None
+																Keine
 															</Text>
 														)}
 													</Table.Td>
@@ -1022,7 +1234,7 @@ export default function BoardConfigPage() {
 									</Table>
 									{syncResults.length > 20 && (
 										<Text size="sm" c="dimmed" mt="sm">
-											Showing first 20 of {syncResults.length} results
+											Zeige die ersten 20 von {syncResults.length} Ergebnissen
 										</Text>
 									)}
 								</Card>
@@ -1033,12 +1245,12 @@ export default function BoardConfigPage() {
 			</Tabs>
 
 			{/* Column Modal */}
-			<Modal opened={columnModalOpen} onClose={() => setColumnModalOpen(false)} title={editingColumn ? "Edit Column Mapping" : "Add Column Mapping"} size="lg">
+			<Modal opened={columnModalOpen} onClose={() => setColumnModalOpen(false)} title={editingColumn ? "Spalten-Zuordnung bearbeiten" : "Spalten-Zuordnung hinzufügen"} size="lg">
 				<Stack gap="md">
 					{!editingColumn && (
 						<Select
-							label="Select Column"
-							placeholder="Choose a monday.com column"
+							label="Spalte auswählen"
+							placeholder="Wähle eine monday.com-Spalte"
 							data={mondayColumns
 								.filter((c) => c.isCompatible)
 								.map((c) => ({
@@ -1051,31 +1263,31 @@ export default function BoardConfigPage() {
 						/>
 					)}
 
-					{editingColumn && <Input label="Column" value={`${columnForm.column_name} (${columnForm.column_type})`} disabled />}
+					{editingColumn && <Input label="Spalte" value={`${columnForm.column_name} (${columnForm.column_type})`} disabled />}
 
-					<Switch label="Enable sync" description="Toggle sync for this column mapping" checked={columnForm.sync_enabled} onChange={(e) => setColumnForm({ ...columnForm, sync_enabled: e.currentTarget.checked })} />
+					<Switch label="Sync aktivieren" description="Sync für diese Spalten-Zuordnung umschalten" checked={columnForm.sync_enabled} onChange={(e) => setColumnForm({ ...columnForm, sync_enabled: e.currentTarget.checked })} />
 
 					<Group justify="flex-end" mt="md">
 						<Button variant="default" onClick={() => setColumnModalOpen(false)}>
-							Cancel
+							Abbrechen
 						</Button>
 						<Button onClick={handleSaveColumn} loading={savingColumn}>
-							{editingColumn ? "Update Mapping" : "Add Mapping"}
+							{editingColumn ? "Zuordnung aktualisieren" : "Zuordnung hinzufügen"}
 						</Button>
 					</Group>
 				</Stack>
 			</Modal>
 
 			{/* Role Override Modal */}
-			<Modal opened={overrideModalOpen} onClose={() => setOverrideModalOpen(false)} title={editingOverride ? "Edit Rate Override" : "Add Rate Override"} size="md">
+			<Modal opened={overrideModalOpen} onClose={() => setOverrideModalOpen(false)} title={editingOverride ? "Satzüberschreibung bearbeiten" : "Satzüberschreibung hinzufügen"} size="md">
 				<Stack gap="md">
 					{!editingOverride && (
 						<Select
-							label="Select Role"
-							placeholder="Choose a role"
+							label="Rolle auswählen"
+							placeholder="Wähle eine Rolle"
 							data={availableRolesForOverride.map((r) => ({
 								value: r.id,
-								label: `${r.name} (Default: €${r.hourly_rate.toFixed(2)})`,
+								label: `${r.name} (Standard: €${r.hourly_rate.toFixed(2)})`,
 							}))}
 							value={overrideForm.role_id}
 							onChange={(val) => {
@@ -1090,18 +1302,18 @@ export default function BoardConfigPage() {
 						/>
 					)}
 
-					{editingOverride && <Input label="Role" value={editingOverride.role?.name || "Unknown Role"} disabled />}
+					{editingOverride && <Input label="Rolle" value={editingOverride.role?.name || "Unbekannte Rolle"} disabled />}
 
-					<NumberInput label="Override Hourly Rate (€)" description="This rate will be used instead of the default for this board" placeholder="0.00" value={overrideForm.hourly_rate} onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
+					<NumberInput label="Überschreibungs-Stundensatz (€)" description="Dieser Satz wird anstelle des Standards für dieses Board verwendet" placeholder="0.00" value={overrideForm.hourly_rate} onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
 
-					<Switch label="Active" description="Toggle whether this override is applied" checked={overrideForm.is_enabled} onChange={(e) => setOverrideForm({ ...overrideForm, is_enabled: e.currentTarget.checked })} />
+					<Switch label="Aktiv" description="Legt fest, ob diese Überschreibung angewendet wird" checked={overrideForm.is_enabled} onChange={(e) => setOverrideForm({ ...overrideForm, is_enabled: e.currentTarget.checked })} />
 
 					<Group justify="flex-end" mt="md">
 						<Button variant="default" onClick={() => setOverrideModalOpen(false)}>
-							Cancel
+							Abbrechen
 						</Button>
 						<Button onClick={handleSaveOverride} loading={savingOverride}>
-							{editingOverride ? "Update Override" : "Add Override"}
+							{editingOverride ? "Überschreibung aktualisieren" : "Überschreibung hinzufügen"}
 						</Button>
 					</Group>
 				</Stack>

@@ -15,7 +15,7 @@ import { createMondayClient } from "./client";
  * - Group-only operations (rename, archive, delete group) fire no webhooks.
  * - Moves to boards not tracked by this app fire no webhooks.
  */
-const WEBHOOK_EVENTS = ["create_item", "change_name", "item_moved_to_any_group", "item_archived", "item_deleted", "item_restored", "create_subitem", "move_subitem", "change_subitem_name", "subitem_deleted", "subitem_archived"];
+export const WEBHOOK_EVENTS = ["create_item", "change_name", "item_moved_to_any_group", "item_archived", "item_deleted", "item_restored", "create_subitem", "move_subitem", "change_subitem_name", "subitem_deleted", "subitem_archived"];
 
 /**
  * Registers webhooks for any {@link WEBHOOK_EVENTS} entries not yet recorded in

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/monday-auth";
 import { upsertMondayBoard } from "@/lib/database";
+import type { BoardConfig } from "@/types/database";
 
 /**
  * GET /api/admin/boards
@@ -34,10 +35,7 @@ export async function GET(request: NextRequest) {
 		let boardsWithBudgetMapping = new Set<string>();
 
 		if (boardIds.length > 0) {
-			const [{ data: syncLogs }, { data: budgetMappings }] = await Promise.all([
-				supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false }),
-				supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true),
-			]);
+			const [{ data: syncLogs }, { data: budgetMappings }] = await Promise.all([supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false }), supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true)]);
 
 			// Group by board_id and take the first (latest) one
 			if (syncLogs) {
@@ -108,7 +106,11 @@ export async function POST(request: NextRequest) {
 
 		// TODO: drop the `as any` once types/database/database.ts is regenerated for migration 033
 		// (adds display_enabled/sort_order/settings, drops the six sync/budget columns referenced there).
-		const { data: board, error } = await supabaseAdmin.from("board_config").upsert(boardData as any, { onConflict: "board_id" }).select().single();
+		const { data: board, error } = await supabaseAdmin
+			.from("board_config")
+			.upsert(boardData as any, { onConflict: "board_id" })
+			.select()
+			.single();
 
 		if (error) {
 			console.error("Error creating/updating board config:", error);
@@ -150,8 +152,12 @@ export async function PATCH(request: NextRequest) {
 		if (sort_order !== undefined) updateData.sort_order = sort_order;
 		if (settings !== undefined) updateData.settings = settings;
 
-		// TODO: drop the `as any` once types/database/database.ts is regenerated for migration 033.
-		const { data: board, error } = await supabaseAdmin.from("board_config").update(updateData as any).eq("board_id", board_id).select().single();
+		const { data: board, error } = await supabaseAdmin
+			.from("board_config")
+			.update(updateData as BoardConfig)
+			.eq("board_id", board_id)
+			.select()
+			.single();
 
 		if (error) {
 			console.error("Error updating board config:", error);
