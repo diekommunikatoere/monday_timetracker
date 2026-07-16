@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { ApiClient } from "@mondaydotcomorg/api";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { MondayGroupInsert } from "@/types/database";
-import { registerBoardWebhooks } from "@/lib/monday/webhooks";
 import { requireAdmin } from "@/lib/monday-auth";
 import { createMondayClient } from "@/lib/monday/client";
 
@@ -67,14 +66,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 				state: board.state,
 				updated_at: new Date().toISOString(),
 			});
-
-			// Register webhooks for the board
-			try {
-				await registerBoardWebhooks(boardId, token);
-			} catch (webhookError) {
-				console.error("Failed to register webhooks during group fetch:", webhookError);
-				// We don't fail the whole request just because webhooks failed
-			}
 		}
 
 		// 2. Get existing groups from DB to preserve sync_enabled values
