@@ -53,13 +53,13 @@ export type ButtonGroupProps = MantineButtonGroupProps & {
  *
  * @property children     - Icon content; **required**.
  * @property colorVariant - Semantic color variant; defaults to `default` when omitted.
- * @property onClick      - Zero-argument click handler.
+ * @property onClick      - Click handler; receives the event (e.g. for `stopPropagation` when nested inside another clickable element).
  * @property href         - Optional URL; presence hints at anchor usage (see {@link IconLink} for a true link).
  */
 export type IconButtonProps = MantineActionIconProps & {
 	children: React.ReactNode;
 	colorVariant?: "primary" | "secondary" | "tertiary" | "primary-muted" | "default";
-	onClick?: () => void;
+	onClick?: React.MouseEventHandler<HTMLButtonElement>;
 	onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
 	href?: string;
 };

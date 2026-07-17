@@ -22,9 +22,7 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 		}
 
-		// TODO: drop the `as any` once types/database/database.ts is regenerated for migration 033
-		// (adds display_enabled/sort_order/settings, drops the six sync/budget columns referenced there).
-		const { data, error } = await (supabaseAdmin.from("board_config") as any).select("board_id, sort_order, monday_board(name)").eq("display_enabled", true).order("sort_order", { ascending: true });
+		const { data, error } = await supabaseAdmin.from("board_config").select("board_id, sort_order, monday_board(name), settings").eq("display_enabled", true).order("sort_order", { ascending: true });
 
 		if (error) {
 			console.error("Error fetching display boards:", error);
@@ -34,6 +32,8 @@ export async function GET(request: NextRequest) {
 		const boards = (data || []).map((row: any) => ({
 			value: row.board_id,
 			label: row.monday_board?.name || row.board_id,
+			jobsSelectable: row.settings?.["jobs_selectable"] ?? false,
+			sortOrder: row.sort_order,
 		}));
 
 		return NextResponse.json({ boards });

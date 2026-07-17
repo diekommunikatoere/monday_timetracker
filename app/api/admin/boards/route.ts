@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/monday-auth";
 import { upsertMondayBoard } from "@/lib/database";
-import type { BoardConfig } from "@/types/database";
 
 /**
  * GET /api/admin/boards
@@ -143,21 +142,17 @@ export async function PATCH(request: NextRequest) {
 			return NextResponse.json({ error: "Board ID is required" }, { status: 400 });
 		}
 
-		const updateData: Record<string, unknown> = {
-			updated_at: new Date().toISOString(),
-		};
-
-		if (sync_enabled !== undefined) updateData.sync_enabled = sync_enabled;
-		if (display_enabled !== undefined) updateData.display_enabled = display_enabled;
-		if (sort_order !== undefined) updateData.sort_order = sort_order;
-		if (settings !== undefined) updateData.settings = settings;
-
-		const { data: board, error } = await supabaseAdmin
-			.from("board_config")
-			.update(updateData as BoardConfig)
-			.eq("board_id", board_id)
-			.select()
-			.single();
+		// Merge (never overwrite) the settings JSONB atomically in Postgres so a
+		// partial or stale payload can't clobber sibling keys. The scalar columns
+		// are folded into the same statement; a NULL arg leaves them unchanged.
+		// (rpc name cast: generated Functions types aren't regenerated per migration.)
+		const { data: board, error } = await supabaseAdmin.rpc("update_board_config" as any, {
+			p_board_id: board_id,
+			p_patch: settings ?? {},
+			p_sync_enabled: sync_enabled ?? null,
+			p_display_enabled: display_enabled ?? null,
+			p_sort_order: sort_order ?? null,
+		});
 
 		if (error) {
 			console.error("Error updating board config:", error);

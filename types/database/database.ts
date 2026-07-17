@@ -902,6 +902,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_board_config: {
+        Args: {
+          p_board_id: string
+          p_display_enabled?: boolean
+          p_patch?: Json
+          p_sort_order?: number
+          p_sync_enabled?: boolean
+        }
+        Returns: {
+          board_id: string
+          created_at: string
+          display_enabled: boolean
+          id: string
+          settings: Json
+          sort_order: number
+          sync_enabled: boolean | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "board_config"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       timer_state: "running" | "paused" | "parked" | "finalized"

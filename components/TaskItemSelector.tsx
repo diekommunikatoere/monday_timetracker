@@ -48,7 +48,6 @@ export interface TaskSelection {
  * @property onSelectionChange - Fired on every board/task change with the full {@link TaskSelection}.
  * @property onResetRef        - If provided, called once with a `reset()` function the parent can invoke to clear all selections.
  * @property initialValues     - Optional preselected board/task; reconciled against loaded data (or rendered from the supplied names as a fallback).
- * @property subItemsOnly      - When `true`, top-level items without subitems are hidden from the task tree — only selectable leaves are subitems.
  */
 interface TaskItemSelectorProps {
 	onSelectionChange: (data: TaskSelection) => void;
@@ -59,7 +58,6 @@ interface TaskItemSelectorProps {
 		itemId?: string;
 		itemName?: string;
 	};
-	subItemsOnly?: boolean;
 }
 
 /**
@@ -72,6 +70,7 @@ interface TaskItemSelectorProps {
  * @property label          - Display label shown in the dropdown.
  * @property name           - monday.com item name, where applicable.
  * @property disabled       - Reserved disabled flag (not currently set by the selector).
+ * @property jobsSelectable - Board-option only: whether this board allows booking top-level items ("jobs") directly, not just their subitems.
  * @property parentItemId   - Parent item id for subitems; absent for top-level items.
  * @property parentItemName - Parent item name for subitems; absent for top-level items.
  */
@@ -80,6 +79,7 @@ type DropdownOption = {
 	label: string;
 	name?: string;
 	disabled?: boolean;
+	jobsSelectable?: boolean;
 	parentItemId?: string;
 	parentItemName?: string;
 };
@@ -120,9 +120,13 @@ type ColorTreeNodeData = TreeNodeData & { color?: string };
  * with any board id still supplied via monday.com widget context (sidebar item
  * view) or `initialValues.boardId` that isn't already in that set; tasks are
  * fetched per board from `/api/tasks` and rendered in a
- * {@link TreeSelect} as a **Group → Job → Task** tree (top-level items with
- * subitems become non-selectable "job" containers). Role is a separate
- * concern — see the shared `RoleSelector`.
+ * {@link TreeSelect} as a **Group → Job → Task** tree. Whether a top-level
+ * item ("job") is itself selectable — via a trailing book-button on its row,
+ * alongside its subitems — is governed by the selected board's
+ * `jobsSelectable` flag (from `board_config.settings.jobs_selectable`): when
+ * off, jobs are non-selectable containers and flat (subitem-less) top-level
+ * items are hidden entirely; when on, both become selectable. Role is a
+ * separate concern — see the shared `RoleSelector`.
  *
  * Data flow: each React Query (`@tanstack/react-query`) query is cached with
  * generous `staleTime`/`gcTime`, tasks are **prefetched** for all loaded
@@ -142,10 +146,9 @@ type ColorTreeNodeData = TreeNodeData & { color?: string };
  * @param props.onSelectionChange - Receives the full selection on each change.
  * @param props.onResetRef        - Optional; receives a reset-all function.
  * @param props.initialValues     - Optional preselection to reconcile against loaded data.
- * @param props.subItemsOnly      - When `true`, only subitems are selectable leaves.
  * @returns A vertical `Flex` of two labelled selectors (board / task) with skeleton loading and inline error text.
  */
-export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues, subItemsOnly }: TaskItemSelectorProps) {
+export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues }: TaskItemSelectorProps) {
 	// State management for selections
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
@@ -484,13 +487,16 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 	// Build hierarchical tree data (Group > Job > Task) from query data.
 	// Also build a lookup map from a leaf value to its metadata, and a map
 	// from a leaf value to the ancestor node values needed to reveal it.
-	const { treeData, valueMeta, expansionMap } = useMemo(() => {
+	const { treeData, valueMeta, expansionMap, selectableJobValues } = useMemo(() => {
 		const meta = new Map<string, { name?: string; parentItemId?: string; parentItemName?: string }>();
 		const expansion = new Map<string, string[]>();
+		const selectableJobValues = new Set<string>();
 
 		if (!selectedBoard || !tasksData?.groups || tasksError) {
-			return { treeData: [] as TreeNodeData[], valueMeta: meta, expansionMap: expansion };
+			return { treeData: [] as TreeNodeData[], valueMeta: meta, expansionMap: expansion, selectableJobValues };
 		}
+
+		const jobsSelectable = !!selectedBoard?.jobsSelectable;
 
 		const groups: ColorTreeNodeData[] = [];
 
@@ -530,15 +536,25 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			// Top-level items: containers when they have subitems, otherwise selectable leaves.
 			topLevel.forEach((option) => {
 				const subs = childrenByParent.get(option.value);
+
 				if (subs && subs.length > 0) {
-					const jobValue = `job:${option.value}`;
+					// container: selectable via book-button only when the board allows it
+					const jobValue = jobsSelectable ? option.value : `job:${option.value}`;
 					usedParents.add(option.value);
+
 					const childNodes = subs
 						.slice()
 						.sort(sortByName)
 						.map((sub) => makeLeaf(sub, jobValue));
+					if (jobsSelectable) {
+						meta.set(option.value, { name: option.name });
+						expansion.set(option.value, [groupValue]);
+						selectableJobValues.add(option.value);
+					}
+
 					itemNodes.push({ value: jobValue, label: option.name ?? option.label, children: childNodes });
-				} else if (!subItemsOnly) {
+				} else if (jobsSelectable) {
+					// flat top-level item (no subitems): normal selectable leaf, only when board allows top-level booking
 					itemNodes.push(makeLeaf(option));
 				}
 			});
@@ -561,8 +577,8 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			}
 		});
 
-		return { treeData: groups, valueMeta: meta, expansionMap: expansion };
-	}, [tasksData, subItemsOnly, selectedBoard, tasksError]);
+		return { treeData: groups, valueMeta: meta, expansionMap: expansion, selectableJobValues };
+	}, [tasksData, selectedBoard, tasksError]);
 
 	// Set initial task if provided and expand the path to reveal it.
 	//
@@ -745,19 +761,41 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 			const isSelected = selectedTask?.value === node.value;
 			const groupColor = isGroup ? (node as ColorTreeNodeData).color : undefined;
 			return (
-				<Flex align="center" gap="4px">
+				<Flex align="center" gap="4px" style={{ width: "100%" }}>
 					{hasChildren && (
 						<IconButton variant="filled" colorVariant="tertiary" size="xs" onClick={() => {}} aria-label="Nicht auswählbar">
 							<Icon name={expanded ? "collapse_all" : "expand_all"} size={12} color="var(--color--text-secondary)" />
 						</IconButton>
 					)}
-					{isSelected && <Icon name="check" size={16} color="var(--color--primary-500)" weight="bold" />}
-					{isGroup && <span style={{ height: ".25em", width: ".25em", display: "inline-block", borderRadius: "50%", backgroundColor: groupColor, margin: "4px" }} />}
-					<span style={{ fontStyle: expanded ? "italic" : "normal" }}>{node.label}</span>
+					<Flex align="center" justify="space-between" gap={0} style={{ width: "100%" }}>
+						<Flex align="center" gap={0}>
+							{isSelected && <Icon name="check" size={16} color="var(--color--primary-500)" weight="bold" />}
+							{isGroup && <span style={{ height: ".25em", width: ".25em", display: "inline-block", borderRadius: "50%", backgroundColor: groupColor, margin: "4px" }} />}
+							<span style={{ fontStyle: expanded ? "italic" : "normal", width: "100%", display: "inline-block" }}>{node.label}</span>
+						</Flex>
+						{selectableJobValues.has(node.value) && (
+							<Tooltip label={isSelected ? "Auswahl aufheben" : "Gesamten Job buchen"} position="left">
+								<IconButton
+									variant="filled"
+									colorVariant="tertiary"
+									size="sm"
+									onClick={(event) => {
+										// Stop the click from bubbling to the row's own Combobox.Option handler,
+										// which would otherwise toggle expand/collapse instead of booking the job.
+										event.stopPropagation();
+										handleTaskChange(isSelected ? null : node.value);
+									}}
+									aria-label={isSelected ? "Auswahl aufheben" : "Job auswählen"}
+								>
+									<Icon name={isSelected ? "close" : "check"} size={16} />
+								</IconButton>
+							</Tooltip>
+						)}
+					</Flex>
 				</Flex>
 			);
 		},
-		[selectedTask],
+		[selectedTask, selectableJobValues, handleTaskChange],
 	);
 
 	return (

@@ -850,12 +850,8 @@ export default function BoardConfigPage() {
 						<Stack gap="md">
 							<Switch
 								label="Jobs auswählbar"
-								checked={boardConfig.settings?.["jobs_selectable"]}
+								checked={!!boardConfig.settings?.["jobs_selectable"]}
 								onChange={(event) => {
-									console.log(boardConfig.settings?.["jobs_selectable"]);
-									console.log("Toggling jobs_selectable:", event.currentTarget.checked);
-									console.log("Current boardConfig:", boardConfig);
-
 									updateBoardConfig({
 										settings: {
 											jobs_selectable: event.currentTarget.checked,

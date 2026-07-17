@@ -201,7 +201,7 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 								? undefined
 								: {
 										show: true,
-										node: <TaskItemSelector onSelectionChange={setSelectedTask} subItemsOnly={true} />,
+										node: <TaskItemSelector onSelectionChange={setSelectedTask} />,
 									}
 						}
 						roleSelector={{
