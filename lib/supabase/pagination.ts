@@ -26,6 +26,8 @@ export interface PaginationConfig {
 	maxRows?: number;
 	/** Delay between batches in milliseconds (default: 0) */
 	delayMs?: number;
+	/** Equality filters applied to every batch, e.g. `{ board_id: "123" }`. */
+	eq?: Record<string, string | number | boolean>;
 }
 
 /**
@@ -239,6 +241,13 @@ export async function fetchAllWithKeyset(client: SupabaseClient<Database>, table
 				.select(select)
 				.order(cursorColumn, { ascending: true })
 				.limit(currentBatchSize);
+
+			// Apply equality filters if provided to every batch
+			if (config.eq) {
+				for (const [col, value] of Object.entries(config.eq)) {
+					query = query.eq(col, value);
+				}
+			}
 
 			// Add cursor filter if we have a last cursor
 			if (lastCursor !== null) {

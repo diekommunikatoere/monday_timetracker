@@ -141,16 +141,17 @@ export async function getTasksFromDB(boardId: string) {
 	console.log(`[getTasksFromDB] Board ${boardId} total items (from view): ${totalBoardItems}, active items: ${activeBoardItems}`);
 
 	// Step 3: Fetch the items with group filtering using pagination for large boards
-	// Use keyset pagination on 'name' column for efficient fetching
-	// Note: We select board_id and is_active to enable in-memory filtering
-	const result = await fetchAllWithKeyset(supabaseAdmin, "view_monday_tasks", "name", "id, name, parent_item_id, parent_item_name, group_id, board_id, is_active", { batchSize: 1000 });
+	// Use keyset pagination on the unique 'id' column (non-unique cursors like
+	// 'name' skip rows at batch boundaries) and scope to the board server-side.
+	// Note: We still select is_active and group_id for in-memory filtering.
+	const result = await fetchAllWithKeyset(supabaseAdmin, "view_monday_tasks", "id", "id, name, parent_item_id, parent_item_name, group_id, board_id, is_active", { batchSize: 1000, eq: { board_id: boardId } });
 
 	if (!result.success) {
 		console.error(`Error fetching items from DB for board ${boardId}:`, result.error);
 		throw new Error(result.error || "Failed to fetch tasks");
 	}
 
-	// Apply filters in memory (board_id, is_active, group_id)
+	// Apply remaining filters in memory (is_active, group_id); board_id is scoped server-side
 	type ViewMondayTask = {
 		board_id: string | null;
 		group_id: string | null;
@@ -162,7 +163,7 @@ export async function getTasksFromDB(boardId: string) {
 		updated_at: string | null;
 	};
 
-	const items = result.data.filter((item: ViewMondayTask) => item.board_id === boardId && item.is_active === true && syncedGroupIds.includes(item.group_id!)) as ViewMondayTask[];
+	const items = result.data.filter((item: ViewMondayTask) => item.is_active === true && syncedGroupIds.includes(item.group_id!)) as ViewMondayTask[];
 
 	if (items.length === 0) {
 		console.log(`[getTasksFromDB] No items found matching sync criteria for board ${boardId}`);
