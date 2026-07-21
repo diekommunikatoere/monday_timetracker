@@ -7,13 +7,18 @@ const nextConfig: NextConfig = {
 		root: path.join(__dirname, ".."),
 	},
 	images: {
-    localPatterns: [
-      {
-        pathname: '/public/img/**',
-        search: '',
-      },
-    ],
-  },
+		localPatterns: [
+			{
+				pathname: "/public/img/**",
+				search: "",
+			},
+		],
+	},
+	experimental: {
+		serverActions: {
+			allowedOrigins: ["*.supabase.com", "*.monday.com"],
+		},
+	},
 };
 
 export default nextConfig;
