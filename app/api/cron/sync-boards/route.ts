@@ -13,8 +13,6 @@ import { createMondayClient } from "@/lib/monday/client";
  */
 export async function GET(request: NextRequest) {
 	try {
-		console.log("[Reconciliation Cron] Received request to sync boards");
-		console.log("[Reconciliation Cron] Starting sync...");
 		// 1. Verify cron secret (if set)
 		const authHeader = request.headers.get("authorization");
 		const cronSecret = process.env.CRON_SECRET;

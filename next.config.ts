@@ -14,11 +14,6 @@ const nextConfig: NextConfig = {
 			},
 		],
 	},
-	experimental: {
-		serverActions: {
-			allowedOrigins: ["*.supabase.com", "*.monday.com"],
-		},
-	},
 };
 
 export default nextConfig;
