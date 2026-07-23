@@ -57,7 +57,6 @@ export async function GET(request: NextRequest) {
 				`;
 
 				const boardTypeResponse = await client.request<any>(boardTypeQuery, { boardId: board.id });
-				console.log(`[Reconciliation Cron] Sanity check: Board type response for ${board.name} (${board.id}):`, boardTypeResponse);
 				const boardType = boardTypeResponse.boards?.[0]?.type;
 
 				if (boardType !== "board") {
@@ -86,8 +85,7 @@ export async function GET(request: NextRequest) {
 				`;
 
 				const boardResponse = await client.request<any>(boardQuery, { boardId: board.id });
-				console.log(`[Reconciliation Cron] Sanity check: Board response for ${board.name} (${board.id}):`, boardResponse);
-				const mondayBoard = boardResponse.data?.boards?.[0];
+				const mondayBoard = boardResponse.boards?.[0];
 
 				if (mondayBoard && boardType === "board") {
 					// Update metadata
@@ -99,6 +97,7 @@ export async function GET(request: NextRequest) {
 						state: mondayBoard.state,
 						updated_at: new Date().toISOString(),
 					});
+					console.log(`[Reconciliation Cron] Updated metadata for board ${board.name} (${board.id})`);
 
 					// Sync Groups
 					if (mondayBoard.groups) {
@@ -119,14 +118,17 @@ export async function GET(request: NextRequest) {
 
 						if (groupsToUpsert.length > 0) {
 							await supabaseAdmin.from("monday_group").upsert(groupsToUpsert, { onConflict: "board_id,id" });
+							console.log(`[Reconciliation Cron] Upserted ${groupsToUpsert.length} groups for board ${board.name} (${board.id})`);
 						}
 					}
 
 					// Verify/Register Webhooks (reconcile also clears stale/duplicate ones)
 					if (reconcile) {
 						await reconcileWebhooks(board.id, token);
+						console.log(`[Reconciliation Cron] Reconciled webhooks for board ${board.name} (${board.id})`);
 					} else {
 						await registerBoardWebhooks(board.id, token);
+						console.log(`[Reconciliation Cron] Registered missing webhooks for board ${board.name} (${board.id})`);
 					}
 				}
 
