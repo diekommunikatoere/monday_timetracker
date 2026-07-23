@@ -45,8 +45,27 @@ export async function GET(request: NextRequest) {
 			try {
 				console.log(`[Reconciliation Cron] Syncing board: ${board.name} (${board.id})`);
 
-				// A. Sync Board Metadata & Webhooks
+				// A. Fetch Board type and only continue if it's "board" (not "sub_items_board", "custom_object" or "document" type)
 				const client = createMondayClient();
+				const boardTypeQuery = `
+					query ($boardId: ID!) {
+						boards(ids: [$boardId]) {
+							id
+							type
+						}
+					}
+				`;
+
+				const boardTypeResponse = await client.request<any>(boardTypeQuery, { boardId: board.id });
+				const boardType = boardTypeResponse.data?.boards?.[0]?.type;
+
+				if (boardType !== "board") {
+					console.log(`[Reconciliation Cron] Skipping board ${board.name} (${board.id}) of type ${boardType}`);
+					results.push({ boardId: board.id, status: "skipped", reason: `Board type is ${boardType}` });
+					continue;
+				}
+
+				// B. Sync Board Metadata & Webhooks
 				const boardQuery = `
 					query ($boardId: ID!) {
 						boards(ids: [$boardId]) {
@@ -54,7 +73,6 @@ export async function GET(request: NextRequest) {
 							name
 							workspace_id
 							board_kind
-							type
 							state
 							groups {
 								id
@@ -67,7 +85,8 @@ export async function GET(request: NextRequest) {
 				`;
 
 				const boardResponse = await client.request<any>(boardQuery, { boardId: board.id });
-				const mondayBoard = boardResponse.data?.data?.boards?.[0];
+				console.log(`[Reconciliation Cron] Sanity check: Board response for ${board.name} (${board.id}):`, boardResponse);
+				const mondayBoard = boardResponse.data?.boards?.[0];
 
 				if (mondayBoard && mondayBoard.type === "board") {
 					// Update metadata
