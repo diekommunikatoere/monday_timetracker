@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
 				console.log(`[Reconciliation Cron] Sanity check: Board response for ${board.name} (${board.id}):`, boardResponse);
 				const mondayBoard = boardResponse.data?.boards?.[0];
 
-				if (mondayBoard && mondayBoard.type === "board") {
+				if (mondayBoard && boardType === "board") {
 					// Update metadata
 					await supabaseAdmin.from("monday_board").upsert({
 						id: board.id,
