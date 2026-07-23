@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
 				const boardTypeResponse = await client.request<any>(boardTypeQuery, { boardId: board.id });
 				console.log(`[Reconciliation Cron] Sanity check: Board type response for ${board.name} (${board.id}):`, boardTypeResponse);
-				const boardType = boardTypeResponse.data?.data?.boards?.[0]?.type;
+				const boardType = boardTypeResponse.boards?.[0]?.type;
 
 				if (boardType !== "board") {
 					console.log(`[Reconciliation Cron] Skipping board ${board.name} (${board.id}) of type ${boardType}`);
