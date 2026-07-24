@@ -32,30 +32,17 @@ import styles from "@/components/styles/features/timer/TimerCommentField.module.
  * @returns A row containing the save-as-draft icon button and the comment input.
  */
 export function TimerComment({ value, onChange, disabled, hasSession, isSaving, onSaveAsDraft }: TimerCommentFieldProps) {
-	// Local state for focus styling only
-	const [isFocused, setIsFocused] = useState(false);
-
-	const handleFocus = () => {
-		setIsFocused(true);
-	};
-
-	const handleBlur = () => {
-		setIsFocused(false);
-	};
-
-	const activeColor = "white";
-	const disabledColor = "var(--color--text-disabled)";
-
-	return (
-		<Flex direction="row" align="center" className="timer-comment-field-container" gap="0" style={{ flex: 1 }}>
-			<Tooltip label="Als Entwurf speichern" position="top" withArrow>
-				<IconButton variant="filled" colorVariant="primary" size="lg" onClick={onSaveAsDraft} disabled={!hasSession || isSaving} loading={isSaving} style={{ borderRadius: "var(--border-radius-small) 0 0 var(--border-radius-small)", height: "100%", width: "auto" }}>
-					<Icon name="save_clock" size={24} />
+	const renderSaveButton = () => {
+		return (
+			<Tooltip label="Als Entwurf speichern" position="bottom" withArrow>
+				<IconButton variant="filled" colorVariant="primary" onClick={onSaveAsDraft} disabled={!hasSession || isSaving} loading={isSaving}>
+					<Icon name="save_clock" size={18} />
 				</IconButton>
 			</Tooltip>
-			<Input classNames={styles} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} onBlur={handleBlur} onFocus={handleFocus} value={value} disabled={disabled} style={{ flex: 1, minWidth: "clamp(min(200px, 100vw), 25vw, 450px)" }} />
-		</Flex>
-	);
+		);
+	};
+
+	return <Input classNames={{ root: styles.commentInput }} placeholder="Kommentar hinzufügen..." aria-label="Kommentar hinzufügen..." onChange={(event) => onChange(event.currentTarget.value)} value={value} disabled={disabled} rightSection={renderSaveButton()} />;
 }
 
 export default TimerComment;

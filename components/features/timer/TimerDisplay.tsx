@@ -32,17 +32,14 @@ export function TimerDisplay({ elapsedTime, status, onReset, disabled }: TimerDi
 	const isActive = status !== "idle";
 	const isPaused = status === "paused";
 
-	const activeColor = "var(--color--text-on-primary)";
-	const disabledColor = "var(--color--text-disabled)";
-
 	return (
-		<Flex direction="row" align="center" justify="center" gap="lg">
+		<Flex className={styles.timerDisplay} direction="row" align="center" justify="center" gap={8}>
 			<Tooltip label="Timer zurücksetzen" position="top" withArrow>
-				<IconButton className={`btn-reset ${styles.timerResetButton}`} onClick={onReset} variant="filled" colorVariant="primary" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
+				<IconButton className={`timer--reset btn-reset ${styles.timerResetButton}`} onClick={onReset} variant="filled" colorVariant="primary" size="lg" aria-label="Timer zurücksetzen" disabled={disabled}>
 					<Icon name="restart_alt" size={24} />
 				</IconButton>
 			</Tooltip>
-			<Text className={`${styles.time} ${isActive ? styles.isActive : ""} ${isPaused ? styles.isPaused : ""}`}>{formatTime(elapsedTime)}</Text>
+			<Text className={`${styles.timerTime} ${isActive ? styles.isActive : ""} ${isPaused ? styles.isPaused : ""}`}>{formatTime(elapsedTime)}</Text>
 		</Flex>
 	);
 }

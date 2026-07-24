@@ -1,5 +1,29 @@
 .timerContainer {
-	padding: 6px;
-	background-color: var(--color--background-secondary);
-	border-radius: var(--border-radius--md);
+	width: 100%;
+	flex-direction: column;
+	flex-flow: row wrap;
+	align-items: center;
+	justify-content: center;
+}
+
+.timerContainerInner {
+	flex: 1;
+	min-width: 300px;
+	width: 100%;
+}
+
+@media (min-width: 850px) {
+	.timerContainer {
+		flex-flow: row nowrap;
+		max-width: 700px;
+	}
+
+	.timerContainerInner {
+		flex: unset;
+		min-width: unset;
+		width: unset;
+	}
+}
+
+@media (min-width: 900px) {
 }

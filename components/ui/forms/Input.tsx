@@ -33,12 +33,13 @@ import { Icon, IconButton } from "@/components";
  * @returns A Mantine `TextInput` with design-system classes and a resolved error.
  */
 export const Input: React.FC<InputProps> = ({ error, validationState, className = "", clearable, onClear, clearButtonLabel = "Eingabe löschen", rightSection, rightSectionPointerEvents, value, ...props }) => {
-	const inputClass = [styles.input, validationState ? styles[`input--${validationState}`] : "", className].filter(Boolean).join(" ");
+	const validationClass = validationState === "error" ? styles.inputError : validationState === "warning" ? styles.inputWarning : validationState === "success" ? styles.inputSuccess : "";
+	const inputClass = [styles.input, validationClass].filter(Boolean).join(" ");
 	const showClearButton = clearable && !!value;
 
 	return (
 		<MantineTextInput
-			classNames={{ input: inputClass }}
+			classNames={{ root: inputClass }}
 			error={typeof error === "string" ? error : error ? "Ungültige Eingabe" : null}
 			value={value}
 			rightSection={

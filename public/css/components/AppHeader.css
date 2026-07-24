@@ -1,7 +1,7 @@
-#appHeader {
+#app-header {
 	position: relative;
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	column-gap: 16px;
 	row-gap: 16px;
 	width: 100%;
@@ -13,32 +13,59 @@
 
 	.header-left-section {
 		flex: 1;
-		min-width: 200px;
-		flex-wrap: wrap;
+		min-width: 300px;
+		width: 100%;
+		align-items: center;
+		justify-content: space-between;
 
-		.logo-container {
-			flex: 1;
-			justify-content: center;
-			flex-wrap: wrap;
+		.section-left-inner {
+			align-items: center;
+			justify-content: flex-start;
+		}
+
+		.section-right-inner {
+			align-items: center;
+			justify-content: flex-end;
+
+			.total-hours-today {
+				.text-today {
+					display: none;
+				}
+			}
 		}
 	}
-}
 
-@media (min-width: 300px) {
-	#appHeader .header-left-section .logo-container {
-		flex-wrap: nowrap;
-		justify-content: flex-start;
+	.header-right-section {
+		flex: 1;
+		min-width: 300px;
+		width: 100%;
 	}
 }
 
-@media (min-width: 900px) {
-	#appHeader {
-		justify-content: flex-start;
+@media (min-width: 700px) {
+	#app-header {
+		justify-content: space-between;
 		flex-wrap: nowrap;
 
 		.header-left-section {
 			flex: unset;
 			min-width: unset;
+			width: unset;
+
+			.total-hours-today {
+				.text-today {
+					display: block;
+				}
+			}
+		}
+	}
+}
+
+@media (min-width: 850px) {
+	#app-header {
+		.header-right-section {
+			flex: unset;
+			width: fit-content;
 		}
 	}
 }

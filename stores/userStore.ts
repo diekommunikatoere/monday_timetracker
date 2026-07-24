@@ -73,7 +73,7 @@ interface UserState {
 	setMondayUser: (user: UserState["mondayUser"]) => void;
 	setSupabaseUser: (user: UserState["supabaseUser"]) => void;
 	/** Flip light/dark, update derived `appTheme`, and persist to the DB via `/api/user/theme`. */
-	toggleTheme: () => Promise<void>;
+	setTheme: (newTheme: AppTheme) => Promise<void>;
 }
 
 export const useUserStore = create<UserState>()(
@@ -125,13 +125,13 @@ export const useUserStore = create<UserState>()(
 				};
 				set({ supabaseUser: user });
 			},
-			toggleTheme: async () => {
+			setTheme: async (newTheme: AppTheme) => {
 				const currentTheme = get().theme;
-				const newTheme: MondayTheme = currentTheme === "light" ? "dark" : "light";
-				const appTheme = mapMondayThemeToAppTheme(newTheme);
+				const mondayTheme: MondayTheme = newTheme === "light" ? "light" : "dark";
+				const appTheme = mapMondayThemeToAppTheme(mondayTheme);
 
 				// Update local state synchronously
-				set({ theme: newTheme, appTheme });
+				set({ theme: mondayTheme, appTheme });
 
 				// Persist to database asynchronously
 				try {
@@ -151,7 +151,7 @@ export const useUserStore = create<UserState>()(
 							"monday-context": JSON.stringify(context),
 							Authorization: `Bearer ${sessionToken}`,
 						},
-						body: JSON.stringify({ theme: newTheme }),
+						body: JSON.stringify({ theme: mondayTheme }),
 					});
 				} catch (error) {
 					console.error("Failed to persist theme change:", error);
