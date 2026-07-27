@@ -34,7 +34,6 @@ type MondayUser = {
 		thumb_small: string | null;
 		tiny: string | null;
 	} | null;
-	team_ids?: string[] | null;
 	isAdmin: boolean;
 	isGuest: boolean;
 	isViewOnly: boolean;
@@ -125,7 +124,6 @@ export const useUserStore = create<UserState>()(
 				const user = {
 					id: useUserStore.getState().mondayUser!.id,
 					email: useUserStore.getState().mondayUser!.email || "",
-					team_ids: useUserStore.getState().mondayUser!.team_ids || [],
 					is_admin: useUserStore.getState().mondayUser!.isAdmin || false,
 				};
 				set({ supabaseUser: user });
