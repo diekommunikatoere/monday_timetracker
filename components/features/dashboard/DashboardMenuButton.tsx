@@ -21,10 +21,8 @@ export function DashboardMenuButton() {
 
 	const renderViewLink = (label: string, path: string, icon: string) => {
 		const isActive = pathname === path;
-		console.log(`Rendering link for ${label} (${path}), isActive: ${isActive}`);
 
 		if (!canAccessRoute(path, user)) {
-			console.warn(`User does not have access to ${path}. Link will not be rendered.`);
 			return null;
 		}
 
