@@ -11,6 +11,8 @@ import type { Role } from "@/types/database";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { canAccessRoute } from "@/lib/permissions";
+import { usePathname } from "next/navigation";
 
 import "@/public/css/components/AdminPage.css";
 
@@ -81,6 +83,19 @@ function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemov
 }
 
 export default function AdminPage() {
+	const pathname = usePathname();
+	const mondayIsAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
+
+	if (!canAccessRoute(pathname, { isAdmin: mondayIsAdmin })) {
+		return (
+			<div id="admin-app">
+				<div className="admin-error">
+					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
+				</div>
+			</div>
+		);
+	}
+
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [allBoardConfigs, setAllBoardConfigs] = useState<any[]>([]);
 	const [pickerGroups, setPickerGroups] = useState<WorkspaceBoardGroup[]>([]);

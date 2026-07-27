@@ -9,6 +9,8 @@
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
 		"expose": "mapps tunnel:create -p 8301",
 		"db:migrate": "supabase db push"
 	},
@@ -43,6 +45,8 @@
 		"@types/react": "19.2.16",
 		"@types/react-dom": "19.2.3",
 		"cross-port-killer": "^1.4.0",
+		"eslint": "^9.39.5",
+		"eslint-config-next": "^16.2.12",
 		"supabase": "^2.104.0",
 		"typescript": "^5.9.3"
 	},

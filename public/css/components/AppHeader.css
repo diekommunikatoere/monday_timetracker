@@ -51,12 +51,6 @@
 			flex: unset;
 			min-width: unset;
 			width: unset;
-
-			.total-hours-today {
-				.text-today {
-					display: block;
-				}
-			}
 		}
 	}
 }
@@ -66,6 +60,20 @@
 		.header-right-section {
 			flex: unset;
 			width: fit-content;
+		}
+	}
+}
+
+@media (min-width: 900px) {
+	#app-header {
+		.header-left-section {
+			.section-right-inner {
+				.total-hours-today {
+					.text-today {
+						display: block;
+					}
+				}
+			}
 		}
 	}
 }

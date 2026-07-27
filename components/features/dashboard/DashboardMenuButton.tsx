@@ -3,13 +3,42 @@
 import { Icon, IconButton } from "@/components";
 import { Flex, Menu, Indicator } from "@mantine/core";
 import { useUserStore } from "@/stores/userStore";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { canAccessRoute } from "@/lib/permissions";
 
 export function DashboardMenuButton() {
+	const supabaseUser = useUserStore((state) => state.supabaseUser);
+	const user = { teamIds: supabaseUser?.team_ids, isAdmin: supabaseUser?.is_admin };
 	const appTheme = useUserStore((state) => state.appTheme);
 	const setTheme = useUserStore((state) => state.setTheme);
+	const pathname = usePathname();
 
-	const setView = (view: "billing" | "analytics") => {
+	const setView = (view: "time-entries" | "abrechnung" | "auswertung") => {
 		console.log(`Switching to view: ${view}`);
+	};
+
+	const renderViewLink = (label: string, path: string, icon: string) => {
+		const isActive = pathname === path;
+		console.log(`Rendering link for ${label} (${path}), isActive: ${isActive}`);
+
+		if (!canAccessRoute(path, user)) {
+			console.warn(`User does not have access to ${path}. Link will not be rendered.`);
+			return null;
+		}
+
+		return (
+			<Menu.Item>
+				<Indicator position="middle-end" size={8} disabled={!isActive}>
+					<Link href={path} style={{ textDecoration: "none", color: "inherit" }}>
+						<Flex align="center" gap={8}>
+							<Icon name={icon} size={16} />
+							{label}
+						</Flex>
+					</Link>
+				</Indicator>
+			</Menu.Item>
+		);
 	};
 
 	return (
@@ -20,26 +49,9 @@ export function DashboardMenuButton() {
 				</IconButton>
 			</Menu.Target>
 			<Menu.Dropdown>
-				<Menu.Item>
-					<Indicator position="middle-end" size={8}>
-						<Flex align="center" gap={8}>
-							<Icon name="home" size={16} />
-							Zeiterfassung
-						</Flex>
-					</Indicator>
-				</Menu.Item>
-				<Menu.Item onClick={() => setView("billing")}>
-					<Flex align="center" gap={8}>
-						<Icon name="receipt_long" size={16} />
-						Abrechnung
-					</Flex>
-				</Menu.Item>
-				<Menu.Item onClick={() => setView("analytics")}>
-					<Flex align="center" gap={8}>
-						<Icon name="bar_chart" size={16} />
-						Auswertung
-					</Flex>
-				</Menu.Item>
+				{renderViewLink("Zeiterfassung", "/dashboards", "home")}
+				{renderViewLink("Abrechnung", "/dashboards/analytics/abrechnung", "receipt_long")}
+				{renderViewLink("Auswertung", "/dashboards/analytics/auswertung", "bar_chart")}
 				<Menu.Divider />
 				<Menu.Sub>
 					<Menu.Sub.Target>
