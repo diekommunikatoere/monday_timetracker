@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/monday-auth";
+
 import { upsertMondayBoard } from "@/lib/database";
+import { requireAdmin } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 interface DisplayBoardInput {
 	board_id: string;

@@ -1,10 +1,10 @@
 // components/ui/forms/types.ts
 // Shared prop types for the form control design-system components.
 
-import React from "react";
 import { TextInputProps as MantineTextInputProps, TextareaProps as MantineTextareaProps, SelectProps as MantineSelectProps, TreeSelectProps as MantineTreeSelectProps } from "@mantine/core";
 import { DatePickerInputProps, DatePickerType, TimeInputProps as MantineTimeInputProps } from "@mantine/dates";
 import { TimePickerProps } from "@mantine/dates";
+import React from "react";
 
 /**
  * Shared validation contract used by every form control in this folder.

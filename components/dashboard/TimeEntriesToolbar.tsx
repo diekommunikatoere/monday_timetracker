@@ -1,14 +1,16 @@
 // components/dashboard/TimeEntriesToolbar.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { Tooltip, Collapse } from "@mantine/core";
 import { type DatesRangeValue } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
+import { useEffect, useState } from "react";
+
 import { DatePicker, Input, Select, Button, Icon, IconButton } from "@/components";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import type { TimeEntriesFilterOption } from "./hooks/useFilteredTimeEntries";
 import classes from "@/components/styles/features/time-entries/TimeEntriesToolbar.module.css";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+
+import type { TimeEntriesFilterOption } from "./hooks/useFilteredTimeEntries";
 
 /**
  * Props for {@link TimeEntriesToolbar}.

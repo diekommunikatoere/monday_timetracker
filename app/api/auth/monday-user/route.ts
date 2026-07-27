@@ -1,5 +1,6 @@
 // app/api/auth/monday-user/route.ts
 import { NextRequest, NextResponse } from "next/server";
+
 import { findOrCreateUserByMondayId } from "@/lib/database/users";
 import { getUserDetails } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";

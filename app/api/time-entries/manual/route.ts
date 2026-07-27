@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { syncAfterFinalize } from "@/lib/columnSync";
 import { insertTimeEntry } from "@/lib/database";
-import { roundDuration } from "@/lib/utils";
-import { verifyMondayJwt } from "@/lib/monday-auth";
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { roundDuration } from "@/lib/utils";
 
 interface ManualTimeEntryRequest {
 	userId: string;

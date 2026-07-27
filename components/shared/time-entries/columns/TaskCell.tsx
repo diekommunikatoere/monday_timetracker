@@ -1,6 +1,8 @@
 // components/shared/time-entries/columns/TaskCell.tsx
 import { Flex, Text, Badge } from "@mantine/core";
+
 import { TimeEntry } from "@/types/time-entry";
+
 import { TimeEntryRowMenu } from "../TimeEntryRowMenu";
 
 /**

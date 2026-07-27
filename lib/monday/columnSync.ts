@@ -19,10 +19,13 @@
  */
 
 import { ClientError } from "@mondaydotcomorg/api";
-import { cacheHelper } from "../redis";
+
 import { SyncPurpose, TimeFormat } from "@/types/database";
-import { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose } from "./utils";
+
+import { cacheHelper } from "../redis";
+
 import { createMondayClient } from "./client";
+import { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose } from "./utils";
 
 // Re-export shared utilities for convenience
 export { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose };

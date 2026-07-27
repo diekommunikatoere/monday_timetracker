@@ -3,13 +3,15 @@
 
 "use client";
 
-import React from "react";
 import { Modal as MantineModal } from "@mantine/core";
-import { ModalProps, ModalCompoundComponent } from "./types";
-import { ModalHeader } from "./ModalHeader";
+import React from "react";
+
+import styles from "@/components/styles/ui/modals/Modal.module.css";
+
 import { ModalBody } from "./ModalBody";
 import { ModalFooter } from "./ModalFooter";
-import styles from "@/components/styles/ui/modals/Modal.module.css";
+import { ModalHeader } from "./ModalHeader";
+import { ModalProps, ModalCompoundComponent } from "./types";
 
 /**
  * Modal root component built on Mantine's `Modal`.

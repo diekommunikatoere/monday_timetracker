@@ -1,19 +1,21 @@
 // components/dashboard/EditTimeEntryModal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
 import { Flex, Text, Group } from "@mantine/core";
+import { useState, useEffect } from "react";
+
 import { Button, Modal } from "@/components";
-import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
-import { useUserStore } from "@/stores/userStore";
+import { useToast } from "@/components/ToastProvider";
+import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { useToast } from "@/components/ToastProvider";
+import { useUserStore } from "@/stores/userStore";
 import { TimeEntry } from "@/types/time-entry";
-import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
-import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
-import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+
 import { useRoles } from "../shared/hooks/useRoles";
+import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
+import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 
 import "@mantine/dates/styles.css";
 

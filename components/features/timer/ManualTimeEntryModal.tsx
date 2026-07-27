@@ -1,19 +1,21 @@
 // components/features/timer/ManualTimeEntryModal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
 import { Group, Flex, Text, Switch } from "@mantine/core";
+import { useState, useEffect } from "react";
+
 import { Button, Modal } from "@/components";
 import TaskItemSelector, { TaskSelection } from "@/components/TaskItemSelector";
-import { useUserStore } from "@/stores/userStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
-import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
-import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFields";
-import { useTimeEntryForm } from "../../shared/hooks/useTimeEntryForm";
-import { useRoles } from "../../shared/hooks/useRoles";
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
+import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+import { useUserStore } from "@/stores/userStore";
+
+import { useRoles } from "../../shared/hooks/useRoles";
+import { useTimeEntryForm } from "../../shared/hooks/useTimeEntryForm";
+import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFields";
 
 /**
  * Props for {@link ManualTimeEntryModal}.

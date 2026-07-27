@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+
+import { requireAdmin } from "@/lib/monday-auth";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { BoardRoleOverrideInsert, BoardRoleOverrideUpdate } from "@/types/database";
-import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/boards/[boardId]/role-overrides

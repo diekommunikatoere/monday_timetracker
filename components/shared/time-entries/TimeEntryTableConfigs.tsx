@@ -1,11 +1,13 @@
 // components/shared/time-entries/TimeEntryTableConfigs.tsx
 import { Checkbox, Text } from "@mantine/core";
-import { TimeEntry } from "@/types/time-entry";
+
 import { ColumnDef } from "@/components/ui/tables/types";
-import { TaskCell } from "./columns/TaskCell";
-import { RoleCell } from "./columns/RoleCell";
-import { TimeRangeCell } from "./columns/TimeRangeCell";
 import { formatDuration } from "@/lib/utils";
+import { TimeEntry } from "@/types/time-entry";
+
+import { RoleCell } from "./columns/RoleCell";
+import { TaskCell } from "./columns/TaskCell";
+import { TimeRangeCell } from "./columns/TimeRangeCell";
 import { TimeEntryRowMenu } from "./TimeEntryRowMenu";
 
 /**

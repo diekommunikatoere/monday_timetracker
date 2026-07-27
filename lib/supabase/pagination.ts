@@ -4,6 +4,7 @@
 // fine for moderate data) and keyset/cursor-based (efficient for large tables).
 
 import { SupabaseClient } from "@supabase/supabase-js";
+
 import type { Database } from "@/types/database";
 
 /**

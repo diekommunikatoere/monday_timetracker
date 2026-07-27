@@ -3,10 +3,12 @@
 
 "use client";
 
-import React from "react";
 import { TimeInput as MantineTimeInput } from "@mantine/dates";
-import { TimeInputProps } from "./types";
+import React from "react";
+
 import styles from "@/components/styles/ui/forms/TimeInput.module.css";
+
+import { TimeInputProps } from "./types";
 
 /**
  * Plain `<input type="time">` field built on Mantine's `TimeInput`.

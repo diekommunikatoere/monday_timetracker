@@ -1,7 +1,8 @@
 // components/shared/time-entries/columns/RoleCell.tsx
 import { Flex, Text, Tooltip, UnstyledButton } from "@mantine/core";
-import { TimeEntry } from "@/types/time-entry";
+
 import { Icon } from "@/components";
+import { TimeEntry } from "@/types/time-entry";
 
 /**
  * Props for {@link RoleCell}.

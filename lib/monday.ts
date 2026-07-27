@@ -2,9 +2,10 @@
 
 import { ClientError } from "@mondaydotcomorg/api";
 import { NextRequest } from "next/server";
-import { cacheHelper } from "./redis";
+
 import { upsertMondayBoard, upsertMondayItem, upsertMondayItemsBatch } from "./database";
 import { createMondayClient } from "./monday/client";
+import { cacheHelper } from "./redis";
 
 // Cache TTL constants (in seconds)
 const CACHE_TTL = {
@@ -720,7 +721,7 @@ export async function getBoardTasks(
 				const subitemsBoard = initialResponse.boards?.[0];
 				if (subitemsBoard?.items_page) {
 					let cursor = subitemsBoard.items_page.cursor;
-					let allSubitems = [...subitemsBoard.items_page.items];
+					const allSubitems = [...subitemsBoard.items_page.items];
 
 					console.log(`[getBoardTasks] Phase 2: Fetched ${allSubitems.length} subitems initially`);
 

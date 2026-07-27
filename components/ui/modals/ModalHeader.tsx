@@ -3,10 +3,12 @@
 
 "use client";
 
-import React from "react";
 import { Modal } from "@mantine/core";
-import { ModalHeaderProps } from "./types";
+import React from "react";
+
 import styles from "@/components/styles/ui/modals/ModalHeader.module.css";
+
+import { ModalHeaderProps } from "./types";
 
 /**
  * Header slot for {@link Modal}.

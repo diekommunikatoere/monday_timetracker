@@ -1,6 +1,7 @@
 "use client";
 
 import { Select } from "@/components";
+
 import type { RoleOption } from "../hooks/useRoles";
 
 /**
@@ -38,21 +39,7 @@ export interface RoleSelectorProps {
  * @returns A labelled, searchable, clearable `Select`.
  */
 export function RoleSelector({ roles, selectedRoleId, onChange, loading, required }: RoleSelectorProps) {
-	return (
-		<Select
-			label="Rolle"
-			placeholder="Rolle auswählen..."
-			data={roles}
-			value={selectedRoleId || null}
-			onChange={(val) => onChange(val || "")}
-			disabled={loading}
-			searchable
-			clearable
-			clearButtonProps={{ "aria-label": "Auswahl löschen" }}
-			nothingFoundMessage="Keine Rollen verfügbar"
-			required={required}
-		/>
-	);
+	return <Select label="Rolle" placeholder="Rolle auswählen..." data={roles} value={selectedRoleId || null} onChange={(val) => onChange(val || "")} disabled={loading} searchable clearable clearButtonProps={{ "aria-label": "Auswahl löschen" }} nothingFoundMessage="Keine Rollen verfügbar" required={required} />;
 }
 
 export default RoleSelector;

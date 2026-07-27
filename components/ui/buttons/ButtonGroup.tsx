@@ -3,10 +3,10 @@
 
 "use client";
 
-import { ButtonGroupProps } from "@/components/ui/buttons/types";
 import { Button } from "@mantine/core";
 
 import styles from "@/components/styles/ui/buttons/ButtonGroup.module.css";
+import { ButtonGroupProps } from "@/components/ui/buttons/types";
 
 /**
  * Groups a set of {@link Button} children into a connected toolbar.

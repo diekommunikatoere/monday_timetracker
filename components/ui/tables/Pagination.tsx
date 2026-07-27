@@ -3,10 +3,12 @@
 
 "use client";
 
-import React from "react";
 import { Pagination as MantinePagination } from "@mantine/core";
-import { PaginationProps } from "./types";
+import React from "react";
+
 import styles from "@/components/styles/ui/tables/Pagination.module.css";
+
+import { PaginationProps } from "./types";
 
 /**
  * Page-number pagination built on Mantine's `Pagination`.

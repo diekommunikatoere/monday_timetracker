@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMondayContext } from "@/lib/monday";
-import { supabaseAdmin } from "@/lib/supabase/server";
+
 import { syncItemColumns, getBoardConfig } from "@/lib/columnSync";
+import { getMondayContext } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 interface Props {
 	params: Promise<{

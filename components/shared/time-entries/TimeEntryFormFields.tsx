@@ -1,10 +1,11 @@
 "use client";
 
 import { Flex, Tooltip } from "@mantine/core";
-import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, TimeInput } from "@/components";
-import { RoleSelector } from "./RoleSelector";
 
+import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, TimeInput } from "@/components";
 import styles from "@/components/styles/features/time-entries/TimeEntryForm.module.css";
+
+import { RoleSelector } from "./RoleSelector";
 
 /**
  * Descriptor for a single quick-adjust (+/-) button rendered under the duration

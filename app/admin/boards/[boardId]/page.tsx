@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Tabs, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+
 import { Icon, Input, Logo, ErrorState } from "@/components";
-import { Tabs, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
 import { Button, IconButton } from "@/components";
-import { notifications } from "@mantine/notifications";
-import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType, MondayGroup } from "@/types/database";
 import { isTimePurpose } from "@/lib/monday/utils";
 import { canAccessRoute } from "@/lib/permissions";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType, MondayGroup } from "@/types/database";
 
 import "@/public/css/components/AdminPage.css";
 

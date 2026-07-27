@@ -2,10 +2,10 @@
 "use client";
 
 import { Card, Flex, Text } from "@mantine/core";
-import { Button } from "@/components/ui/buttons/Button";
-import { Icon } from "@/components";
 
+import { Icon } from "@/components";
 import classes from "@/components/styles/features/time-entries/BulkActions.module.css";
+import { Button } from "@/components/ui/buttons/Button";
 
 /**
  * Props for {@link BulkActionButtons}.

@@ -1,11 +1,12 @@
 // components/features/timer/TimerComment.tsx
 "use client";
 
-import { useState } from "react";
 import { Flex, Tooltip } from "@mantine/core";
+import { useState } from "react";
+
 import { Icon, IconButton, Input } from "@/components";
-import type { TimerCommentFieldProps } from "@/types/timer.types";
 import styles from "@/components/styles/features/timer/TimerCommentField.module.css";
+import type { TimerCommentFieldProps } from "@/types/timer.types";
 
 /**
  * `TimerComment` — presentational comment field shown next to the running timer.

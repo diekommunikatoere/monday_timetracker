@@ -1,7 +1,8 @@
 // app/api/cron/cleanup-soft-deletes/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { cleanupOrphanedSoftDeletes, purgeTrashedMondayItems } from "@/lib/database";
+
 import { syncAfterDelete } from "@/lib/columnSync";
+import { cleanupOrphanedSoftDeletes, purgeTrashedMondayItems } from "@/lib/database";
 import { cacheHelper } from "@/lib/redis";
 
 /**

@@ -1,8 +1,8 @@
 // components/ui/modals/types.ts
 // Shared prop types for the modal design-system components.
 
-import React from "react";
 import { ModalProps as MantineModalProps } from "@mantine/core";
+import React from "react";
 
 /**
  * Props for the {@link Modal} root component.

@@ -1,11 +1,12 @@
 "use client";
 
-import { Icon, IconButton } from "@/components";
 import { Flex, Menu, Indicator } from "@mantine/core";
-import { useUserStore } from "@/stores/userStore";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { Icon, IconButton } from "@/components";
 import { canAccessRoute } from "@/lib/permissions";
+import { useUserStore } from "@/stores/userStore";
 
 export function DashboardMenuButton() {
 	const supabaseUser = useUserStore((state) => state.supabaseUser);

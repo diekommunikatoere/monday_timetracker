@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { getBoardTasks } from "@/lib/monday";
-import { registerBoardWebhooks, reconcileWebhooks } from "@/lib/monday/webhooks";
-import { upsertMondayItemsBatch } from "@/lib/database";
 import { ApiClient } from "@mondaydotcomorg/api";
+import { NextRequest, NextResponse } from "next/server";
+
+import { upsertMondayItemsBatch } from "@/lib/database";
+import { getBoardTasks } from "@/lib/monday";
 import { createMondayClient } from "@/lib/monday/client";
+import { registerBoardWebhooks, reconcileWebhooks } from "@/lib/monday/webhooks";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * GET /api/cron/sync-boards

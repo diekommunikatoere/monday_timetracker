@@ -1,8 +1,9 @@
 // components/dashboard/hooks/useFilteredTimeEntries.ts
 "use client";
 
-import { useMemo } from "react";
 import Fuse from "fuse.js";
+import { useMemo } from "react";
+
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { TimeEntry } from "@/types/time-entry";
 

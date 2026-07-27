@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+
 import { isPurposeCompatible, isTimePurpose } from "@/lib/monday/utils";
-import type { ColumnSyncConfigInsert, ColumnSyncConfigUpdate, SyncPurpose } from "@/types/database";
 import { requireAdmin } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import type { ColumnSyncConfigInsert, ColumnSyncConfigUpdate, SyncPurpose } from "@/types/database";
 
 /**
  * GET /api/admin/boards/[boardId]/columns

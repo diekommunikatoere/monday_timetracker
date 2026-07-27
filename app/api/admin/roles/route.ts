@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+
 import { requireAdmin } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 import type { RoleInsert, RoleUpdate } from "@/types/database";
 
 /**

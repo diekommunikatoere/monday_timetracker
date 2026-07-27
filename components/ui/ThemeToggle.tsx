@@ -4,8 +4,9 @@
 "use client";
 
 import { Tooltip } from "@mantine/core";
-import { useUserStore } from "@/stores/userStore";
+
 import { Icon, IconButton } from "@/components";
+import { useUserStore } from "@/stores/userStore";
 
 /**
  * Small icon button that switches the global app theme between light and dark.

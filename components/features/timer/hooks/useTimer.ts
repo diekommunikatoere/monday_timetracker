@@ -2,15 +2,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import type { Database } from "@/types/database";
-import type { UseTimerReturn, TimerActions, TimerState, ActiveTimer, ActiveTimersResponse } from "@/types/timer.types";
+
+import { useHydration } from "@/lib/store-utils";
 import { supabase } from "@/lib/supabase/client";
+import { useModalStore } from "@/stores/modalStore";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import { useModalStore } from "@/stores/modalStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { useHydration } from "@/lib/store-utils";
+import type { Database } from "@/types/database";
+import type { UseTimerReturn, TimerActions, TimerState, ActiveTimer, ActiveTimersResponse } from "@/types/timer.types";
 
 type TimeEntryRow = Database["public"]["Tables"]["time_entry"]["Row"];
 

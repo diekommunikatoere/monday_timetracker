@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/monday-auth";
+
 import { upsertMondayBoard } from "@/lib/database";
+import { requireAdmin } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * GET /api/admin/boards
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 		}
 
 		const boardIds = boards?.map((b) => b.board_id) || [];
-		let lastSyncs: Record<string, any> = {};
+		const lastSyncs: Record<string, any> = {};
 		let boardsWithBudgetMapping = new Set<string>();
 
 		if (boardIds.length > 0) {

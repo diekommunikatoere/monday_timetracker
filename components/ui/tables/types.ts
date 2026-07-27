@@ -1,7 +1,7 @@
 // components/ui/tables/types.ts
 // Column-definition types powering the data table (used by TimeEntryTable et al.).
-import { ReactNode } from "react";
 import { PaginationProps as MantinePaginationProps } from "@mantine/core";
+import { ReactNode } from "react";
 
 /**
  * Declarative definition of a single table column.

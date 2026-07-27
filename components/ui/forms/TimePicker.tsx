@@ -3,10 +3,12 @@
 
 "use client";
 
-import React from "react";
 import { TimePicker as MantineTimePicker } from "@mantine/dates";
-import { TimePickerComponentProps } from "./types";
+import React from "react";
+
 import styles from "@/components/styles/ui/forms/TimePicker.module.css";
+
+import { TimePickerComponentProps } from "./types";
 
 /**
  * Time field built on Mantine's `TimePicker`.

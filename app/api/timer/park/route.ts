@@ -1,8 +1,9 @@
 // Route to park a timer. This saves a timer as a draft time-entry.
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
 	try {

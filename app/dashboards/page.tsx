@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";

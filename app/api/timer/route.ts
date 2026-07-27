@@ -3,9 +3,10 @@
 // (running/paused/parked rows + computed elapsed_seconds); the client ticks the
 // live second locally between updates.
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
 	try {

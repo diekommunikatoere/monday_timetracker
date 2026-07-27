@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/monday-auth";
+
 import { getAllBoardsGroupedByWorkspace } from "@/lib/monday";
+import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/monday/boards

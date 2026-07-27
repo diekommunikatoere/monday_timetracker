@@ -1,7 +1,8 @@
 // components/features/timer/TimerProvider.tsx
 import { ReactNode } from "react";
-import TimerContext from "@/contexts/TimerContext";
+
 import { useTimer } from "@/components/features/timer/hooks/useTimer";
+import TimerContext from "@/contexts/TimerContext";
 
 /**
  * `TimerProvider` — React context provider that exposes the {@link useTimer}

@@ -4,8 +4,10 @@
 "use client";
 
 import React from "react";
-import { ModalBodyProps } from "./types";
+
 import styles from "@/components/styles/ui/modals/ModalBody.module.css";
+
+import { ModalBodyProps } from "./types";
 
 /**
  * Body slot for {@link Modal}.

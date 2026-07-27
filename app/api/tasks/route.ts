@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
 import { ClientError } from "@mondaydotcomorg/api";
+import { NextRequest, NextResponse } from "next/server";
+
+import { getTasksFromDB } from "@/lib/database";
 import { getBoardTasks } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
-import { getTasksFromDB } from "@/lib/database";
 
 // Disable Next.js caching to ensure fresh data on each request
 export const dynamic = "force-dynamic";

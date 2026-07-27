@@ -3,11 +3,13 @@
 
 "use client";
 
-import React from "react";
 import { Tooltip, TextInput as MantineTextInput, Textarea as MantineTextarea } from "@mantine/core";
-import { InputProps, TextareaProps } from "./types";
-import styles from "@/components/styles/ui/forms/Input.module.css";
+import React from "react";
+
 import { Icon, IconButton } from "@/components";
+import styles from "@/components/styles/ui/forms/Input.module.css";
+
+import { InputProps, TextareaProps } from "./types";
 
 /**
  * Single-line text field built on Mantine's `TextInput`.

@@ -2,9 +2,10 @@
 // timer_pause closes the open segment (the gap until resume is the pause) and sets
 // the entry to 'paused'. Idempotent if it's already paused. Resuming is /api/timer/resume.
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
 	try {

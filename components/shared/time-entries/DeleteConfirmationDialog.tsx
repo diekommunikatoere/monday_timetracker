@@ -2,6 +2,7 @@
 "use client";
 
 import { Text, Group } from "@mantine/core";
+
 import { Button, Modal } from "@/components";
 
 /**

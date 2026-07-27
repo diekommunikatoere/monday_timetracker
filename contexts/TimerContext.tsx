@@ -1,5 +1,6 @@
 // contexts/TimerContext.tsx
 import { createContext, useContext } from "react";
+
 import type { UseTimerReturn } from "@/types/timer.types";
 
 /**

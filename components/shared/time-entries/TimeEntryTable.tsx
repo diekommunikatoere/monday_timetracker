@@ -2,10 +2,11 @@
 "use client";
 
 import { Table, Center, Loader, Text, Box, LoadingOverlay } from "@mantine/core";
-import { TimeEntry } from "@/types/time-entry";
 import { useMemo } from "react";
-import { ColumnDef } from "@/components/ui/tables/types";
+
 import styles from "@/components/styles/features/time-entries/TimeEntryTable.module.css";
+import { ColumnDef } from "@/components/ui/tables/types";
+import { TimeEntry } from "@/types/time-entry";
 
 /**
  * Props for {@link TimeEntryTable}.

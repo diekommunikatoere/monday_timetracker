@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useMondayStore } from "./mondayStore";
+
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
+
+import { useMondayStore } from "./mondayStore";
 
 /** Raw theme value as reported by the monday context. */
 export type MondayTheme = "black" | "light" | "dark";

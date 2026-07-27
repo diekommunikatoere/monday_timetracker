@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
 import { TimeEntry } from "@/types/time-entry";
+
 import { useMondayStore } from "./mondayStore";
 
 /** Page sizes offered by the dashboard's page-size picker. */

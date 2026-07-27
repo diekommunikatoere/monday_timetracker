@@ -2,10 +2,11 @@
 "use client";
 
 import { Flex, Text, Tooltip } from "@mantine/core";
+
 import { Icon, IconButton } from "@/components";
+import styles from "@/components/styles/features/timer/TimerDisplay.module.css";
 import { formatTime } from "@/lib/utils";
 import type { TimerDisplayProps } from "@/types/timer.types";
-import styles from "@/components/styles/features/timer/TimerDisplay.module.css";
 
 /**
  * `TimerDisplay` — presentational read-out of elapsed time plus a reset button.

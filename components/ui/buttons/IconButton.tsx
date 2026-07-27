@@ -4,6 +4,7 @@
 "use client";
 
 import { ActionIcon } from "@mantine/core";
+
 import styles from "@/components/styles/ui/buttons/IconGroup.module.css";
 
 import { IconButtonProps } from "./types";

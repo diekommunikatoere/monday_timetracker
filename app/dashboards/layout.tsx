@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+
 import { ErrorState, LoadingState } from "@/components";
-import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
+import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
+import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
+import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
 
 export default function DashboardsLayout(props: LayoutProps<"/dashboards">) {
 	// Get user and time entries state

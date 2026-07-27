@@ -2,9 +2,10 @@
 "use client";
 
 import { Box, Flex } from "@mantine/core";
-import { useTimerContext } from "@/contexts/TimerContext";
+
 import { TimerComment, TimerControls, TimerDisplay } from "@/components/features/timer";
 import styles from "@/components/styles/features/timer/TimerContainer.module.css";
+import { useTimerContext } from "@/contexts/TimerContext";
 
 /**
  * `TimerContainer` — smart container for the live timer widget.

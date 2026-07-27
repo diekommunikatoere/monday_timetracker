@@ -1,19 +1,20 @@
 "use client";
 
+import { Flex, Tooltip, Text } from "@mantine/core";
 import { useCallback, useEffect, useState } from "react";
+
 import { DashboardMenuButton, Logo } from "@/components";
+import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
+import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
+import { ManualTimeEntryModal } from "@/components/features/timer";
 import TimerContainer from "@/components/features/timer/TimerContainer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex, Tooltip, Text } from "@mantine/core";
-import { useModalStore } from "@/stores/modalStore";
-import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { ManualTimeEntryModal } from "@/components/features/timer";
-import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
-import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
 import { useTimerContext } from "@/contexts/TimerContext";
 import { APP_VERSION } from "@/lib/version";
+import { useModalStore } from "@/stores/modalStore";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+import { useUserStore } from "@/stores/userStore";
 
 import "@/public/css/components/AppHeader.css";
 
