@@ -1,24 +1,51 @@
 .timeEntryTable {
-	--table-border-color: var(--color--border-layout);
-	--table-highlight-on-hover-color: var(--color--background-primary-hover);
-}
+	background-color: var(--color--table-background);
+	--table-border-color: var(--color--table-border);
+	--table-highlight-on-hover-color: var(--color--table-row-background-hover);
+	--table-hover-color: var(--color--table-row-background-hover);
+	--table-striped-color: var(--color--table-row-background-striped);
 
-.headerRow {
-	border-bottom: 2px solid var(--color--border-layout);
-}
-
-.selectedPrimary {
-	background-color: var(--color--selected-primary);
-
-	&:hover {
-		background-color: var(--color--selected-primary-hover);
+	:where(tr)[data-hover] {
+		--tr-hover-bg: var(--color--table-row-background-hover);
 	}
 }
 
-.highlightPrimary {
-	background-color: var(--color--highlight);
+.headerRow {
+	border-bottom: 2px solid var(--color--table-border);
+}
+
+.headerCell {
+	background-color: var(--color--table-header-background);
+}
+
+.bodyRow {
+	border-bottom: 1px solid var(--color--table-border);
+}
+
+.expandedRow {
+	background-color: var(--color--table-row-background-expanded);
 
 	&:hover {
-		background-color: var(--color--highlight-hover);
+		background-color: var(--color--table-row-background-expanded-hover);
+	}
+}
+
+.rowStriped {
+	background-color: var(--color--table-row-background-striped);
+}
+
+.selected {
+	background-color: var(--color--table-row-background-selected);
+
+	&:hover {
+		background-color: var(--color--table-row-background-selected-hover);
+	}
+}
+
+.highlighted {
+	background-color: var(--color--table-row-background-highlighted);
+
+	&:hover {
+		background-color: var(--color--table-row-background-highlighted-hover);
 	}
 }

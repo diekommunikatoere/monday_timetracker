@@ -16,16 +16,16 @@ export type BudgetBoardStatus = "active" | "archived";
  *
  * @property budget_board_status     - Presence of this key marks the board as a budget board at all.
  * @property label                   - Display label for archived periods (e.g. `"2025"`); unused for `"active"`.
- * @property job_relation_column_id  - The board_relation/connect_boards column listing linked job items.
- * @property budget_amount_column_id - Admin-config field currently labeled "AL-Spalte" in the UI.
- * @property budget_column_id        - The numbers/formula/mirror column holding the total budget figure.
+ * @property job_relation_column_id - The board_relation/connect_boards column listing linked job items.
+ * @property budget_column_id       - The numbers/formula/mirror column holding the total budget figure.
+ * @property cost_column_id         - The numbers/formula/mirror column holding the cost figure, labeled "Agenturleistungs-Spalte" in the UI.
  */
 export interface BudgetBoardSettings {
 	budget_board_status?: BudgetBoardStatus;
 	label?: string | null;
 	job_relation_column_id?: string;
-	budget_amount_column_id?: string;
 	budget_column_id?: string;
+	cost_column_id?: string;
 }
 
 /** Per-role time breakdown for one budget item, enriched with the role's display color. */
@@ -53,7 +53,7 @@ export interface AbrechnungLinkedItem {
 export interface AbrechnungBudgetItem {
 	id: string;
 	name: string;
-	budgetAmount: number | null;
+	budget: number | null;
 	totalSeconds: number;
 	totalCost: number;
 	remainingBudget: number | null;

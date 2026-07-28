@@ -68,16 +68,16 @@ async function loadBudgetBoard(config: { board_id: string; settings: unknown; mo
 	const settings = (config.settings ?? {}) as BudgetBoardSettings;
 	const boardName = config.monday_board?.name || config.board_id;
 	const label = settings.label ?? null;
-	const { job_relation_column_id: relationColumnId, budget_column_id: budgetColumnId, budget_amount_column_id: budgetAmountColumnId } = settings;
+	const { job_relation_column_id: relationColumnId, budget_column_id: budgetColumnId, cost_column_id: costColumnId } = settings;
 
-	if (!relationColumnId || !budgetColumnId || !budgetAmountColumnId) {
-		console.warn(`[getAbrechnungData] Budget board ${config.board_id} is missing job_relation_column_id/budget_amount_column_id configuration; skipping.`);
+	if (!relationColumnId || !budgetColumnId || !costColumnId) {
+		console.warn(`[getAbrechnungData] Budget board ${config.board_id} is missing job_relation_column_id/budget_column_id/cost_column_id configuration; skipping.`);
 		return { boardId: config.board_id, boardName, label, status, items: [] };
 	}
 
 	let rawItems: BudgetBoardItem[];
 	try {
-		rawItems = await getBudgetBoardItems(config.board_id, relationColumnId, budgetColumnId, budgetAmountColumnId);
+		rawItems = await getBudgetBoardItems(config.board_id, relationColumnId, budgetColumnId, costColumnId);
 	} catch (err) {
 		console.error(`[getAbrechnungData] Failed to fetch items for budget board ${config.board_id}:`, err);
 		return { boardId: config.board_id, boardName, label, status, items: [] };
@@ -104,10 +104,10 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem): P
 		return {
 			id: item.id,
 			name: item.name,
-			budgetAmount: item.budgetAmount,
+			budget: item.budget,
 			totalSeconds: 0,
 			totalCost: 0,
-			remainingBudget: item.budgetAmount,
+			remainingBudget: item.budget,
 			utilizationPercent: 0,
 			byRole: [],
 			linkedItems,
@@ -120,10 +120,22 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem): P
 		supabaseAdmin.rpc("calculate_remaining_budget", {
 			p_board_id: budgetBoardId,
 			p_item_ids: linkedItemIds,
-			p_budget_amount: item.budgetAmount ?? 0,
+			p_budget_amount: item.budget ?? 0,
 			p_user_id: null,
 		} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
 	]);
+
+	const linkedItemBudgetResultRows = await Promise.all(
+		linkedItems.map(
+			(linkedItem) =>
+				supabaseAdmin.rpc("calculate_remaining_budget", {
+					p_board_id: linkedItem.board?.id ?? budgetBoardId,
+					p_item_ids: [linkedItem.id],
+					p_budget_amount: null,
+					p_user_id: null,
+				} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
+		),
+	);
 
 	if (totalTimeResult.error) console.error(`[getAbrechnungData] get_item_total_time failed for budget item ${item.id}:`, totalTimeResult.error);
 	if (byRoleResult.error) console.error(`[getAbrechnungData] get_item_time_by_role failed for budget item ${item.id}:`, byRoleResult.error);
@@ -145,20 +157,24 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem): P
 	return {
 		id: item.id,
 		name: item.name,
-		budgetAmount: item.budgetAmount,
+		budget: item.budget,
 		totalSeconds: totalTimeResult.data ?? 0,
 		totalCost: budgetResult?.total_cost ?? 0,
-		remainingBudget: item.budgetAmount !== null ? (budgetResult?.remaining_budget ?? item.budgetAmount) : null,
+		remainingBudget: item.budget !== null ? (budgetResult?.remaining_budget ?? item.budget) : null,
 		utilizationPercent: utilizationPercent,
 		byRole: byRoleData.map((r) => ({
 			// ! Implement cost per role in RPC
 			roleId: r.role_id,
 			roleName: r.role_name,
 			totalSeconds: r.total_seconds,
+			totalCost: 0,
 			entryCount: r.entry_count,
 			colorHex: colorMap.get(r.role_id),
 		})),
-		linkedItems,
+		linkedItems: linkedItems.map((linkedItem, index) => ({
+			...linkedItem,
+			totalCost: linkedItemBudgetResultRows[index].data?.[0]?.total_cost ?? 0,
+		})),
 	};
 }
 

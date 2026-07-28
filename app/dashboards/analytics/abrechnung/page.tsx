@@ -77,6 +77,7 @@ export default function AbrechnungPage() {
 	console.log("AbrechnungPage render:", {
 		sortedSelectedArchiveBoards,
 		archiveSelectData,
+		sortedActiveBoards,
 	});
 
 	return (

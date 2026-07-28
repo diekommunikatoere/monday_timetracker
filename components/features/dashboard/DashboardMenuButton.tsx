@@ -15,10 +15,6 @@ export function DashboardMenuButton() {
 	const setTheme = useUserStore((state) => state.setTheme);
 	const pathname = usePathname();
 
-	const setView = (view: "time-entries" | "abrechnung" | "auswertung") => {
-		console.log(`Switching to view: ${view}`);
-	};
-
 	const renderViewLink = (label: string, path: string, icon: string) => {
 		const isActive = pathname === path;
 
@@ -27,15 +23,15 @@ export function DashboardMenuButton() {
 		}
 
 		return (
-			<Menu.Item>
-				<Indicator position="middle-end" size={8} disabled={!isActive}>
-					<Link href={path} style={{ textDecoration: "none", color: "inherit" }}>
+			<Menu.Item p={0}>
+				<Link href={path} style={{ display: "block", textDecoration: "none", color: "inherit", padding: "calc(var(--mantine-spacing-xs) / 1.5) var(--mantine-spacing-sm)" }}>
+					<Indicator position="middle-end" size={8} disabled={!isActive}>
 						<Flex align="center" gap={8}>
 							<Icon name={icon} size={16} />
 							{label}
 						</Flex>
-					</Link>
-				</Indicator>
+					</Indicator>
+				</Link>
 			</Menu.Item>
 		);
 	};

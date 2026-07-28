@@ -5,9 +5,9 @@ import { Table, Center, Loader, Text, Badge, Group, ActionIcon, Stack, Box, Simp
 import { Fragment, useMemo, useState } from "react";
 
 import { Icon } from "@/components";
+import styles from "@/components/styles/ui/tables/Table.module.css";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
-import styles from "@/components/styles/ui/tables/Table.module.css";
 import type { AbrechnungBudgetItem } from "@/types/abrechnung";
 
 /**
@@ -17,7 +17,7 @@ import type { AbrechnungBudgetItem } from "@/types/abrechnung";
  */
 function formatEuro(value: number | null): string {
 	if (value === null) return "–";
-	return `${value.toFixed(2)} €`;
+	return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(value);
 }
 
 /**
@@ -84,8 +84,8 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 				align: "right",
 				minWidth: 110,
 				cell: ({ row }) => (
-					<Text size="sm" /* ff="var(--font--mono)" */ style={{ letterSpacing: "-2%" }}>
-						{formatEuro(row.budgetAmount)}
+					<Text size="sm" style={{ letterSpacing: "-2%" }}>
+						{formatEuro(row.budget)}
 					</Text>
 				),
 			},
@@ -95,8 +95,19 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 				align: "right",
 				minWidth: 110,
 				cell: ({ row }) => (
-					<Text size="sm" /* ff="var(--font--mono)" */ style={{ letterSpacing: "-2%" }}>
+					<Text size="sm" style={{ letterSpacing: "-2%" }}>
 						{formatEuro(row.totalCost)}
+					</Text>
+				),
+			},
+			{
+				id: "time",
+				header: "Zeit",
+				align: "right",
+				minWidth: 100,
+				cell: ({ row }) => (
+					<Text size="sm" style={{ letterSpacing: "-2%" }}>
+						{formatDuration(row.totalSeconds)}
 					</Text>
 				),
 			},
@@ -106,7 +117,7 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 				align: "right",
 				minWidth: 80,
 				cell: ({ row }) => (
-					<Text c={row.remainingBudget !== null && row.remainingBudget < 0 ? "red" : undefined} fw={row.remainingBudget !== null && row.remainingBudget < 0 ? 600 : undefined} size="sm" /* ff="var(--font--mono)" */ style={{ letterSpacing: "-2%" }}>
+					<Text c={row.remainingBudget !== null && row.remainingBudget < 0 ? "red" : undefined} fw={row.remainingBudget !== null && row.remainingBudget < 0 ? 600 : undefined} size="sm" style={{ letterSpacing: "-2%" }}>
 						{formatEuro(row.remainingBudget)}
 					</Text>
 				),
@@ -118,26 +129,15 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 				minWidth: 80,
 				cell: ({ row }) => {
 					return row.utilizationPercent === null ? (
-						<Text size="sm" c="dimmed">
+						<Text size="sm" c="var(--color--text-secondary)">
 							Budget fehlt
 						</Text>
 					) : (
 						<Badge variant="dot" color={row.utilizationPercent > 100 ? "red" : row.utilizationPercent > 90 ? "orange" : row.utilizationPercent > 80 ? "yellow" : "green"} fw={600}>
-							{row.utilizationPercent.toFixed(0)}%
+							{row.utilizationPercent.toFixed(0)} %
 						</Badge>
 					);
 				},
-			},
-			{
-				id: "time",
-				header: "Zeit",
-				align: "right",
-				minWidth: 100,
-				cell: ({ row }) => (
-					<Text size="sm" /* ff="var(--font--mono)" */ style={{ letterSpacing: "-2%" }}>
-						{formatDuration(row.totalSeconds)}
-					</Text>
-				),
 			},
 		],
 		[expandedIds],
@@ -218,7 +218,7 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 /** Drill-down panel shown under an expanded budget item: per-role breakdown + linked job items. */
 function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 	return (
-		<Stack gap="md">
+		<Stack gap="md" pb="md">
 			{item.byRole.length > 0 && (
 				<>
 					<Box>
@@ -286,7 +286,7 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 									</Table.Td>
 									<Table.Td>
 										<Text size="xs" style={{ letterSpacing: "-2%" }}>
-											{/* {formatEuro(linked.totalCost)} */}0 €
+											{formatEuro(linked.totalCost)}
 										</Text>
 									</Table.Td>
 								</Table.Tr>

@@ -56,12 +56,12 @@ interface BudgetBoardRow {
 	status: "active" | "archived";
 	label: string | null;
 	job_relation_column_id: string | null;
-	budget_amount_column_id: string | null;
+	cost_column_id: string | null;
 	budget_column_id: string | null;
 }
 
 const BUDGET_RELATION_COLUMN_TYPES = ["board_relation", "connect_boards"];
-const BUDGET_AMOUNT_COLUMN_TYPES = ["numbers", "formula", "mirror"];
+const COST_COLUMN_TYPES = ["numbers", "formula", "mirror"];
 const BUDGET_COLUMN_TYPES = ["numbers", "formula", "mirror"];
 
 /** Draggable row in the "Boards verwalten" sortable list. */
@@ -142,7 +142,7 @@ export default function AdminPage() {
 		budget_board_status: "active" as "active" | "archived",
 		label: "",
 		job_relation_column_id: "",
-		budget_amount_column_id: "",
+		cost_column_id: "",
 		budget_column_id: "",
 	});
 	const [budgetBoardColumns, setBudgetBoardColumns] = useState<BudgetColumnOption[]>([]);
@@ -451,7 +451,7 @@ export default function AdminPage() {
 					status: b.settings.budget_board_status as "active" | "archived",
 					label: b.settings.label ?? null,
 					job_relation_column_id: b.settings.job_relation_column_id ?? null,
-					budget_amount_column_id: b.settings.budget_amount_column_id ?? null,
+					cost_column_id: b.settings.cost_column_id ?? null,
 					budget_column_id: b.settings.budget_column_id ?? null,
 				};
 			})
@@ -512,7 +512,7 @@ export default function AdminPage() {
 				budget_board_status: existing.status,
 				label: existing.label || "",
 				job_relation_column_id: existing.job_relation_column_id || "",
-				budget_amount_column_id: existing.budget_amount_column_id || "",
+				cost_column_id: existing.cost_column_id || "",
 				budget_column_id: existing.budget_column_id || "",
 			});
 			fetchBudgetBoardColumns(existing.board_id);
@@ -525,7 +525,7 @@ export default function AdminPage() {
 				budget_board_status: "active",
 				label: "",
 				job_relation_column_id: "",
-				budget_amount_column_id: "",
+				cost_column_id: "",
 				budget_column_id: "",
 			});
 			setBudgetBoardColumns([]);
@@ -543,7 +543,7 @@ export default function AdminPage() {
 			board_name: pickerBoard?.label || selected?.label || boardId,
 			workspace_id: pickerBoard?.workspaceId === DEFAULT_WORKSPACE_ID ? undefined : pickerBoard?.workspaceId,
 			job_relation_column_id: "",
-			budget_amount_column_id: "",
+			cost_column_id: "",
 			budget_column_id: "",
 		}));
 		fetchBudgetBoardColumns(boardId);
@@ -554,7 +554,7 @@ export default function AdminPage() {
 			notifications.show({ title: "Validierungsfehler", message: "Bitte ein Board auswählen", color: "red" });
 			return;
 		}
-		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.budget_amount_column_id || !budgetBoardForm.budget_column_id) {
+		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.cost_column_id || !budgetBoardForm.budget_column_id) {
 			notifications.show({ title: "Validierungsfehler", message: "Bitte Verknüpfungs-, Agenturleistungs- und Budget-Spalte auswählen", color: "red" });
 			return;
 		}
@@ -573,7 +573,7 @@ export default function AdminPage() {
 					budget_board_status: budgetBoardForm.budget_board_status,
 					label: budgetBoardForm.budget_board_status === "archived" ? budgetBoardForm.label : null,
 					job_relation_column_id: budgetBoardForm.job_relation_column_id,
-					budget_amount_column_id: budgetBoardForm.budget_amount_column_id,
+					cost_column_id: budgetBoardForm.cost_column_id,
 					budget_column_id: budgetBoardForm.budget_column_id,
 				}),
 			});
@@ -1109,7 +1109,7 @@ export default function AdminPage() {
 
 							<Select label="Budget-Spalte" description="Numbers-, Formula- oder Mirror-Spalte mit dem Budget-Betrag" placeholder="Spalte auswählen" data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))} value={budgetBoardForm.budget_column_id || null} onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_column_id: val || "" })} searchable />
 
-							<Select label="Agenturleistungs-Spalte" description="Numbers-, Formula- oder Mirror-Spalte mit dem Agenturleistungs-Betrag" placeholder="Spalte auswählen" data={budgetBoardColumns.filter((c) => BUDGET_AMOUNT_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))} value={budgetBoardForm.budget_amount_column_id || null} onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_amount_column_id: val || "" })} searchable />
+							<Select label="Agenturleistungs-Spalte" description="Numbers-, Formula- oder Mirror-Spalte mit dem Agenturleistungs-Betrag" placeholder="Spalte auswählen" data={budgetBoardColumns.filter((c) => COST_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))} value={budgetBoardForm.cost_column_id || null} onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, cost_column_id: val || "" })} searchable />
 						</>
 					) : (
 						<Text size="sm" c="dimmed">

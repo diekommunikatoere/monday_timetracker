@@ -1222,20 +1222,22 @@ export interface BudgetBoardLinkedItem {
 /**
  * A single row (budget item) fetched by {@link getBudgetBoardItems}.
  *
- * @property id               - monday.com item ID of the budget item.
- * @property name              - Display name of the budget item.
- * @property budgetAmountText  - Raw `.text` of the budget-amount column, or `null` if empty/missing.
- * @property budgetAmount      - `budgetAmountText` parsed to a number via {@link parseNumericColumnText}, or `null`.
- * @property linkedItemIds     - IDs of every job item linked via the relation column (`linked_item_ids`).
- * @property linkedItems       - Same items with name + board, for drill-down display.
+ * @property id           - monday.com item ID of the budget item.
+ * @property name         - Display name of the budget item.
+ * @property budgetText   - Raw `.text` of the budget column, or `null` if empty/missing.
+ * @property budget       - `budgetText` parsed to a number via {@link parseNumericColumnText}, or `null`.
+ * @property costText     - Raw `.text` of the cost ("Agenturleistung") column, or `null` if empty/missing.
+ * @property cost         - `costText` parsed to a number via {@link parseNumericColumnText}, or `null`.
+ * @property linkedItemIds - IDs of every job item linked via the relation column (`linked_item_ids`).
+ * @property linkedItems  - Same items with name + board, for drill-down display.
  */
 export interface BudgetBoardItem {
 	id: string;
 	name: string;
-	budgetAmountText: string | null;
-	budgetAmount: number | null;
-	budgetRemainingAmountText: string | null;
-	budgetRemainingAmount: number | null;
+	budgetText: string | null;
+	budget: number | null;
+	costText: string | null;
+	cost: number | null;
 	linkedItemIds: string[];
 	linkedItems: BudgetBoardLinkedItem[];
 }
@@ -1281,7 +1283,7 @@ type RawBudgetBoardItem = {
  * **Algorithm**: cursor-paginates `boards.items_page` / `next_items_page` (same
  * pattern as {@link getBoardTasks}'s Phase 1, but flat — budget boards aren't
  * grouped for this purpose), requesting only `column_values(ids: [relationColumnId,
- * budgetAmountColumnId])` with the `... on BoardRelationValue` fragment (same shape
+ * costColumnId])` with the `... on BoardRelationValue` fragment (same shape
  * as {@link findLinkedItems}) to keep the query complexity low regardless of board size.
  *
  * `linked_items[].board` is read directly from monday per query — this is how the
@@ -1289,19 +1291,20 @@ type RawBudgetBoardItem = {
  * currently lives on (including archived/moved boards) without maintaining a
  * separate "job board" registry.
  *
- * @param boardId               - The budget board's monday.com ID.
- * @param relationColumnId      - The `board_relation`/`connect_boards` column listing linked job items.
- * @param budgetAmountColumnId  - The `numbers`/`formula`/`mirror` column holding the budget figure.
+ * @param boardId          - The budget board's monday.com ID.
+ * @param relationColumnId - The `board_relation`/`connect_boards` column listing linked job items.
+ * @param budgetColumnId   - The `numbers`/`formula`/`mirror` column holding the total budget figure.
+ * @param costColumnId     - The `numbers`/`formula`/`mirror` column holding the cost ("Agenturleistung") figure.
  * @returns One {@link BudgetBoardItem} per item on the board, in API order.
  * @throws If `boardId` is not a valid positive integer, or on unrecoverable API errors.
  */
-export async function getBudgetBoardItems(boardId: string, relationColumnId: string, budgetColumnId: string, budgetAmountColumnId: string): Promise<BudgetBoardItem[]> {
+export async function getBudgetBoardItems(boardId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string): Promise<BudgetBoardItem[]> {
 	if (!boardId || isNaN(Number(boardId)) || Number(boardId) <= 0) {
 		throw new Error("boardId must be a valid positive integer");
 	}
 
 	const columnValuesFragment = `
-		column_values(ids: [$relationColumnId, $budgetColumnId, $budgetAmountColumnId]) {
+		column_values(ids: [$relationColumnId, $budgetColumnId, $costColumnId]) {
 			id
 			text
 			... on BoardRelationValue {
@@ -1319,7 +1322,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	`;
 
 	const initialQuery = `
-		query ($boardId: ID!, $relationColumnId: String!, $budgetColumnId: String!, $budgetAmountColumnId: String!) {
+		query ($boardId: ID!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!) {
 			boards(ids: [$boardId]) {
 				items_page(limit: 100) {
 					cursor
@@ -1337,7 +1340,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	`;
 
 	const nextPageQuery = `
-		query ($cursor: String!, $relationColumnId: String!, $budgetColumnId: String!, $budgetAmountColumnId: String!) {
+		query ($cursor: String!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!) {
 			next_items_page(limit: 100, cursor: $cursor) {
 				cursor
 				items {
@@ -1355,7 +1358,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	const rawItems: RawBudgetBoardItem[] = [];
 
 	try {
-		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, relationColumnId, budgetColumnId, budgetAmountColumnId });
+		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, relationColumnId, budgetColumnId, costColumnId });
 
 		if (response.error) {
 			throw new Error(response.error?.message || "Failed to fetch budget board items");
@@ -1370,7 +1373,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 		let cursor = itemsPage.cursor;
 
 		while (cursor) {
-			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, relationColumnId, budgetColumnId, budgetAmountColumnId });
+			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, relationColumnId, budgetColumnId, costColumnId });
 
 			if (pageResponse.error) {
 				console.warn(`[getBudgetBoardItems] Pagination error for board ${boardId}: ${pageResponse.error.message}`);
@@ -1394,18 +1397,21 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	return rawItems.map((item) => {
 		const relationValue = item.column_values.find((cv) => cv.id === relationColumnId);
 		const budgetValue = item.column_values.find((cv) => cv.id === budgetColumnId);
-		const budgetRemainingValue = item.column_values.find((cv) => cv.id === budgetAmountColumnId);
+		const costValue = item.column_values.find((cv) => cv.id === costColumnId);
 
-		const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, board: li.board }));
+		// totalCost defaults to 0 pending per-linked-item cost breakdown (see the
+		// "Implement cost per role in RPC" TODO in lib/abrechnung.ts) — the drill-down
+		// UI already renders a hardcoded "0 €" for this in AbrechnungTable.tsx.
+		const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, board: li.board, totalCost: 0 }));
 		const linkedItemIds = relationValue?.linked_item_ids ?? linkedItems.map((li) => li.id);
 
 		return {
 			id: item.id,
 			name: item.name,
-			budgetAmountText: budgetValue?.text ?? null,
-			budgetAmount: parseNumericColumnText(budgetValue?.text),
-			budgetRemainingAmountText: budgetRemainingValue?.text ?? null,
-			budgetRemainingAmount: parseNumericColumnText(budgetRemainingValue?.text),
+			budgetText: budgetValue?.text ?? null,
+			budget: parseNumericColumnText(budgetValue?.text),
+			costText: costValue?.text ?? null,
+			cost: parseNumericColumnText(costValue?.text),
 			linkedItemIds,
 			linkedItems,
 		};
