@@ -23,10 +23,10 @@
 }
 
 .expandedRow {
-	background-color: var(--color--table-row-background-expanded);
+	background-color: var(--color--table-row-background-highlighted);
 
 	&:hover {
-		background-color: var(--color--table-row-background-expanded-hover);
+		background-color: var(--color--table-row-background-highlighted-hover);
 	}
 }
 

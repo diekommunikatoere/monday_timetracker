@@ -18,7 +18,7 @@
 
 import { getBudgetBoardItems, type BudgetBoardItem } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod } from "@/types/abrechnung";
+import type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange } from "@/types/abrechnung";
 import type { GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
 
 // Domain types live in `@/types/abrechnung` (not here) so client code — the Zustand
@@ -26,7 +26,7 @@ import type { GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/
 // imports `lib/supabase/server`'s service-role client). Re-exported for convenience so
 // existing server-side importers (e.g. the admin budget-config API route) can keep
 // importing them from here.
-export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod };
+export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange };
 
 /**
  * Loads every budget board matching `status` (optionally narrowed to a single `boardId`),
@@ -40,9 +40,14 @@ export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, A
  *
  * @param status  - `"active"` (default) or `"archived"`.
  * @param boardId - Optional: narrow to one budget board (used for a single archived period).
+ * @param range   - Optional: narrows the rollup (`totalSeconds`/`totalCost`/`remainingBudget`/
+ *                  `utilizationPercent`) to time entries within this date range; `budget`
+ *                  itself is unaffected. Unset (or both bounds `null`) means all-time,
+ *                  matching pre-existing behavior. Only the active view's toolbar sets this —
+ *                  the archive is intentionally never date-filtered.
  * @returns One {@link AbrechnungBoard} per matching `board_config` row.
  */
-export async function getAbrechnungData(status: BudgetBoardStatus = "active", boardId?: string): Promise<AbrechnungBoard[]> {
+export async function getAbrechnungData(status: BudgetBoardStatus = "active", boardId?: string, range?: AbrechnungDateRange): Promise<AbrechnungBoard[]> {
 	let query = supabaseAdmin.from("board_config").select("board_id, settings, monday_board(name)").eq("settings->>budget_board_status", status);
 
 	if (boardId) {
@@ -60,11 +65,11 @@ export async function getAbrechnungData(status: BudgetBoardStatus = "active", bo
 		return [];
 	}
 
-	return Promise.all(boardConfigs.map((config: any) => loadBudgetBoard(config, status)));
+	return Promise.all(boardConfigs.map((config: any) => loadBudgetBoard(config, status, range)));
 }
 
 /** Loads and rolls up a single budget board's items. Never throws — degrades to an empty `items` array. */
-async function loadBudgetBoard(config: { board_id: string; settings: unknown; monday_board?: { name: string } | null }, status: BudgetBoardStatus): Promise<AbrechnungBoard> {
+async function loadBudgetBoard(config: { board_id: string; settings: unknown; monday_board?: { name: string } | null }, status: BudgetBoardStatus, range?: AbrechnungDateRange): Promise<AbrechnungBoard> {
 	const settings = (config.settings ?? {}) as BudgetBoardSettings;
 	const boardName = config.monday_board?.name || config.board_id;
 	const label = settings.label ?? null;
@@ -83,7 +88,7 @@ async function loadBudgetBoard(config: { board_id: string; settings: unknown; mo
 		return { boardId: config.board_id, boardName, label, status, items: [] };
 	}
 
-	const items = await Promise.all(rawItems.map((item) => rollupBudgetItem(config.board_id, item)));
+	const items = await Promise.all(rawItems.map((item) => rollupBudgetItem(config.board_id, item, range)));
 
 	return { boardId: config.board_id, boardName, label, status, items };
 }
@@ -95,10 +100,16 @@ async function loadBudgetBoard(config: { board_id: string; settings: unknown; mo
  * but as of `supabase/migrations/038_calculate_remaining_budget_per_item_board.sql` the
  * `board_role_override` join uses each time entry's own `board_id`, so a budget item whose
  * linked job items span multiple boards gets each entry's correct board-specific rate override.
+ *
+ * `range` (added in `039_rollup_functions_date_range.sql`) narrows every RPC call — including
+ * the per-linked-item `calculate_remaining_budget` calls — to time entries within the bounds;
+ * `item.budget` itself is never touched by it.
  */
-async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem): Promise<AbrechnungBudgetItem> {
+async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, range?: AbrechnungDateRange): Promise<AbrechnungBudgetItem> {
 	const linkedItemIds = item.linkedItemIds;
 	const linkedItems: AbrechnungLinkedItem[] = item.linkedItems;
+	const startDate = range?.startDate ?? null;
+	const endDate = range?.endDate ?? null;
 
 	if (linkedItemIds.length === 0) {
 		return {
@@ -115,13 +126,15 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem): P
 	}
 
 	const [totalTimeResult, byRoleResult, budgetResultRows] = await Promise.all([
-		supabaseAdmin.rpc("get_item_total_time", { p_item_ids: linkedItemIds, p_user_id: null } as any) as unknown as Promise<{ data: number | null; error: any }>,
-		supabaseAdmin.rpc("get_item_time_by_role", { p_item_ids: linkedItemIds, p_user_id: null } as any) as unknown as Promise<{ data: GetItemTimeByRoleResult[] | null; error: any }>,
+		supabaseAdmin.rpc("get_item_total_time", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: number | null; error: any }>,
+		supabaseAdmin.rpc("get_item_time_by_role", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: GetItemTimeByRoleResult[] | null; error: any }>,
 		supabaseAdmin.rpc("calculate_remaining_budget", {
 			p_board_id: budgetBoardId,
 			p_item_ids: linkedItemIds,
 			p_budget_amount: item.budget ?? 0,
 			p_user_id: null,
+			p_start_date: startDate,
+			p_end_date: endDate,
 		} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
 	]);
 
@@ -133,6 +146,8 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem): P
 					p_item_ids: [linkedItem.id],
 					p_budget_amount: null,
 					p_user_id: null,
+					p_start_date: startDate,
+					p_end_date: endDate,
 				} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
 		),
 	);

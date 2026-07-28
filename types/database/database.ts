@@ -597,7 +597,9 @@ export type Database = {
         Args: {
           p_board_id: string
           p_budget_amount: number
+          p_end_date?: string
           p_item_ids: string[]
+          p_start_date?: string
           p_user_id?: string
         }
         Returns: {
@@ -628,7 +630,12 @@ export type Database = {
         Returns: number
       }
       get_item_time_by_role: {
-        Args: { p_item_ids: string[]; p_user_id?: string }
+        Args: {
+          p_end_date?: string
+          p_item_ids: string[]
+          p_start_date?: string
+          p_user_id?: string
+        }
         Returns: {
           entry_count: number
           role_id: string
@@ -668,7 +675,12 @@ export type Database = {
         }[]
       }
       get_item_total_time: {
-        Args: { p_item_ids: string[]; p_user_id?: string }
+        Args: {
+          p_end_date?: string
+          p_item_ids: string[]
+          p_start_date?: string
+          p_user_id?: string
+        }
         Returns: number
       }
       get_user_time_entries: {

@@ -134,3 +134,31 @@ export const secondsToDuration = (seconds: number): string => {
 	const minutes = Math.floor((seconds % 3600) / 60);
 	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
+
+/**
+ * Midnight of the given local day — the inclusive lower bound of a date-range
+ * filter. Shared by `useFilteredTimeEntries` (client-side filtering) and
+ * `abrechnungStore` (server-side rollup range), so both interpret a picked
+ * "start day" identically.
+ *
+ * @param date - Any `Date`; only its local calendar day is used.
+ * @returns A new `Date` at `00:00:00.000` local time on that day.
+ */
+export const startOfDay = (date: Date): Date => {
+	const d = new Date(date);
+	d.setHours(0, 0, 0, 0);
+	return d;
+};
+
+/**
+ * The last instant of the given local day — the inclusive upper bound of a
+ * date-range filter. See {@link startOfDay}.
+ *
+ * @param date - Any `Date`; only its local calendar day is used.
+ * @returns A new `Date` at `23:59:59.999` local time on that day.
+ */
+export const endOfDay = (date: Date): Date => {
+	const d = new Date(date);
+	d.setHours(23, 59, 59, 999);
+	return d;
+};

@@ -8,7 +8,7 @@ import { Icon } from "@/components";
 import styles from "@/components/styles/ui/tables/Table.module.css";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
-import type { AbrechnungBudgetItem } from "@/types/abrechnung";
+import type { AbrechnungBudgetItem, AbrechnungTableRow } from "@/types/abrechnung";
 
 /**
  * Formats a euro amount for display, matching the `€{value.toFixed(2)}`
@@ -23,30 +23,35 @@ function formatEuro(value: number | null): string {
 /**
  * Props for {@link AbrechnungTable}.
  *
- * @property items   - The {@link AbrechnungBudgetItem} rows to render.
- * @property loading - Shows a centered `Loader` when there are no rows yet.
- * @property error   - Renders a centered red error message instead of the table.
+ * @property items           - The {@link AbrechnungTableRow} rows to render.
+ * @property loading         - Shows a centered `Loader` when there are no rows yet.
+ * @property error           - Renders a centered red error message instead of the table.
+ * @property showBoardColumn - Adds a leading "Budget-Board" column showing `row.boardName`.
+ *   Used for the single flat active-view table (multiple boards share one table there); the
+ *   Archiv section renders one table per board with the board name as a heading instead, so
+ *   it omits this (default `false`) to avoid a redundant column.
  */
 export interface AbrechnungTableProps {
-	items: AbrechnungBudgetItem[];
+	items: AbrechnungTableRow[];
 	loading?: boolean;
 	error?: string | null;
+	showBoardColumn?: boolean;
 }
 
 /**
  * Presentational table for the Abrechnung (budget rollup) view.
  *
  * One row per budget item (e.g. a client/retainer on the "Retainer" board), with
- * budget / tracked cost / remaining budget / utilization / tracked time columns.
- * Rows expand (click the chevron) to a drill-down panel listing the linked job
- * items (with the board they currently live on) and a per-role time breakdown —
- * see `lib/abrechnung.ts` for how these are rolled up.
+ * an optional Budget-Board column, then budget / tracked cost / remaining budget /
+ * utilization / tracked time columns. Rows expand (click the chevron) to a drill-down
+ * panel listing the linked job items (with the board they currently live on) and a
+ * per-role time breakdown — see `lib/abrechnung.ts` for how these are rolled up.
  *
  * Follows the `ColumnDef`-driven convention used by
  * `components/shared/time-entries/TimeEntryTable.tsx`, extended with a local
  * expand/collapse row state (not something the generic time-entry table needs).
  */
-export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps) {
+export function AbrechnungTable({ items, loading, error, showBoardColumn = false }: AbrechnungTableProps) {
 	const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
 	const toggleExpand = (id: string) => {
@@ -61,7 +66,7 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 		});
 	};
 
-	const columns: ColumnDef<AbrechnungBudgetItem>[] = useMemo(
+	const columns: ColumnDef<AbrechnungTableRow>[] = useMemo(
 		() => [
 			{
 				id: "name",
@@ -72,10 +77,24 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 						<ActionIcon variant="subtle" size="sm" onClick={() => toggleExpand(row.id)} aria-label={expandedIds.has(row.id) ? "Details ausblenden" : "Details anzeigen"}>
 							<Icon name={expandedIds.has(row.id) ? "expand_more" : "chevron_right"} size={18} />
 						</ActionIcon>
-						<Text fw={500} size="sm">
-							{row.name}
+						<Text fw={500} size="sm" style={{ display: "inline-flex", gap: "8px", alignItems: "center" }} title={row.name}>
+							{row.name}{" "}
+							<Badge variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
+								{row.linkedItems.length}
+							</Badge>
 						</Text>
 					</Group>
+				),
+			},
+			{
+				id: "board",
+				header: "Budget-Board",
+				minWidth: 180,
+				hidden: !showBoardColumn,
+				cell: ({ row }) => (
+					<Text size="sm" c="var(--color--text-secondary)">
+						{row.boardName}
+					</Text>
 				),
 			},
 			{
@@ -180,10 +199,10 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 
 	return (
 		<Table.ScrollContainer minWidth={calculatedMinWidth} maxHeight={750} style={{ flex: 1, width: "100%" }} scrollAreaProps={{ type: "auto", offsetScrollbars: "present" }}>
-			<Table stickyHeader highlightOnHover withColumnBorders withRowBorders verticalSpacing="sm" layout="auto" style={{ width: "100%" }} className={styles.table}>
+			<Table stickyHeader highlightOnHover withTableBorder withColumnBorders withRowBorders verticalSpacing="sm" layout="auto" style={{ width: "100%" }} className={styles.table}>
 				<Table.Thead className={styles.headerRow}>
 					<Table.Tr>
-						{columns.map((col) => (
+						{visibleColumns.map((col) => (
 							<Table.Th key={col.id} fw={600} style={{ minWidth: col.minWidth }} ta={col.align || "left"} className={styles.headerCell}>
 								{typeof col.header === "function" ? col.header({ data: items }) : col.header}
 							</Table.Th>
@@ -194,7 +213,7 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 					{items.map((item, rowIndex) => (
 						<Fragment key={item.id}>
 							<Table.Tr className={expandedIds.has(item.id) ? styles.expandedRow : styles.bodyRow}>
-								{columns.map((col) => (
+								{visibleColumns.map((col) => (
 									<Table.Td key={col.id} ta={col.align || "left"} style={{ minWidth: col.minWidth }}>
 										{col.cell({ row: item, index: rowIndex })}
 									</Table.Td>
@@ -202,7 +221,7 @@ export function AbrechnungTable({ items, loading, error }: AbrechnungTableProps)
 							</Table.Tr>
 							{expandedIds.has(item.id) && (
 								<Table.Tr>
-									<Table.Td colSpan={columns.length} style={{ background: "var(--color--background-secondary)" }}>
+									<Table.Td colSpan={visibleColumns.length} style={{ background: "var(--color--background-secondary)" }}>
 										<AbrechnungItemDetails item={item} />
 									</Table.Td>
 								</Table.Tr>
@@ -243,8 +262,11 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 			)}
 
 			<Box>
-				<Text size="sm" fw={600} mb={8}>
-					Verknüpfte Agentur-Projekte ({item.linkedItems.length})
+				<Text size="sm" fw={600} mb={8} style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
+					Verknüpfte Agentur-Projekte{" "}
+					<Badge variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
+						{item.linkedItems.length}
+					</Badge>
 				</Text>
 				{item.linkedItems.length === 0 ? (
 					<Text size="sm" c="dimmed">

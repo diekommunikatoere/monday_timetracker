@@ -71,9 +71,33 @@ export interface AbrechnungBoard {
 	items: AbrechnungBudgetItem[];
 }
 
+/**
+ * A budget item flattened out of its board, for the single-table active-view Abrechnung
+ * layout (`AbrechnungTable` with `showBoardColumn`). `AbrechnungBoard.items` don't carry
+ * their board's identity on their own — this re-attaches it so rows from different boards
+ * can share one table and be told apart via the "Budget-Board" column. See
+ * `useFilteredAbrechnung` for where these are produced.
+ */
+export interface AbrechnungTableRow extends AbrechnungBudgetItem {
+	boardId: string;
+	boardName: string;
+}
+
 /** A cheap, monday-API-free entry in the "pick a year" archive list. */
 export interface ArchivedBudgetPeriod {
 	boardId: string;
 	boardName: string;
 	label: string | null;
+}
+
+/**
+ * Optional date bounds for the Abrechnung "Zeitraum" filter, narrowing which
+ * finalized time entries count toward `totalSeconds`/`totalCost`/`remainingBudget`/
+ * `utilizationPercent` on {@link AbrechnungBudgetItem} — `budget` itself is unaffected.
+ * Both bounds are ISO instants (not bare dates); `null` means unbounded on that side.
+ * See `getAbrechnungData` in `lib/abrechnung.ts`.
+ */
+export interface AbrechnungDateRange {
+	startDate: string | null;
+	endDate: string | null;
 }

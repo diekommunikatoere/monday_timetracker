@@ -4,11 +4,18 @@ import { getAbrechnungData } from "@/lib/abrechnung";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
- * GET /api/analytics/abrechnung
+ * GET /api/analytics/abrechnung?from=<ISO>&to=<ISO>
  *
  * Returns the current fiscal year's budget boards, each with its budget items
  * rolled up (tracked time / cost / remaining budget across all linked job items).
  * Read-only report; see `lib/abrechnung.ts` for the rollup logic.
+ *
+ * `from`/`to` are optional ISO instants (see `AbrechnungDateRange`) that narrow the
+ * rollup to that range — the Abrechnung toolbar's "Zeitraum" filter. They must be
+ * absolute instants computed client-side (there is no server-side timezone; see
+ * `lib/time/calculations.ts`), not bare `YYYY-MM-DD` strings. Unparseable or missing
+ * values are silently treated as unbounded on that side rather than erroring, since
+ * an all-time rollup is a safe default.
  */
 export async function GET(request: NextRequest) {
 	try {
@@ -22,7 +29,12 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 		}
 
-		const boards = await getAbrechnungData("active");
+		const fromParam = request.nextUrl.searchParams.get("from");
+		const toParam = request.nextUrl.searchParams.get("to");
+		const startDate = fromParam && !isNaN(new Date(fromParam).getTime()) ? fromParam : null;
+		const endDate = toParam && !isNaN(new Date(toParam).getTime()) ? toParam : null;
+
+		const boards = await getAbrechnungData("active", undefined, { startDate, endDate });
 
 		return NextResponse.json({ boards });
 	} catch (error) {
