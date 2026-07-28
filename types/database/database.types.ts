@@ -80,6 +80,7 @@ export interface GetItemTimeByRoleResult {
 	role_id: string;
 	role_name: string;
 	total_seconds: number;
+	total_cost: number;
 	entry_count: number;
 }
 

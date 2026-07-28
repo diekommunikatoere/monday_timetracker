@@ -1,0 +1,43 @@
+.table {
+	background-color: var(--color--table-background);
+	--table-border-color: var(--color--table-border);
+	--table-highlight-on-hover-color: var(--color--table-row-background-hover);
+	--table-hover-color: var(--color--table-row-background-hover);
+	--table-striped-color: var(--color--table-row-background-striped);
+
+	:where(tr)[data-hover] {
+		--tr-hover-bg: var(--color--table-row-background-hover);
+	}
+}
+
+.headerRow {
+	border-bottom: 2px solid var(--color--table-border);
+}
+
+.headerCell {
+	background-color: var(--color--table-header-background);
+}
+
+.bodyRow {
+	border-bottom: 1px solid var(--color--table-border);
+}
+
+.expandedRow {
+	background-color: var(--color--table-row-background-expanded);
+
+	&:hover {
+		background-color: var(--color--table-row-background-expanded-hover);
+	}
+}
+
+.rowStriped {
+	background-color: var(--color--table-row-background-striped);
+}
+
+.selected {
+	background-color: var(--color--table-row-background-selected);
+
+	&:hover {
+		background-color: var(--color--table-row-background-selected-hover);
+	}
+}

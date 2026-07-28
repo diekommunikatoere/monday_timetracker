@@ -25,6 +25,7 @@
 
 import { ClientError } from "@mondaydotcomorg/api";
 
+import { parseNumericColumnText } from "@/lib/monday/utils";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { SyncPurpose, TimeFormat, SyncColumnType, GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
 
@@ -478,39 +479,9 @@ export async function getBudgetFromColumn(boardId: string, itemId: string, colum
 			return null;
 		}
 
-		// Try to parse as number from the .text property (most reliable for Mirror/Formula)
-		const text = columnValue.text || "";
-		if (!text) return null;
-
-		// Robust number extraction:
-		// 1. Remove all characters except digits, dots, and commas
-		// 2. Identify the decimal separator (last dot or comma)
-		// 3. Normalize to standard float format (dot as decimal, no thousands separator)
-		let cleaned = text.replace(/[^0-9.,-]/g, "");
-
-		// Find the last occurrence of a dot or comma
-		const lastDot = cleaned.lastIndexOf(".");
-		const lastComma = cleaned.lastIndexOf(",");
-
-		if (lastComma > lastDot) {
-			// Comma is likely the decimal separator (European format)
-			// Remove all dots (thousands separators) and replace the last comma with a dot
-			cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
-		} else if (lastDot > lastComma) {
-			// Dot is likely the decimal separator (US format)
-			// Remove all commas (thousands separators)
-			cleaned = cleaned.replace(/,/g, "");
-		} else {
-			// No separators or only one type - just remove commas if any (assuming they are thousands separators if no dot)
-			// Actually, if there's only a comma, it might be a decimal separator.
-			// Let's assume if there's only one separator and it's a comma, it's a decimal separator if it's followed by 1-2 digits.
-			if (lastComma !== -1 && cleaned.length - lastComma <= 3) {
-				cleaned = cleaned.replace(/,/g, ".");
-			}
-		}
-
-		const parsedValue = parseFloat(cleaned);
-		return isNaN(parsedValue) ? null : parsedValue;
+		// Parse the .text property (most reliable for Mirror/Formula) — shared with
+		// the bulk getBudgetBoardItems path so both agree on number formatting.
+		return parseNumericColumnText(columnValue.text);
 	} catch (error) {
 		console.error("Error fetching budget from monday.com:", error);
 		return null;

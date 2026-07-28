@@ -222,6 +222,14 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--input-text": "var(--color--text-primary)",
 		"--color--input-text-disabled": "var(--color--text-disabled)",
 
+		"--color--table-background": "var(--color--background-primary)",
+		"--color--table-header-background": "var(--color--tertiary-800)",
+		"--color--table-border": "var(--color--tertiary-500)",
+		"--color--table-row-background-striped": "var(--color--tertiary-900)",
+		"--color--table-row-background-hover": "var(--color--tertiary-700)",
+		"--color--table-row-background-selected": "var(--color--secondary-900)",
+		"--color--table-row-background-selected-hover": "var(--color--secondary-800)",
+
 		/* Mantine variables */
 		"--mantine-color-placeholder": "var(--color--text-placeholder)",
 		"--input-bg": "var(--color--background-primary)",
@@ -300,6 +308,16 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--input-border-disabled": "var(--color--tertiary-200)",
 		"--color--input-text": "var(--color--text-primary)",
 		"--color--input-text-disabled": "var(--color--text-disabled)",
+
+		"--color--table-background": "var(--color--background-primary)",
+		"--color--table-header-background": "var(--color--tertiary-100)",
+		"--color--table-border": "var(--color--tertiary-500)",
+		"--color--table-row-background-striped": "var(--color--tertiary-100)",
+		"--color--table-row-background-hover": "var(--color--tertiary-200)",
+		"--color--table-row-background-selected": "var(--color--secondary-100)",
+		"--color--table-row-background-selected-hover": "var(--color--secondary-200)",
+		"--color--table-row-background-expanded": "var(--color--secondary-100)",
+		"--color--table-row-background-expanded-hover": "var(--color--secondary-200)",
 
 		/* Mantine variables */
 		"--mantine-color-placeholder": "var(--color--text-placeholder)",

@@ -1,5 +1,5 @@
 // lib/database.ts
-// Core data-access layer for time entries, timer segments, and the
+// Core data-access layer for time entries and the
 // monday.com dimension tables (monday_board, monday_item).
 //
 // Architecture notes:
@@ -32,8 +32,6 @@ type TimeEntryWithRole = FrontendTimeEntry;
 type TimeEntryInsert = Database["public"]["Tables"]["time_entry"]["Insert"];
 /** Update shape for `time_entry`. */
 type TimeEntryUpdate = Database["public"]["Tables"]["time_entry"]["Update"];
-/** Insert shape for `timer_segment`. */
-type TimerSegmentInsert = Database["public"]["Tables"]["timer_segment"]["Insert"];
 
 // ============================================
 // Dimension Management Helpers

@@ -5,6 +5,7 @@ import { NextRequest } from "next/server";
 
 import { upsertMondayBoard, upsertMondayItem, upsertMondayItemsBatch } from "./database";
 import { createMondayClient } from "./monday/client";
+import { parseNumericColumnText } from "./monday/utils";
 import { cacheHelper } from "./redis";
 
 // Cache TTL constants (in seconds)
@@ -1199,6 +1200,216 @@ export async function findLinkedItems(boardId: string, itemId: string, targetBoa
 		console.error("Error in findLinkedItems:", error);
 		return [];
 	}
+}
+
+/**
+ * A job item linked to a budget item via a `board_relation` column, as returned
+ * by {@link getBudgetBoardItems}.
+ *
+ * @property id    - monday.com item ID of the linked job item.
+ * @property name  - Display name of the linked job item.
+ * @property board - The board the linked item currently lives on (`null` if monday
+ *                    omitted it), used to resolve archived/moved job boards dynamically
+ *                    rather than tracking them in `board_config`.
+ */
+export interface BudgetBoardLinkedItem {
+	id: string;
+	name: string;
+	board: { id: string; name: string } | null;
+	totalCost: number;
+}
+
+/**
+ * A single row (budget item) fetched by {@link getBudgetBoardItems}.
+ *
+ * @property id               - monday.com item ID of the budget item.
+ * @property name              - Display name of the budget item.
+ * @property budgetAmountText  - Raw `.text` of the budget-amount column, or `null` if empty/missing.
+ * @property budgetAmount      - `budgetAmountText` parsed to a number via {@link parseNumericColumnText}, or `null`.
+ * @property linkedItemIds     - IDs of every job item linked via the relation column (`linked_item_ids`).
+ * @property linkedItems       - Same items with name + board, for drill-down display.
+ */
+export interface BudgetBoardItem {
+	id: string;
+	name: string;
+	budgetAmountText: string | null;
+	budgetAmount: number | null;
+	budgetRemainingAmountText: string | null;
+	budgetRemainingAmount: number | null;
+	linkedItemIds: string[];
+	linkedItems: BudgetBoardLinkedItem[];
+}
+
+/** Raw response shape for the initial `items_page` query in {@link getBudgetBoardItems}. */
+type BudgetBoardItemsPageResponse = {
+	boards: Array<{
+		items_page: {
+			cursor: string | null;
+			items: RawBudgetBoardItem[];
+		};
+	}>;
+	complexity?: { query: number };
+	error?: APIError;
+};
+
+/** Raw response shape for the `next_items_page` pagination query in {@link getBudgetBoardItems}. */
+type BudgetBoardNextItemsPageResponse = {
+	next_items_page?: {
+		cursor: string | null;
+		items: RawBudgetBoardItem[];
+	};
+	complexity?: { query: number };
+	error?: APIError;
+};
+
+/** A single item as returned by the `column_values(ids: [...])` query in {@link getBudgetBoardItems}. */
+type RawBudgetBoardItem = {
+	id: string;
+	name: string;
+	column_values: Array<{
+		id: string;
+		text: string | null;
+		linked_item_ids?: string[];
+		linked_items?: Array<{ id: string; name: string; board: { id: string; name: string } | null }>;
+	}>;
+};
+
+/**
+ * Fetches every item on a budget board (e.g. "Retainer"), with its budget amount
+ * and its linked job items — the data source for the Abrechnung (budget rollup) view.
+ *
+ * **Algorithm**: cursor-paginates `boards.items_page` / `next_items_page` (same
+ * pattern as {@link getBoardTasks}'s Phase 1, but flat — budget boards aren't
+ * grouped for this purpose), requesting only `column_values(ids: [relationColumnId,
+ * budgetAmountColumnId])` with the `... on BoardRelationValue` fragment (same shape
+ * as {@link findLinkedItems}) to keep the query complexity low regardless of board size.
+ *
+ * `linked_items[].board` is read directly from monday per query — this is how the
+ * caller (see `lib/abrechnung.ts`) discovers which board each linked job item
+ * currently lives on (including archived/moved boards) without maintaining a
+ * separate "job board" registry.
+ *
+ * @param boardId               - The budget board's monday.com ID.
+ * @param relationColumnId      - The `board_relation`/`connect_boards` column listing linked job items.
+ * @param budgetAmountColumnId  - The `numbers`/`formula`/`mirror` column holding the budget figure.
+ * @returns One {@link BudgetBoardItem} per item on the board, in API order.
+ * @throws If `boardId` is not a valid positive integer, or on unrecoverable API errors.
+ */
+export async function getBudgetBoardItems(boardId: string, relationColumnId: string, budgetColumnId: string, budgetAmountColumnId: string): Promise<BudgetBoardItem[]> {
+	if (!boardId || isNaN(Number(boardId)) || Number(boardId) <= 0) {
+		throw new Error("boardId must be a valid positive integer");
+	}
+
+	const columnValuesFragment = `
+		column_values(ids: [$relationColumnId, $budgetColumnId, $budgetAmountColumnId]) {
+			id
+			text
+			... on BoardRelationValue {
+				linked_item_ids
+				linked_items {
+					id
+					name
+					board {
+						id
+						name
+					}
+				}
+			}
+		}
+	`;
+
+	const initialQuery = `
+		query ($boardId: ID!, $relationColumnId: String!, $budgetColumnId: String!, $budgetAmountColumnId: String!) {
+			boards(ids: [$boardId]) {
+				items_page(limit: 100) {
+					cursor
+					items {
+						id
+						name
+						${columnValuesFragment}
+					}
+				}
+			}
+			complexity {
+				query
+			}
+		}
+	`;
+
+	const nextPageQuery = `
+		query ($cursor: String!, $relationColumnId: String!, $budgetColumnId: String!, $budgetAmountColumnId: String!) {
+			next_items_page(limit: 100, cursor: $cursor) {
+				cursor
+				items {
+					id
+					name
+					${columnValuesFragment}
+				}
+			}
+			complexity {
+				query
+			}
+		}
+	`;
+
+	const rawItems: RawBudgetBoardItem[] = [];
+
+	try {
+		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, relationColumnId, budgetColumnId, budgetAmountColumnId });
+
+		if (response.error) {
+			throw new Error(response.error?.message || "Failed to fetch budget board items");
+		}
+
+		const itemsPage = response.boards?.[0]?.items_page;
+		if (!itemsPage) {
+			return [];
+		}
+
+		rawItems.push(...itemsPage.items);
+		let cursor = itemsPage.cursor;
+
+		while (cursor) {
+			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, relationColumnId, budgetColumnId, budgetAmountColumnId });
+
+			if (pageResponse.error) {
+				console.warn(`[getBudgetBoardItems] Pagination error for board ${boardId}: ${pageResponse.error.message}`);
+				break;
+			}
+
+			const nextPage = pageResponse.next_items_page;
+			if (!nextPage) break;
+
+			rawItems.push(...nextPage.items);
+			cursor = nextPage.cursor;
+		}
+	} catch (error) {
+		if (error instanceof ClientError) {
+			console.error("ClientError in getBudgetBoardItems:", error.response?.errors);
+		}
+		console.error(`Error fetching budget board items for board ${boardId}:`, error);
+		throw error;
+	}
+
+	return rawItems.map((item) => {
+		const relationValue = item.column_values.find((cv) => cv.id === relationColumnId);
+		const budgetValue = item.column_values.find((cv) => cv.id === budgetColumnId);
+		const budgetRemainingValue = item.column_values.find((cv) => cv.id === budgetAmountColumnId);
+
+		const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, board: li.board }));
+		const linkedItemIds = relationValue?.linked_item_ids ?? linkedItems.map((li) => li.id);
+
+		return {
+			id: item.id,
+			name: item.name,
+			budgetAmountText: budgetValue?.text ?? null,
+			budgetAmount: parseNumericColumnText(budgetValue?.text),
+			budgetRemainingAmountText: budgetRemainingValue?.text ?? null,
+			budgetRemainingAmount: parseNumericColumnText(budgetRemainingValue?.text),
+			linkedItemIds,
+			linkedItems,
+		};
+	});
 }
 
 /**

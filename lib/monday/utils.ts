@@ -62,3 +62,46 @@ export function isPurposeCompatible(columnType: string, purpose: SyncPurpose): b
 export function isTimePurpose(purpose: SyncPurpose): boolean {
 	return purpose === "total_time" || purpose === "time_by_role";
 }
+
+/**
+ * Parses a numeric value out of a monday.com column's `.text` display string.
+ *
+ * Shared by {@link "../columnSync".getBudgetFromColumn} (single-item budget lookup)
+ * and {@link "../monday".getBudgetBoardItems} (bulk budget-board fetch) so both
+ * paths agree on number formatting without an extra network round-trip per item.
+ *
+ * Handles both US (`1,234.56`) and European (`1.234,56`) formats by inspecting
+ * whichever of `.`/`,` appears last in the cleaned string:
+ * 1. Strip everything except digits, `.`, `,`, and `-`.
+ * 2. If the last comma comes after the last dot, treat comma as the decimal
+ *    separator (European) — drop dots, replace the last comma with a dot.
+ * 3. If the last dot comes after the last comma, treat dot as the decimal
+ *    separator (US) — drop commas.
+ * 4. If there's only a trailing comma followed by 1–2 digits, treat it as a
+ *    decimal separator too (e.g. `"1234,5"`).
+ *
+ * @param text - The column's `.text` value (may be `null`/`undefined`/empty).
+ * @returns The parsed number, or `null` if `text` is empty or not parseable.
+ */
+export function parseNumericColumnText(text: string | null | undefined): number | null {
+	if (!text) return null;
+
+	let cleaned = text.replace(/[^0-9.,-]/g, "");
+
+	const lastDot = cleaned.lastIndexOf(".");
+	const lastComma = cleaned.lastIndexOf(",");
+
+	if (lastComma > lastDot) {
+		// Comma is likely the decimal separator (European format)
+		cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+	} else if (lastDot > lastComma) {
+		// Dot is likely the decimal separator (US format)
+		cleaned = cleaned.replace(/,/g, "");
+	} else if (lastComma !== -1 && cleaned.length - lastComma <= 3) {
+		// Only a comma present, close enough to the end to be a decimal separator
+		cleaned = cleaned.replace(/,/g, ".");
+	}
+
+	const parsedValue = parseFloat(cleaned);
+	return isNaN(parsedValue) ? null : parsedValue;
+}
