@@ -1,0 +1,68 @@
+/*
+ * Layout for the dashboard AuswertungToolbar.
+ *
+ * Same container-query approach as `AbrechnungToolbar.module.css` (and for the
+ * same reason: this widget's width is set by the monday dashboard tile, not the
+ * browser viewport) — see that file's header comment for the full rationale.
+ * `.container` establishes the query context; everything inside responds to it.
+ *
+ * Switch point: 900px of available width flips the toolbar from stacked
+ * (search on top, week navigation below) to side-by-side (search left, week
+ * navigation right). Narrower than Abrechnung's 1200px switch point since this
+ * toolbar has fewer controls.
+ */
+
+.container {
+	container-type: inline-size;
+	container-name: auswertung-toolbar;
+}
+
+.toolbar {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--mantine-spacing-sm);
+	padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+
+.searchGroup {
+	width: 100%;
+	max-width: 500px;
+}
+
+/* Week navigation: ◀ / label / ▶, then the date-jump picker and "Diese Woche" reset. */
+.weekNav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--mantine-spacing-xs);
+	width: 100%;
+}
+
+.weekLabel {
+	min-width: 220px;
+	text-align: center;
+}
+
+.datePicker {
+	width: 160px;
+}
+
+@container auswertung-toolbar (min-width: 900px) {
+	.toolbar {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--mantine-spacing-sm);
+	}
+
+	.searchGroup {
+		flex: 0 0 auto;
+		width: 320px;
+	}
+
+	.weekNav {
+		width: auto;
+		justify-content: flex-end;
+	}
+}

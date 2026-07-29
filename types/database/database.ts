@@ -726,6 +726,18 @@ export type Database = {
           user_photo_urls: Json
         }[]
       }
+      get_users_time_by_role: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: {
+          entry_count: number
+          hourly_rate: number
+          role_color_hex: string
+          role_id: string
+          role_name: string
+          total_seconds: number
+          user_id: string
+        }[]
+      }
       purge_trashed_monday_items: {
         Args: { p_days?: number }
         Returns: {

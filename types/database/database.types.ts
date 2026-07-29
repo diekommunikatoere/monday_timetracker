@@ -107,6 +107,30 @@ export interface GetItemsTimeByRoleResult {
 }
 
 /**
+ * One row from `get_users_time_by_role` — time tracked by a user, grouped by role.
+ * Powers the Auswertung view (`lib/auswertung.ts`), which classifies each row as
+ * billable/non-billable/role-less from `hourly_rate`/`role_id` itself rather than
+ * from a column this RPC returns — there's no per-row classification flag.
+ *
+ * @property role_id        - `null` for role-less time entries — still counted in a
+ *                             user's total but excluded from any per-role breakdown by the caller.
+ * @property hourly_rate    - The role's **global** `role.hourly_rate` (not the per-board
+ *                             effective rate `get_items_time_by_role` uses) — `null` for
+ *                             role-less rows. `0`/`null` means non-billable.
+ * @property total_seconds  - Summed duration for this user+role, in **seconds**.
+ * @property entry_count    - Number of time entries contributing to the total.
+ */
+export interface GetUsersTimeByRoleResult {
+	user_id: string;
+	role_id: string | null;
+	role_name: string | null;
+	role_color_hex: string | null;
+	hourly_rate: number | null;
+	total_seconds: number;
+	entry_count: number;
+}
+
+/**
  * Result of `calculate_remaining_budget` — budget math for an item.
  *
  * @property budget_amount       - The configured budget (currency units).
