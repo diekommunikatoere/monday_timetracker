@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@AGENTS.md
+
 ## What this is
 
 A time-tracking app that runs **embedded inside monday.com** as a dashboard widget / sidebar item view. Users track time with a timer or manual entries; data lives in Supabase (PostgreSQL) and is cached in Redis. Finalized time is pushed back to monday.com board columns (total time, time-by-role, remaining budget).
@@ -70,6 +72,7 @@ All monday API access goes through [lib/monday.ts](lib/monday.ts) (and `lib/mond
 **Webhooks** (`app/api/webhooks/monday/route.ts`): handles monday's `challenge` handshake, then a `switch` on event type (`create_pulse`, `update_name`, `move_pulse_into_group`, `move_pulse_into_board`, `delete_pulse`, `archive_pulse`, `restore_pulse`, `move_subitem`) to keep the local `monday_item` / `monday_group` mirror in sync and re-push stale parent budgets. **Known gap (see memory): group ops and moves to untracked boards fire no webhooks — the reconciliation cron is the backstop.**
 
 **Cron routes** (auth: optional `Bearer ${CRON_SECRET}`, no user session):
+
 - `/api/cron/sync-boards` — reconciles `monday_board` rows with the monday API and registers/reconciles webhooks (`?reconcile=true` prunes stale ones).
 - `/api/cron/cleanup-soft-deletes` — purges orphaned soft-deletes, drains the Redis `hard_delete:*` queue into column syncs, and purges trashed monday items.
 
