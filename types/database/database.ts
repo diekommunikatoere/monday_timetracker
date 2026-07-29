@@ -683,6 +683,22 @@ export type Database = {
         }
         Returns: number
       }
+      get_items_time_by_role: {
+        Args: {
+          p_end_date?: string
+          p_item_ids: string[]
+          p_start_date?: string
+          p_user_id?: string
+        }
+        Returns: {
+          entry_count: number
+          item_id: string
+          role_id: string
+          role_name: string
+          total_cost: number
+          total_seconds: number
+        }[]
+      }
       get_user_time_entries: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {

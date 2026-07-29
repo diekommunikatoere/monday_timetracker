@@ -8,7 +8,7 @@ import { Icon } from "@/components";
 import styles from "@/components/styles/ui/tables/Table.module.css";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
-import type { AbrechnungBudgetItem, AbrechnungTableRow } from "@/types/abrechnung";
+import type { AbrechnungBudgetItem, AbrechnungLinkedItem, AbrechnungRoleBreakdown, AbrechnungTableRow } from "@/types/abrechnung";
 
 /**
  * Formats a euro amount for display, matching the `€{value.toFixed(2)}`
@@ -79,7 +79,7 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 						</ActionIcon>
 						<Text fw={500} size="sm" style={{ display: "inline-flex", gap: "8px", alignItems: "center" }} title={row.name}>
 							{row.name}{" "}
-							<Badge variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
+							<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
 								{row.linkedItems.length}
 							</Badge>
 						</Text>
@@ -234,6 +234,35 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 	);
 }
 
+/**
+ * Card grid showing time + cost per role. Shared between the budget item's own
+ * "Zeit nach Rolle" panel and each linked job item's role drill-down — see
+ * `lib/abrechnung.ts`'s `rollupBudgetItem` for how both are derived from the same
+ * `get_items_time_by_role` rows. Role-less time entries are excluded (no row to show them
+ * under), so the cards can sum to less than the enclosing row's own time/cost.
+ */
+function RoleBreakdownCards({ roles }: { roles: AbrechnungRoleBreakdown[] }) {
+	return (
+		<SimpleGrid type="container" cols={{ base: 1, "500px": 2, "620px": 3, "800px": 4 }} spacing={8}>
+			{roles.map((role) => (
+				<Card key={role.roleId} withBorder padding="sm" radius="sm" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: "8px", borderColor: "var(--color--border-layout)", backgroundColor: "var(--color--background-primary)" }}>
+					<Text size="xs" c={"var(--color--text-secondary)"} fw={600} lh={1}>
+						{role.roleName}
+					</Text>
+					<Stack gap={2} align="flex-end">
+						<Text c={"var(--color--text-primary)"} fw={600} size="xs" lh={1}>
+							{formatDuration(role.totalSeconds)}
+						</Text>
+						<Text c={"var(--color--text-secondary)"} size="xs" lh={1}>
+							{formatEuro(role.totalCost)}
+						</Text>
+					</Stack>
+				</Card>
+			))}
+		</SimpleGrid>
+	);
+}
+
 /** Drill-down panel shown under an expanded budget item: per-role breakdown + linked job items. */
 function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 	return (
@@ -244,18 +273,7 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 						<Text size="sm" fw={600} mb={8}>
 							Zeit nach Rolle
 						</Text>
-						<SimpleGrid type="container" cols={{ base: 1, "500px": 2, "620px": 3, "800px": 4 }} spacing={8}>
-							{Object.values(item.byRole).map((role) => (
-								<Card key={role.roleId} withBorder padding="sm" radius="sm" style={{ flex: 1, minWidth: "150px", flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: "8px", borderColor: "var(--color--border-layout)", backgroundColor: "var(--color--background-primary)" }}>
-									<Text size="xs" c={"var(--color--text-secondary)"} fw={600} lh={1}>
-										{role.roleName}
-									</Text>
-									<Text c={"var(--color--text-primary)"} fw={600} size="xs" lh={1}>
-										{formatDuration(role.totalSeconds)}
-									</Text>
-								</Card>
-							))}
-						</SimpleGrid>
+						<RoleBreakdownCards roles={item.byRole} />
 					</Box>
 					<hr style={{ borderColor: "var(--color--border-layout)", margin: "8px 0" }} />
 				</>
@@ -264,7 +282,7 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 			<Box>
 				<Text size="sm" fw={600} mb={8} style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
 					Verknüpfte Agentur-Projekte{" "}
-					<Badge variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
+					<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
 						{item.linkedItems.length}
 					</Badge>
 				</Text>
@@ -273,50 +291,101 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 						Keine verknüpften Agentur-Projekte.
 					</Text>
 				) : (
-					<Table striped withTableBorder withColumnBorders withRowBorders verticalSpacing="sm" layout="auto" style={{ width: "100%" }} className={styles.table}>
-						<Table.Thead className={styles.headerRow}>
-							<Table.Tr>
-								<Table.Th className={styles.headerCell}>
-									<Text fw={600} size="xs">
-										Projekt{item.linkedItems.length > 1 ? "e" : ""}
-									</Text>
-								</Table.Th>
-								<Table.Th className={styles.headerCell}>
-									<Text fw={600} size="xs">
-										Board
-									</Text>
-								</Table.Th>
-								<Table.Th className={styles.headerCell}>
-									<Text fw={600} size="xs">
-										Agenturleistung
-									</Text>
-								</Table.Th>
-							</Table.Tr>
-						</Table.Thead>
-						<Table.Tbody>
-							{item.linkedItems.map((linked) => (
-								<Table.Tr key={linked.id} className={styles.bodyRow}>
-									<Table.Td>
-										<Text fw={500} size="xs">
-											{linked.name}
-										</Text>
-									</Table.Td>
-									<Table.Td>
-										<Text fw={500} size="xs">
-											{linked.board ? linked.board.name : ""}
-										</Text>
-									</Table.Td>
-									<Table.Td>
-										<Text size="xs" style={{ letterSpacing: "-2%" }}>
-											{formatEuro(linked.totalCost)}
-										</Text>
-									</Table.Td>
-								</Table.Tr>
-							))}
-						</Table.Tbody>
-					</Table>
+					<LinkedItemsTable linkedItems={item.linkedItems} />
 				)}
 			</Box>
 		</Stack>
+	);
+}
+
+/** The "Verknüpfte Agentur-Projekte" table, with per-row expansion into a role breakdown. */
+function LinkedItemsTable({ linkedItems }: { linkedItems: AbrechnungLinkedItem[] }) {
+	const [expandedLinkedIds, setExpandedLinkedIds] = useState<Set<string>>(new Set());
+
+	const toggleLinkedExpand = (id: string) => {
+		setExpandedLinkedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			return next;
+		});
+	};
+
+	return (
+		<Table striped withTableBorder withColumnBorders withRowBorders verticalSpacing="sm" layout="auto" style={{ width: "100%" }} className={styles.table}>
+			<Table.Thead className={styles.headerRow}>
+				<Table.Tr>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Projekt{linkedItems.length > 1 ? "e" : ""}
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Board
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Zeit
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Agenturleistung
+						</Text>
+					</Table.Th>
+				</Table.Tr>
+			</Table.Thead>
+			<Table.Tbody>
+				{linkedItems.map((linked) => {
+					const hasBreakdown = linked.byRole.length > 0;
+					const isExpanded = expandedLinkedIds.has(linked.id);
+					return (
+						<Fragment key={linked.id}>
+							<Table.Tr className={styles.bodyRow}>
+								<Table.Td>
+									<Group gap="xs" wrap="nowrap">
+										<ActionIcon variant="subtle" size="sm" disabled={!hasBreakdown} onClick={() => toggleLinkedExpand(linked.id)} aria-label={isExpanded ? "Details ausblenden" : "Details anzeigen"}>
+											<Icon name={isExpanded ? "expand_more" : "chevron_right"} size={16} />
+										</ActionIcon>
+										<Text fw={500} size="xs">
+											{linked.name}
+										</Text>
+									</Group>
+								</Table.Td>
+								<Table.Td>
+									<Text fw={500} size="xs">
+										{linked.board ? linked.board.name : ""}
+									</Text>
+								</Table.Td>
+								<Table.Td>
+									<Text size="xs" style={{ letterSpacing: "-2%" }}>
+										{formatDuration(linked.totalSeconds)}
+									</Text>
+								</Table.Td>
+								<Table.Td>
+									<Text size="xs" style={{ letterSpacing: "-2%" }}>
+										{formatEuro(linked.totalCost)}
+									</Text>
+								</Table.Td>
+							</Table.Tr>
+							{isExpanded && hasBreakdown && (
+								<Table.Tr>
+									<Table.Td colSpan={4} style={{ background: "var(--color--background-secondary)" }}>
+										<Box p="xs">
+											<RoleBreakdownCards roles={linked.byRole} />
+										</Box>
+									</Table.Td>
+								</Table.Tr>
+							)}
+						</Fragment>
+					);
+				})}
+			</Table.Tbody>
+		</Table>
 	);
 }

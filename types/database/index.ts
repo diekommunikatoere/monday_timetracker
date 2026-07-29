@@ -41,6 +41,7 @@ export type {
 	MondayWebhookUpdate,
 	// RPC result types
 	GetItemTimeByRoleResult,
+	GetItemsTimeByRoleResult,
 	CalculateRemainingBudgetResult,
 	GetCurrentElapsedTimeResult,
 	GetTimerSessionWithElapsedResult,

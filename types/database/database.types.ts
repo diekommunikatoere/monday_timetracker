@@ -85,6 +85,28 @@ export interface GetItemTimeByRoleResult {
 }
 
 /**
+ * One row from `get_items_time_by_role` — like {@link GetItemTimeByRoleResult}, but grouped
+ * per item (not collapsed across the whole `p_item_ids` set), and with `total_cost` actually
+ * populated (tracked time × effective hourly rate, same expression as `calculate_remaining_budget`).
+ * A job item's subitem time is attributed to the job item, matching the other rollup RPCs.
+ *
+ * @property item_id       - The (job) item this row's time is attributed to.
+ * @property role_id       - `null` for role-less time entries — still counted in `total_seconds`/
+ *                            `total_cost` but excluded from any per-role breakdown by the caller.
+ * @property total_seconds - Summed duration for this item+role, in **seconds**.
+ * @property total_cost    - Tracked time × effective hourly rate (currency units); `0` for role-less rows.
+ * @property entry_count   - Number of time entries contributing to the total.
+ */
+export interface GetItemsTimeByRoleResult {
+	item_id: string;
+	role_id: string | null;
+	role_name: string | null;
+	total_seconds: number;
+	total_cost: number;
+	entry_count: number;
+}
+
+/**
  * Result of `calculate_remaining_budget` — budget math for an item.
  *
  * @property budget_amount       - The configured budget (currency units).

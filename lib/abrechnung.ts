@@ -19,7 +19,7 @@
 import { getBudgetBoardItems, type BudgetBoardItem } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange } from "@/types/abrechnung";
-import type { GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
+import type { GetItemsTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
 
 // Domain types live in `@/types/abrechnung` (not here) so client code — the Zustand
 // store, the page — can import them without pulling in this server-only module (which
@@ -101,13 +101,17 @@ async function loadBudgetBoard(config: { board_id: string; settings: unknown; mo
  * `board_role_override` join uses each time entry's own `board_id`, so a budget item whose
  * linked job items span multiple boards gets each entry's correct board-specific rate override.
  *
- * `range` (added in `039_rollup_functions_date_range.sql`) narrows every RPC call — including
- * the per-linked-item `calculate_remaining_budget` calls — to time entries within the bounds;
- * `item.budget` itself is never touched by it.
+ * `range` (added in `039_rollup_functions_date_range.sql`) narrows every RPC call to time
+ * entries within the bounds; `item.budget` itself is never touched by it.
+ *
+ * Per-role time+cost is fetched once via `get_items_time_by_role` (`040_items_time_by_role.sql`)
+ * and then regrouped in-memory two ways: collapsed across all linked items for the budget
+ * item's own `byRole`, and kept per linked item for `linkedItems[].byRole`/`totalSeconds`/
+ * `totalCost`. This replaced an older N+1 (one `calculate_remaining_budget` call per linked
+ * item, cost-only, no per-role split) with a single grouped call.
  */
 async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, range?: AbrechnungDateRange): Promise<AbrechnungBudgetItem> {
 	const linkedItemIds = item.linkedItemIds;
-	const linkedItems: AbrechnungLinkedItem[] = item.linkedItems;
 	const startDate = range?.startDate ?? null;
 	const endDate = range?.endDate ?? null;
 
@@ -121,13 +125,13 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 			remainingBudget: item.budget,
 			utilizationPercent: 0,
 			byRole: [],
-			linkedItems,
+			linkedItems: item.linkedItems.map((linkedItem) => ({ ...linkedItem, totalSeconds: 0, totalCost: 0, byRole: [] })),
 		};
 	}
 
-	const [totalTimeResult, byRoleResult, budgetResultRows] = await Promise.all([
+	const [totalTimeResult, itemsByRoleResult, budgetResultRows] = await Promise.all([
 		supabaseAdmin.rpc("get_item_total_time", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: number | null; error: any }>,
-		supabaseAdmin.rpc("get_item_time_by_role", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: GetItemTimeByRoleResult[] | null; error: any }>,
+		supabaseAdmin.rpc("get_items_time_by_role", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: GetItemsTimeByRoleResult[] | null; error: any }>,
 		supabaseAdmin.rpc("calculate_remaining_budget", {
 			p_board_id: budgetBoardId,
 			p_item_ids: linkedItemIds,
@@ -138,26 +142,12 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 		} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
 	]);
 
-	const linkedItemBudgetResultRows = await Promise.all(
-		linkedItems.map(
-			(linkedItem) =>
-				supabaseAdmin.rpc("calculate_remaining_budget", {
-					p_board_id: linkedItem.board?.id ?? budgetBoardId,
-					p_item_ids: [linkedItem.id],
-					p_budget_amount: null,
-					p_user_id: null,
-					p_start_date: startDate,
-					p_end_date: endDate,
-				} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
-		),
-	);
-
 	if (totalTimeResult.error) console.error(`[getAbrechnungData] get_item_total_time failed for budget item ${item.id}:`, totalTimeResult.error);
-	if (byRoleResult.error) console.error(`[getAbrechnungData] get_item_time_by_role failed for budget item ${item.id}:`, byRoleResult.error);
+	if (itemsByRoleResult.error) console.error(`[getAbrechnungData] get_items_time_by_role failed for budget item ${item.id}:`, itemsByRoleResult.error);
 	if (budgetResultRows.error) console.error(`[getAbrechnungData] calculate_remaining_budget failed for budget item ${item.id}:`, budgetResultRows.error);
 
-	const byRoleData = byRoleResult.data ?? [];
-	const colorMap = await getRoleColorMap(byRoleData.map((r) => r.role_id));
+	const itemsByRoleData = itemsByRoleResult.data ?? [];
+	const colorMap = await getRoleColorMap(itemsByRoleData.filter((r) => r.role_id !== null).map((r) => r.role_id as string));
 	const budgetResult = budgetResultRows.data?.[0];
 	const utilizationPercent = (() => {
 		if (budgetResult?.budget_amount === 0 && budgetResult?.total_cost > 0) {
@@ -169,6 +159,44 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 		}
 	})();
 
+	// Collapse across all linked items → the budget item's own "Zeit nach Rolle". Role-less
+	// rows (role_id === null) are excluded from the breakdown but still count toward
+	// totalSeconds/totalCost via the get_item_total_time/calculate_remaining_budget calls above.
+	const byRoleTotals = new Map<string, { roleName: string; totalSeconds: number; totalCost: number; entryCount: number }>();
+	for (const row of itemsByRoleData) {
+		if (row.role_id === null) continue;
+		const existing = byRoleTotals.get(row.role_id);
+		if (existing) {
+			existing.totalSeconds += row.total_seconds;
+			existing.totalCost += row.total_cost;
+			existing.entryCount += row.entry_count;
+		} else {
+			byRoleTotals.set(row.role_id, { roleName: row.role_name ?? "", totalSeconds: row.total_seconds, totalCost: row.total_cost, entryCount: row.entry_count });
+		}
+	}
+	const byRole: AbrechnungRoleBreakdown[] = Array.from(byRoleTotals.entries())
+		.map(([roleId, r]) => ({ roleId, roleName: r.roleName, totalSeconds: r.totalSeconds, totalCost: r.totalCost, entryCount: r.entryCount, colorHex: colorMap.get(roleId) }))
+		.sort((a, b) => b.totalSeconds - a.totalSeconds);
+
+	// Kept per linked item → each linked item's own time/cost and role breakdown.
+	const rowsByItemId = new Map<string, GetItemsTimeByRoleResult[]>();
+	for (const row of itemsByRoleData) {
+		const rows = rowsByItemId.get(row.item_id);
+		if (rows) rows.push(row);
+		else rowsByItemId.set(row.item_id, [row]);
+	}
+	const linkedItems: AbrechnungLinkedItem[] = item.linkedItems.map((linkedItem) => {
+		const rows = rowsByItemId.get(linkedItem.id) ?? [];
+		const totalSeconds = rows.reduce((sum, r) => sum + r.total_seconds, 0);
+		const totalCost = rows.reduce((sum, r) => sum + r.total_cost, 0);
+		const linkedByRole: AbrechnungRoleBreakdown[] = rows
+			.filter((r) => r.role_id !== null)
+			.map((r) => ({ roleId: r.role_id as string, roleName: r.role_name ?? "", totalSeconds: r.total_seconds, totalCost: r.total_cost, entryCount: r.entry_count, colorHex: colorMap.get(r.role_id as string) }))
+			.sort((a, b) => b.totalSeconds - a.totalSeconds);
+
+		return { ...linkedItem, totalSeconds, totalCost, byRole: linkedByRole };
+	});
+
 	return {
 		id: item.id,
 		name: item.name,
@@ -177,19 +205,8 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 		totalCost: budgetResult?.total_cost ?? 0,
 		remainingBudget: item.budget !== null ? (budgetResult?.remaining_budget ?? item.budget) : null,
 		utilizationPercent: utilizationPercent,
-		byRole: byRoleData.map((r) => ({
-			// ! Implement cost per role in RPC
-			roleId: r.role_id,
-			roleName: r.role_name,
-			totalSeconds: r.total_seconds,
-			totalCost: 0,
-			entryCount: r.entry_count,
-			colorHex: colorMap.get(r.role_id),
-		})),
-		linkedItems: linkedItems.map((linkedItem, index) => ({
-			...linkedItem,
-			totalCost: linkedItemBudgetResultRows[index].data?.[0]?.total_cost ?? 0,
-		})),
+		byRole,
+		linkedItems,
 	};
 }
 

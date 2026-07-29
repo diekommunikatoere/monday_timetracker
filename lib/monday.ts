@@ -1399,9 +1399,9 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 		const budgetValue = item.column_values.find((cv) => cv.id === budgetColumnId);
 		const costValue = item.column_values.find((cv) => cv.id === costColumnId);
 
-		// totalCost defaults to 0 pending per-linked-item cost breakdown (see the
-		// "Implement cost per role in RPC" TODO in lib/abrechnung.ts) — the drill-down
-		// UI already renders a hardcoded "0 €" for this in AbrechnungTable.tsx.
+		// totalCost is a placeholder — lib/abrechnung.ts overwrites it (along with
+		// totalSeconds/byRole, which AbrechnungLinkedItem adds on top of this monday-only
+		// shape) with the real per-item rollup from get_items_time_by_role.
 		const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, board: li.board, totalCost: 0 }));
 		const linkedItemIds = relationValue?.linked_item_ids ?? linkedItems.map((li) => li.id);
 

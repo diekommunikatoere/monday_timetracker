@@ -38,12 +38,20 @@ export interface AbrechnungRoleBreakdown {
 	colorHex?: string;
 }
 
-/** A linked job item shown in a budget item's drill-down, with the board it currently lives on. */
+/**
+ * A linked job item shown in a budget item's drill-down, with the board it currently lives on.
+ *
+ * `byRole` excludes role-less time entries (see `get_items_time_by_role` in
+ * `lib/abrechnung.ts`), so it can sum to less than `totalSeconds`/`totalCost` — that's
+ * expected, not a bug, matching the budget item's own `AbrechnungBudgetItem.byRole`.
+ */
 export interface AbrechnungLinkedItem {
 	id: string;
 	name: string;
 	board: { id: string; name: string } | null;
+	totalSeconds: number;
 	totalCost: number;
+	byRole: AbrechnungRoleBreakdown[];
 }
 
 /**

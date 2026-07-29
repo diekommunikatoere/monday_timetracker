@@ -91,7 +91,7 @@ export default function AbrechnungPage() {
 		.sort((a, b) => a.label.localeCompare(b.label));
 
 	return (
-		<div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+		<div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
 			<AbrechnungToolbar boardOptions={boardOptions} />
 			<div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 32 }}>
 				{activeError && <ErrorState message={activeError} />}
