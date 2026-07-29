@@ -1,12 +1,15 @@
 // components/dashboard/analytics/AuswertungToolbar.tsx
 "use client";
 
-import { Text } from "@mantine/core";
+import { Popover, Text } from "@mantine/core";
+import { DatePicker as MantineCalendar } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
-import { DatePicker, Input, Button, Icon, IconButton } from "@/components";
+import { Input, Icon, IconButton } from "@/components";
 import classes from "@/components/styles/features/auswertung/AuswertungToolbar.module.css";
+import { DatePickerProps } from "@/components/ui/forms/types";
 import { getISOWeek, startOfISOWeek } from "@/lib/time/calculations";
 import { useAuswertungStore } from "@/stores/auswertungStore";
 
@@ -42,6 +45,7 @@ export default function AuswertungToolbar() {
 	// only updates ~200ms after typing stops — same pattern as `AbrechnungToolbar`.
 	const [searchInput, setSearchInput] = useState(filters.search);
 	const [debouncedSearch] = useDebouncedValue(searchInput, 200);
+	const [datePickerOpened, setDatePickerOpened] = useState(false);
 
 	useEffect(() => {
 		setFilter({ search: debouncedSearch });
@@ -49,6 +53,21 @@ export default function AuswertungToolbar() {
 	}, [debouncedSearch]);
 
 	const isCurrentWeek = !!weekStart && weekStart.getTime() === startOfISOWeek(new Date()).getTime();
+
+	const getDayProps: DatePickerProps<"range">["getDayProps"] = (date) => {
+		const d = dayjs(date);
+		const isToday = d.isSame(dayjs(), "day");
+
+		if (isToday) {
+			return {
+				style: {
+					borderColor: "var(--color--border-ui)",
+				},
+			};
+		}
+
+		return {};
+	};
 
 	return (
 		<div className={classes.container}>
@@ -66,22 +85,28 @@ export default function AuswertungToolbar() {
 					<IconButton size="lg" colorVariant="tertiary" onClick={() => stepWeek(1)} aria-label="Nächste Woche">
 						<Icon name="chevron_right" />
 					</IconButton>
-					<DatePicker
-						className={classes.datePicker}
-						placeholder="Datum wählen"
-						value={null}
-						onChange={(value) => value && goToWeekOf(new Date(value))}
-						valueFormat="DD.MM.YYYY"
-						leftSection={<Icon name="date_range" size={18} color="var(--color--text-placeholder)" />}
-						leftSectionPointerEvents="none"
-						highlightToday
-						withWeekNumbers
-					/>
-					{!isCurrentWeek && (
-						<Button variant="default" onClick={goToCurrentWeek}>
-							Diese Woche
-						</Button>
-					)}
+					<Popover opened={datePickerOpened} onChange={setDatePickerOpened} position="bottom" withArrow shadow="md">
+						<Popover.Target>
+							<IconButton size="lg" colorVariant="tertiary" onClick={() => setDatePickerOpened((opened) => !opened)} aria-label="Datum wählen">
+								<Icon name="date_range" size={21} />
+							</IconButton>
+						</Popover.Target>
+						<Popover.Dropdown styles={{ dropdown: { backgroundColor: "var(--color--background-secondary)" } }}>
+							<MantineCalendar
+								value={null}
+								onChange={(value) => {
+									if (value) goToWeekOf(new Date(value));
+									setDatePickerOpened(false);
+								}}
+								highlightToday
+								withWeekNumbers
+								getDayProps={getDayProps}
+							/>
+						</Popover.Dropdown>
+					</Popover>
+					<IconButton size="lg" colorVariant="primary" onClick={goToCurrentWeek} disabled={isCurrentWeek}>
+						<Icon name="today" size={21} />
+					</IconButton>
 				</div>
 			</div>
 		</div>

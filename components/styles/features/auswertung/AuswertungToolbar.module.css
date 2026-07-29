@@ -42,10 +42,9 @@
 .weekLabel {
 	min-width: 220px;
 	text-align: center;
-}
-
-.datePicker {
-	width: 160px;
+	padding: 6px 4px;
+	border-radius: var(--border-radius--sm);
+	background-color: var(--color--background-secondary);
 }
 
 @container auswertung-toolbar (min-width: 900px) {

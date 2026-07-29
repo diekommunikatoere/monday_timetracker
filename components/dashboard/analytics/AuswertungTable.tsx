@@ -36,7 +36,7 @@ export interface AuswertungTableProps {
  * Presentational table for the Auswertung (per-user weekly utilization) view.
  *
  * One row per user, with their selected week's tracked time split into
- * "Abrechenbar" (billable, role `hourly_rate > 0`) / "Nicht abrechenbar"
+ * "Fakturierbar" (billable, role `hourly_rate > 0`) / "Nicht fakturierbar"
  * (non-billable, rate `0`) / "Gesamt" (total) columns. The "Ohne Rolle" column
  * (role-less time entries) only renders when at least one visible row has any —
  * most weeks won't. Rows expand (click the chevron) to a drill-down panel with
@@ -97,14 +97,14 @@ export function AuswertungTable({ items, loading, error }: AuswertungTableProps)
 			},
 			{
 				id: "billable",
-				header: "Abrechenbar",
+				header: "Fakturierbar",
 				align: "right",
 				minWidth: 130,
 				cell: ({ row }) => <DurationCell seconds={row.billableSeconds} />,
 			},
 			{
 				id: "nonBillable",
-				header: "Nicht abrechenbar",
+				header: "Nicht fakturierbar",
 				align: "right",
 				minWidth: 150,
 				cell: ({ row }) => <DurationCell seconds={row.nonBillableSeconds} />,
@@ -256,7 +256,7 @@ function AuswertungUserDetails({ user }: { user: AuswertungUserRow }) {
 			{billableRoles.length > 0 && (
 				<Box>
 					<Text size="sm" fw={600} mb={8}>
-						Abrechenbar
+						Fakturierbar
 					</Text>
 					<RoleBreakdownCards roles={billableRoles} />
 				</Box>
@@ -264,7 +264,7 @@ function AuswertungUserDetails({ user }: { user: AuswertungUserRow }) {
 			{nonBillableRoles.length > 0 && (
 				<Box>
 					<Text size="sm" fw={600} mb={8}>
-						Nicht abrechenbar
+						Nicht fakturierbar
 					</Text>
 					<RoleBreakdownCards roles={nonBillableRoles} />
 				</Box>
