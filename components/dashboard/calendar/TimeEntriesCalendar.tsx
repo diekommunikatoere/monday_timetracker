@@ -1,7 +1,7 @@
 // components/dashboard/calendar/TimeEntriesCalendar.tsx
 "use client";
 
-import { HoverCard, UnstyledButton, Tooltip } from "@mantine/core";
+import { Divider, HoverCard, Text, UnstyledButton, Tooltip } from "@mantine/core";
 import { DayViewProps, Schedule, ScheduleEventData, ScheduleLabelsOverride, ScheduleViewLevel } from "@mantine/schedule";
 import { useCallback, useMemo, useState } from "react";
 
@@ -13,7 +13,7 @@ import { ManualTimeEntryModal } from "@/components/features/timer/ManualTimeEntr
 import DeleteConfirmationDialog from "@/components/shared/time-entries/DeleteConfirmationDialog";
 import { useToast } from "@/components/ToastProvider";
 import { useTimeEntriesRefetch } from "@/contexts/TimeEntriesContext";
-import { endOfDay, endOfISOWeek, formatTimeString, secondsToDuration, startOfDay, startOfISOWeek } from "@/lib/utils";
+import { endOfDay, endOfISOWeek, formatDuration, formatTime, formatTimeString, secondsToDuration, startOfDay, startOfISOWeek } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { TimeEntry } from "@/types/time-entry";
@@ -91,8 +91,6 @@ export function TimeEntriesCalendar() {
 		const rangeEnd = view === "week" ? endOfISOWeek(date) : endOfDay(date);
 		return filterEntriesForVisibleRange(allEntries, rangeStart, rangeEnd).map(entryToScheduleEvent);
 	}, [allEntries, date, view]);
-
-	console.log("TimeEntriesCalendar: rendering with", { date, view, events });
 
 	// Edit dispatch mirrors TimeEntriesTable.handleEdit: finalized -> full modal,
 	// parked -> reduced draft modal. paused/running never reach the calendar.
@@ -262,6 +260,35 @@ export function TimeEntriesCalendar() {
 		setShowManualEntryModal(true);
 	}, []);
 
+	// Customizes only the inner event body (becomes the children of Mantine's own
+	// `eventInner` box), so the resize-handle elements and `--event-bg` wiring
+	// `renderEvent` would otherwise discard stay intact.
+	const renderEventBody: NonNullable<DayViewProps["renderEventBody"]> = useCallback((event) => {
+		const entry = getEntryFromEvent(event);
+		return (
+			<div className={styles.eventBody}>
+				<div className={styles.eventNameContainer}>
+					<Text className={styles.eventTaskName} fw={600} truncate data-timer-state={entry.timer_state}>
+						{entry.task_name}
+					</Text>
+					<Text className={styles.eventParentItemName} truncate>
+						{entry.parent_item_name}
+					</Text>
+				</div>
+				{/* {entry.comment && (
+					<Tooltip label={entry.comment} withArrow position="top">
+						<UnstyledButton aria-label="Kommentar anzeigen" tabIndex={-1} style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "help" }} className={styles.eventComment}>
+							<Icon name="comment" size={14} />
+						</UnstyledButton>
+					</Tooltip>
+				)} */}
+			</div>
+		);
+	}, []);
+
+	// Decorates the default event button (via `props`) with the context menu and
+	// state attribute; renders `props.children` untouched so Mantine's resize
+	// handles and `eventInner` (see renderEventBody above) still mount.
 	const renderEvent: NonNullable<DayViewProps["renderEvent"]> = useCallback((event, props) => {
 		const entry = getEntryFromEvent(event);
 		return (
@@ -276,62 +303,53 @@ export function TimeEntriesCalendar() {
 							setContextMenu({ x: e.clientX, y: e.clientY, entry });
 						}}
 					>
-						<div className={styles.eventBody}>
-							{/* Inner Container */}
-							<div className={styles.innerContainer}>
-								{/* Event name container */}
-								<div className={styles.eventNameContainer}>
-									{/* Task name */}
-									<span className={styles.taskName}>{event.payload.entry.task_name}</span>
-									{/* Job name  */}
-									<span className={styles.parentItemName}>{event.payload.entry.parent_item_name}</span>
-								</div>
-							</div>
-							{event.payload.entry.comment && (
-								<div className={styles.commentContainer}>
-									<Tooltip label={event.payload.entry.comment} withArrow position="top">
-										<UnstyledButton aria-label="Kommentar anzeigen" disabled style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "help" }}>
-											<Icon name="comment" size={14} />
-										</UnstyledButton>
-									</Tooltip>
-								</div>
-							)}
-						</div>
 						{props.children}
 					</UnstyledButton>
 				</HoverCard.Target>
-				<HoverCard.Dropdown>
-					<div className={styles.innerContainer}>
+				<HoverCard.Dropdown className={styles.cardDropdown}>
+					<div className={styles.cardInnerContainer}>
 						{/* Event name container */}
-						<div className={styles.eventNameContainer}>
+						<div className={styles.cardNameContainer}>
 							{/* Task name */}
-							<span className={styles.taskName}>{event.payload.entry.task_name}</span>
+							<Text className={styles.cardTaskName} size="xs">
+								{entry.task_name}
+							</Text>
 							{/* Job name  */}
-							<span className={styles.parentItemName}>{event.payload.entry.parent_item_name}</span>
+							<Text className={styles.cardParentItemName} size="xs">
+								{entry.parent_item_name}
+							</Text>
 						</div>
+						<Divider my={8} />
 						{/* Additional info container */}
-						<div className={styles.eventInfoContainer}>
+						<div className={styles.cardInfoContainer}>
 							{/* Board */}
-							<span className={styles.boardName}>
+							<Text className={styles.boardName} size="xs">
 								<Icon name="dock_to_right" size={14} />
-								{event.payload.entry.board_name}
-							</span>
+								{entry.board_name}
+							</Text>
 							{/* Role */}
-							<span className={styles.roleName}>
+							<Text className={styles.roleName} size="xs">
 								<Icon name="assignment_ind" size={14} />
-								{event.payload.entry.role_name}
-							</span>
+								{entry.role_name}
+							</Text>
+							{entry.comment && (
+								<Text className={styles.comment} size="xs">
+									<Icon name="comment" size={14} />
+									{entry.comment}
+								</Text>
+							)}
+							{/* Duration */}
+							<Text className={styles.duration} size="xs">
+								<Icon name="access_time" size={14} />
+								{formatDuration(entry.duration)}
+							</Text>
+							{/* Start and endtime */}
+							<Text className={styles.startEndTime} size="xs">
+								<Icon name="access_time" size={14} />
+								{formatTimeString(new Date(entry.start_time))} - {formatTimeString(new Date(entry.end_time))}
+							</Text>
 						</div>
 					</div>
-					{event.payload.entry.comment && (
-						<div className={styles.commentContainer}>
-							<Tooltip label={event.payload.entry.comment} withArrow position="top">
-								<UnstyledButton aria-label="Kommentar anzeigen" disabled style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "help" }}>
-									<Icon name="comment" size={14} />
-								</UnstyledButton>
-							</Tooltip>
-						</div>
-					)}
 				</HoverCard.Dropdown>
 			</HoverCard>
 		);
@@ -369,7 +387,10 @@ export function TimeEntriesCalendar() {
 					onTimeSlotClick={handleSlotClick}
 					onSlotDragEnd={handleSlotDrag}
 					className={styles.schedule}
+					renderEventBody={renderEventBody}
 					dayViewProps={{
+						className: styles.dayView,
+						classNames: { dayViewScrollArea: styles.viewScrollArea, header: styles.viewHeader },
 						intervalMinutes: 15,
 						startScrollTime: "07:00:00",
 						withAllDaySlot: false,
@@ -377,6 +398,8 @@ export function TimeEntriesCalendar() {
 						renderEvent,
 					}}
 					weekViewProps={{
+						className: styles.weekView,
+						classNames: { weekViewScrollArea: styles.viewScrollArea, header: styles.viewHeader },
 						intervalMinutes: 15,
 						startScrollTime: "07:00:00",
 						withAllDaySlots: false,

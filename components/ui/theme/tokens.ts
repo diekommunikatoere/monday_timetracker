@@ -234,6 +234,16 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--table-row-background-expanded": "var(--color--secondary-900)",
 		"--color--table-row-background-expanded-hover": "var(--color--secondary-800)",
 
+		"--color--calendar-event-background": "var(--color--primary-900)",
+		"--color--calendar-event-background-hover": "var(--color--primary-800)",
+		"--color--calendar-event-draft-background": "var(--color--secondary-900)",
+		"--color--calendar-event-draft-background-hover": "var(--color--secondary-800)",
+		"--color--calendar-event-text": "var(--color--primary-50)",
+		"--color--calendar-event-text-muted": "var(--color--primary-400)",
+		"--color--calendar-event-text-draft": "var(--color--secondary-100)",
+		"--color--calendar-card-background": "var(--color--background-secondary)",
+		"--color--calendar-card-background-hover": "var(--color--background-secondary-hover)",
+
 		/* Mantine variables */
 		"--mantine-color-placeholder": "var(--color--text-placeholder)",
 		"--input-bg": "var(--color--background-primary)",
@@ -324,6 +334,16 @@ export const themeTokens: CSSVariablesResolver = (theme) => ({
 		"--color--table-row-background-highlighted-hover": "var(--color--tertiary-200)",
 		"--color--table-row-background-expanded": "var(--color--secondary-100)",
 		"--color--table-row-background-expanded-hover": "var(--color--secondary-200)",
+
+		"--color--calendar-event-background": "var(--color--primary-200)",
+		"--color--calendar-event-background-hover": "var(--color--primary-300)",
+		"--color--calendar-event-draft-background": "var(--color--secondary-200)",
+		"--color--calendar-event-draft-background-hover": "var(--color--secondary-300)",
+		"--color--calendar-event-text": "var(--color--primary-950)",
+		"--color--calendar-event-text-muted": "var(--color--primary-900)",
+		"--color--calendar-event-text-draft": "var(--color--secondary-900)",
+		"--color--calendar-card-background": "var(--color--background-secondary)",
+		"--color--calendar-card-background-hover": "var(--color--background-secondary-hover)",
 
 		/* Mantine variables */
 		"--mantine-color-placeholder": "var(--color--text-placeholder)",

@@ -12,64 +12,138 @@
 }
 
 .schedule {
+	display: flex;
+	flex-direction: column;
 	flex: 1;
 	min-height: 0;
-
-	.mantine-weekView-weekViewRoot {
-		flex: 1;
-		min-height: 0;
-	}
 }
 
-.schedule :global([data-timer-state="parked"]) {
-	outline: 1px dashed var(--color--border-ui);
-	outline-offset: -1px;
+.weekView,
+.dayView {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
 }
+
+.viewHeader {
+	padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+
+.viewScrollArea {
+	min-height: 0;
+	height: 100%;
+}
+
+/* Event card */
 
 .event {
-	background-color: var(--color--surface-primary);
-}
+	container-type: size;
+	--event-bg: var(--color--calendar-event-background) !important;
+	--event-hover: var(--color--calendar-event-background-hover) !important;
+	--event-radius: var(--border-radius--sm) !important;
 
-.eventInner {
-	--event-bg: var(--color--surface-primary);
+	&[data-timer-state="parked"] {
+		outline: 1px dashed var(--color--border-ui);
+		outline-offset: -1px;
+		--event-bg: var(--color--calendar-event-draft-background) !important;
+		--event-hover: var(--color--calendar-event-draft-background-hover) !important;
+	}
 }
 
 .eventBody {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	justify-content: flex-start;
 	width: 100%;
 	height: 100%;
-	position: relative;
-}
-
-.innerContainer {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	width: 100%;
 }
 
 .eventNameContainer {
 	display: flex;
-	flex: 1;
+	width: 100%;
 	flex-direction: column;
-	gap: 2px;
-	font-size: 0.65rem;
+	gap: 4px;
 }
 
-.taskName {
+.eventTaskName {
+	font-size: 0.6rem;
+	line-height: 1;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	max-height: 2em;
+	color: var(--color--calendar-event-text);
+
+	&[data-timer-state="parked"] {
+		color: var(--color--calendar-event-text-draft);
+	}
 }
 
-.parentItemName {
+.eventParentItemName {
+	display: none;
+	font-size: 0.75em;
+	line-height: 1;
+	font-style: italic;
+	font-weight: 500;
+	color: var(--color--calendar-event-text-muted);
+}
+
+.eventComment {
+	display: flex;
+	flex: 0 0 auto;
+}
+
+/* Hover card */
+
+.cardDropdown {
+	background-color: var(--color--calendar-card-background);
+	border-radius: var(--border-radius--md);
+	padding: 8px;
+	width: 100%;
+	max-width: 300px;
+}
+
+.cardInnerContainer {
+	display: flex;
+	flex-shrink: 1;
+	flex-direction: column;
+	width: 100%;
+}
+
+.cardNameContainer {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 0.8rem;
+}
+
+.cardTaskName {
+	font-weight: 600;
+}
+
+.cardParentItemName {
 	font-size: 0.9em;
+	font-style: italic;
 	color: var(--color--text-secondary);
 }
 
-.eventInfoContainer {
+.cardInfoContainer {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.boardName,
+.roleName,
+.comment,
+.duration,
+.startEndTime {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 4px;
 }
 
 .boardName {
@@ -78,12 +152,25 @@
 .roleName {
 }
 
-.commentContainer {
-	flex-shrink: 0;
+@container (min-height: 18px) {
+	.eventBody {
+		align-items: flex-start;
+	}
 }
 
-@container size (height > 32px) {
-	.parentItemName {
-		display: none;
+@container (min-height: 32px) {
+	.eventTaskName {
+		white-space: normal;
+		max-height: none;
+	}
+}
+
+@container (min-height: 32px) and (min-width: 100px) {
+	.eventTaskName {
+		font-size: 0.7rem;
+	}
+
+	.eventParentItemName {
+		display: initial;
 	}
 }
