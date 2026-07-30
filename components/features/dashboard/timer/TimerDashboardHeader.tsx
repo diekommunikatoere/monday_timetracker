@@ -116,7 +116,6 @@ export function TimerDashboardHeader() {
 										<span>Kalender</span>
 									</Center>
 								),
-								disabled: true, // Calendar view is not implemented yet
 							},
 						]}
 						value={dashboardViewMode === "table" ? "table" : "calendar"}

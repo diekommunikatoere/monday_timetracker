@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { TimeEntriesCalendar } from "@/components/dashboard/calendar/TimeEntriesCalendar";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
@@ -24,7 +25,7 @@ export default function DashboardPage() {
 			case "table":
 				return <TimeEntriesTable onRefetch={() => refetch(userId!)} />;
 			case "calendar":
-				return <div>Calendar view is not implemented yet.</div>;
+				return <TimeEntriesCalendar />;
 			default:
 				return <div>Unknown view mode: {dashboardViewMode}</div>;
 		}

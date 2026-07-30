@@ -8,7 +8,7 @@ import { Button, Modal } from "@/components";
 import TaskItemSelector, { TaskSelection } from "@/components/TaskItemSelector";
 import { useToast } from "@/components/ToastProvider";
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
-import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
+import { calculateDurationBetweenTimes, combineDateAndTime, durationToSeconds, getCurrentTimeString, secondsToDuration } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
@@ -24,10 +24,15 @@ import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFiel
  *                     `false` triggers the close transition.
  * @property onClose - Called when the user dismisses the modal (cancel button,
  *                     backdrop, or after a successful save).
+ * @property initialRange - Optional pre-fill from a calendar slot click/drag-select
+ *                     (see `TimeEntriesCalendar`). When set, the form opens seeded
+ *                     with this date/time range instead of the "now, zero duration"
+ *                     default; end-locked so subsequent duration edits move the start.
  */
 interface ManualTimeEntryModalProps {
 	show: boolean;
 	onClose: () => void;
+	initialRange?: { date: Date; startTime: string; endTime: string };
 }
 
 /**
@@ -63,7 +68,7 @@ interface ManualTimeEntryModalProps {
  * @returns A `Modal` containing the manual entry form and save/cancel actions.
  */
 
-export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProps) {
+export function ManualTimeEntryModal({ show, onClose, initialRange }: ManualTimeEntryModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -78,17 +83,23 @@ export function ManualTimeEntryModal({ show, onClose }: ManualTimeEntryModalProp
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 
-	// Reset form when modal opens: default end-locked at "now" with zero duration.
+	// Reset form when modal opens: end-locked, seeded from a calendar slot selection
+	// when provided, otherwise the "now" / zero-duration default.
 	useEffect(() => {
 		if (show) {
-			const now = getCurrentTimeString();
-			handlers.reset({ date: new Date(), duration: "00:00", startTime: now, endTime: now, comment: "" }, "end", false);
+			if (initialRange) {
+				const durationSeconds = calculateDurationBetweenTimes(initialRange.startTime, initialRange.endTime);
+				handlers.reset({ date: initialRange.date, duration: secondsToDuration(durationSeconds), startTime: initialRange.startTime, endTime: initialRange.endTime, comment: "" }, "end", false);
+			} else {
+				const now = getCurrentTimeString();
+				handlers.reset({ date: new Date(), duration: "00:00", startTime: now, endTime: now, comment: "" }, "end", false);
+			}
 			setSelectedTask(null);
 			setAsDraft(false);
 			setSelectedRoleId("");
 			setError(null);
 		}
-	}, [show]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [show, initialRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleSave = async () => {
 		if (!userProfile?.id) {
