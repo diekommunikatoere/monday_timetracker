@@ -14,6 +14,8 @@ export { DatePicker } from "./ui/forms/DatePicker";
 export { TimeInput } from "./ui/forms/TimeInput";
 export { TimePicker } from "./ui/forms/TimePicker";
 
+export { SegmentedControl } from "./ui/inputs/SegmentedControl";
+
 export { Pagination } from "./ui/tables/Pagination";
 export type { PaginationProps } from "./ui/tables/types";
 

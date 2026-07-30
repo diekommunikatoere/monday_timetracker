@@ -5,6 +5,7 @@ import { Tooltip, Collapse } from "@mantine/core";
 import { type DatesRangeValue } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useEffect, useState } from "react";
+import dayjs from "dayjs";
 
 import { DatePicker, Input, Select, Button, Icon, IconButton } from "@/components";
 import classes from "@/components/styles/features/time-entries/TimeEntriesToolbar.module.css";
@@ -68,6 +69,15 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 		setShowFilters((prev) => !prev);
 	};
 
+	const d = dayjs();
+
+	const handleSetDateToToday = () => {
+		const today = d.toDate();
+		setFilter({ startDate: today, endDate: today });
+	};
+
+	const isToday = filters.startDate && filters.endDate && dayjs(filters.startDate).isSame(d, "day") && dayjs(filters.endDate).isSame(d, "day");
+
 	// Sort roles and boards by name for the dropdowns, so the order is stable and
 	// predictable (and not dependent on the order of the user's entries).
 	filterOptions.roles.sort((a, b) => a.name.localeCompare(b.name));
@@ -78,16 +88,23 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 			<div className={classes.toolbar}>
 				<div className={classes.searchGroup}>
 					<Input placeholder="Aufgabe oder Kommentar suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
-					<Tooltip label={showFilters ? "Filter ausblenden" : "Filter einblenden"} position="top" withArrow>
-						<IconButton size="lg" colorVariant={showFilters ? undefined : "tertiary"} onClick={handleToggleFilters} aria-label={showFilters ? "Filter ausblenden" : "Filter einblenden"}>
-							<Icon name={showFilters ? "filter_alt_off" : "filter_alt"} />
-						</IconButton>
-					</Tooltip>
-					{hasActiveFilters && (
-						<Button variant="default" onClick={handleReset} className={classes.resetButton}>
-							Filter zurücksetzen
-						</Button>
-					)}
+					<div className={classes.buttonGroup}>
+						<Tooltip label="Heutige Zeiteinträge" position="top" withArrow>
+							<IconButton size="lg" colorVariant="tertiary" onClick={handleSetDateToToday} aria-label="Heutige Zeiteinträge" className={classes.todayButton} disabled={isToday}>
+								<Icon name="today" size={21} />
+							</IconButton>
+						</Tooltip>
+						<Tooltip label={showFilters ? "Filter ausblenden" : "Filter einblenden"} position="top" withArrow>
+							<IconButton size="lg" colorVariant={showFilters ? undefined : "tertiary"} onClick={handleToggleFilters} aria-label={showFilters ? "Filter ausblenden" : "Filter einblenden"} className={classes.filterToggleButton}>
+								<Icon name={showFilters ? "filter_alt_off" : "filter_alt"} />
+							</IconButton>
+						</Tooltip>
+						{hasActiveFilters && (
+							<Button variant="default" onClick={handleReset} className={classes.resetButton}>
+								Filter zurücksetzen
+							</Button>
+						)}
+					</div>
 				</div>
 				<Collapse expanded={showFilters} className={classes.filtersCollapse} transitionDuration={200} keepMounted>
 					<div className={classes.filtersRow}>

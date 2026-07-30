@@ -72,12 +72,16 @@ interface UserState {
 	/** Theme actually rendered, derived from `theme`. */
 	appTheme: AppTheme;
 
+	/** Dashboard view mode: table or calendar. */
+	dashboardViewMode: "table" | "calendar";
+
 	authenticated: boolean;
 
 	setMondayUser: (user: UserState["mondayUser"]) => void;
 	setSupabaseUser: (user: UserState["supabaseUser"]) => void;
 	/** Flip light/dark, update derived `appTheme`, and persist to the DB via `/api/user/theme`. */
 	setTheme: (newTheme: AppTheme) => Promise<void>;
+	setDashboardViewMode: (newMode: "table" | "calendar") => void;
 }
 
 export const useUserStore = create<UserState>()(
@@ -87,6 +91,7 @@ export const useUserStore = create<UserState>()(
 			supabaseUser: null,
 			theme: "black",
 			appTheme: "dark",
+			dashboardViewMode: "table",
 			authenticated: false,
 
 			/**
@@ -161,6 +166,10 @@ export const useUserStore = create<UserState>()(
 				} catch (error) {
 					console.error("Failed to persist theme change:", error);
 				}
+			},
+			setDashboardViewMode: (newMode: "table" | "calendar") => {
+				set({ dashboardViewMode: newMode });
+				console.log(`Dashboard view mode set to: ${newMode}`);
 			},
 			/**
 			 * Find or create the Supabase user for the current monday session via

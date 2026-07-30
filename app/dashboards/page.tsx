@@ -10,6 +10,7 @@ export default function DashboardPage() {
 	// Get user and time entries state
 	const userId = useUserStore((state) => state.supabaseUser?.id);
 	const { fetchTimeEntries, refetch } = useTimeEntriesStore();
+	const dashboardViewMode = useUserStore((state) => state.dashboardViewMode);
 
 	// Fetch time entries when userId is available
 	useEffect(() => {
@@ -18,5 +19,16 @@ export default function DashboardPage() {
 		}
 	}, [userId, fetchTimeEntries]);
 
-	return <TimeEntriesTable onRefetch={() => refetch(userId!)} />;
+	function renderViewMode(dashboardViewMode) {
+		switch (dashboardViewMode) {
+			case "table":
+				return <TimeEntriesTable onRefetch={() => refetch(userId!)} />;
+			case "calendar":
+				return <div>Calendar view is not implemented yet.</div>;
+			default:
+				return <div>Unknown view mode: {dashboardViewMode}</div>;
+		}
+	}
+
+	return renderViewMode(dashboardViewMode);
 }

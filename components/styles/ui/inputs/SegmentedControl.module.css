@@ -1,0 +1,23 @@
+.segmentedControl {
+	background-color: var(--color--background-secondary);
+}
+.control {
+}
+
+.input {
+}
+
+.label {
+	&[data-disabled="true"] .innerLabel {
+		color: var(--color--text-disabled);
+	}
+}
+
+.indicator {
+	background-color: var(--color--button-tertiary-bg);
+	box-shadow: var(--box-shadow--xs);
+}
+
+.innerLabel {
+	color: var(--color--text-primary);
+}

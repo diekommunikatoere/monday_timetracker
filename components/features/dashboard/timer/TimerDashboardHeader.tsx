@@ -1,9 +1,9 @@
 "use client";
 
-import { Flex, Tooltip, Text } from "@mantine/core";
+import { Center, Flex, Tooltip, Text } from "@mantine/core";
 import { useCallback, useEffect, useState } from "react";
 
-import { DashboardMenuButton, Logo } from "@/components";
+import { DashboardMenuButton, Icon, Logo, SegmentedControl } from "@/components";
 import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
 import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 import { ManualTimeEntryModal } from "@/components/features/timer";
@@ -39,6 +39,8 @@ import "@/public/css/components/AppHeader.css";
 export function TimerDashboardHeader() {
 	const { allEntries } = useTimeEntriesStore();
 	const userId = useUserStore((state) => state.supabaseUser?.id);
+	const dashboardViewMode = useUserStore((state) => state.dashboardViewMode);
+	const setDashboardViewMode = useUserStore((state) => state.setDashboardViewMode);
 	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
 	const { showTimerSave, closeTimerSave, showEmptyCommentConfirmation, closeEmptyCommentConfirmation } = useModalStore((s) => s);
 	const { actions, state } = useTimerContext();
@@ -92,6 +94,35 @@ export function TimerDashboardHeader() {
 				</Flex>
 				<div className="header-right-section">
 					<TimerContainer />
+				</div>
+
+				<div className="header-view-switch">
+					<SegmentedControl
+						data={[
+							{
+								value: "table",
+								label: (
+									<Center style={{ gap: 4 }}>
+										<Icon name="table" size={16} />
+										<span>Tabelle</span>
+									</Center>
+								),
+							},
+							{
+								value: "calendar",
+								label: (
+									<Center style={{ gap: 4 }}>
+										<Icon name="event_note" size={16} />
+										<span>Kalender</span>
+									</Center>
+								),
+								disabled: true, // Calendar view is not implemented yet
+							},
+						]}
+						value={dashboardViewMode === "table" ? "table" : "calendar"}
+						onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
+						radius="md"
+					/>
 				</div>
 			</header>
 			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />

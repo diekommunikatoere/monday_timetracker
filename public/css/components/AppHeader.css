@@ -13,8 +13,8 @@
 
 	.header-left-section {
 		flex: 1;
-		min-width: 300px;
 		width: 100%;
+		min-width: min(300px, 100%);
 		align-items: center;
 		justify-content: space-between;
 
@@ -37,20 +37,32 @@
 
 	.header-right-section {
 		flex: 1;
-		min-width: 300px;
+		min-width: min(500px, 100%);
 		width: 100%;
+	}
+
+	.header-view-switch {
+		width: 100%;
+
+		.mantine-SegmentedControl-root {
+			width: 100%;
+		}
 	}
 }
 
 @media (min-width: 700px) {
 	#app-header {
 		justify-content: space-between;
-		flex-wrap: nowrap;
+		flex-wrap: wrap;
 
 		.header-left-section {
 			flex: unset;
-			min-width: unset;
+
 			width: unset;
+		}
+
+		.header-right-section {
+			width: 100%;
 		}
 	}
 }
@@ -59,7 +71,12 @@
 	#app-header {
 		.header-right-section {
 			flex: unset;
+			min-width: unset;
 			width: fit-content;
+		}
+
+		.header-view-switch {
+			width: auto;
 		}
 	}
 }
