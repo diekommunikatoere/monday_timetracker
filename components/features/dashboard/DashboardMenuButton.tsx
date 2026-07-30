@@ -45,7 +45,7 @@ export function DashboardMenuButton() {
 			</Menu.Target>
 			<Menu.Dropdown>
 				{renderViewLink("Zeiterfassung", "/dashboards", "home")}
-				{renderViewLink("Abrechnung", "/dashboards/analytics/abrechnung", "receipt_long")}
+				{/* {renderViewLink("Abrechnung", "/dashboards/analytics/abrechnung", "receipt_long")} */} {/* commented out until view is ready */}
 				{renderViewLink("Auswertung", "/dashboards/analytics/auswertung", "bar_chart")}
 				<Menu.Divider />
 				<Menu.Sub>
