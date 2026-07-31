@@ -5,8 +5,9 @@
 
 import { Button } from "@mantine/core";
 
-import styles from "@/components/styles/ui/buttons/ButtonGroup.module.css";
 import { ButtonGroupProps } from "@/components/ui/buttons/types";
+
+import styles from "@/components/styles/ui/buttons/ButtonGroup.module.css";
 
 /**
  * Groups a set of {@link Button} children into a connected toolbar.

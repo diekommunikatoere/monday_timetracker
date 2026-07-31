@@ -6,10 +6,10 @@
 import { DatePickerInput as MantineDatePickerInput, DatePickerType } from "@mantine/dates";
 import dayjs from "dayjs";
 
-import styles from "@/components/styles/ui/forms/DatePicker.module.css";
-
 import { defaultClearButtonProps } from "./clearButton";
 import { DatePickerProps } from "./types";
+
+import styles from "@/components/styles/ui/forms/DatePicker.module.css";
 
 /**
  * Date field built on Mantine's `DatePickerInput`.

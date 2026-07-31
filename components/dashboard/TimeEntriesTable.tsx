@@ -16,7 +16,6 @@ import { TimeEntry } from "@/types/time-entry";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getDashboardColumns } from "../shared/time-entries/TimeEntryTableConfigs";
-
 import BulkActionButtons from "./BulkActionButtons";
 import EditDraftEntryModal from "./EditDraftEntryModal";
 import EditTimeEntryModal from "./EditTimeEntryModal";

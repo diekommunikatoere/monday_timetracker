@@ -5,9 +5,9 @@
 
 import React from "react";
 
-import styles from "@/components/styles/ui/modals/ModalBody.module.css";
-
 import { ModalBodyProps } from "./types";
+
+import styles from "@/components/styles/ui/modals/ModalBody.module.css";
 
 /**
  * Body slot for {@link Modal}.

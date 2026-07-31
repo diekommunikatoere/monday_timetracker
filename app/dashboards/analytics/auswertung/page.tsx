@@ -51,13 +51,7 @@ export default function AuswertungPage() {
 			<div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 32 }}>
 				{error && <ErrorState message={error} />}
 
-				{loading && rows.length === 0 && !error ? (
-					<LoadingState />
-				) : hasActiveFilters && rows.length === 0 ? (
-					<Text c="dimmed">Keine Mitarbeiter für diese Suche gefunden.</Text>
-				) : (
-					<AuswertungTable items={rows} loading={loading} error={null} />
-				)}
+				{loading && rows.length === 0 && !error ? <LoadingState /> : hasActiveFilters && rows.length === 0 ? <Text c="dimmed">Keine Mitarbeiter für diese Suche gefunden.</Text> : <AuswertungTable items={rows} loading={loading} error={null} />}
 			</div>
 		</div>
 	);

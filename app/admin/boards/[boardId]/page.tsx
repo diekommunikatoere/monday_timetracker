@@ -13,6 +13,7 @@ import { isTimePurpose } from "@/lib/monday/utils";
 import { canAccessRoute } from "@/lib/permissions";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useUserStore } from "@/stores/userStore";
+
 import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType, MondayGroup } from "@/types/database";
 
 import "@/public/css/components/AdminPage.css";
@@ -1316,7 +1317,15 @@ export default function BoardConfigPage() {
 
 					{editingOverride && <Input label="Rolle" value={editingOverride.role?.name || "Unbekannte Rolle"} disabled />}
 
-					<NumberInput label="Überschreibungs-Stundensatz (€)" description="Dieser Satz wird anstelle des Standards für dieses Board verwendet" placeholder="0.00" value={overrideForm.hourly_rate} onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
+					<NumberInput
+						label="Überschreibungs-Stundensatz (€)"
+						description="Dieser Satz wird anstelle des Standards für dieses Board verwendet"
+						placeholder="0.00"
+						value={overrideForm.hourly_rate}
+						onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })}
+						min={0}
+						decimalScale={2}
+					/>
 
 					<Switch label="Aktiv" description="Legt fest, ob diese Überschreibung angewendet wird" checked={overrideForm.is_enabled} onChange={(e) => setOverrideForm({ ...overrideForm, is_enabled: e.currentTarget.checked })} />
 

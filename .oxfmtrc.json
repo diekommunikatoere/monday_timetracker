@@ -10,8 +10,5 @@
 		"ignoreCase": true,
 		"newlinesBetween": true
 	},
-	"ignorePatterns": [
-		"types/database/database.ts",
-		"**/*.md"
-	]
+	"ignorePatterns": ["types/database/database.ts", "**/*.md"]
 }

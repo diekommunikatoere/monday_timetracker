@@ -4,8 +4,9 @@
 import { Box, Flex } from "@mantine/core";
 
 import { TimerComment, TimerControls, TimerDisplay } from "@/components/features/timer";
-import styles from "@/components/styles/features/timer/TimerContainer.module.css";
 import { useTimerContext } from "@/contexts/TimerContext";
+
+import styles from "@/components/styles/features/timer/TimerContainer.module.css";
 
 /**
  * `TimerContainer` — smart container for the live timer widget.

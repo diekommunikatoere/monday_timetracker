@@ -8,10 +8,11 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
 import { Input, Icon, IconButton } from "@/components";
-import classes from "@/components/styles/features/auswertung/AuswertungToolbar.module.css";
 import { DatePickerProps } from "@/components/ui/forms/types";
 import { getISOWeek, startOfISOWeek } from "@/lib/time/calculations";
 import { useAuswertungStore } from "@/stores/auswertungStore";
+
+import classes from "@/components/styles/features/auswertung/AuswertungToolbar.module.css";
 
 /** `"KW 31 · 27.07. – 02.08.2026"` — the selected ISO week, German-formatted. */
 function formatWeekLabel(weekStart: Date): string {
@@ -73,7 +74,16 @@ export default function AuswertungToolbar() {
 		<div className={classes.container}>
 			<div className={classes.toolbar}>
 				<div className={classes.searchGroup}>
-					<Input placeholder="Mitarbeiter suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
+					<Input
+						placeholder="Mitarbeiter suchen…"
+						value={searchInput}
+						onChange={(event) => setSearchInput(event.currentTarget.value)}
+						leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />}
+						leftSectionPointerEvents="none"
+						clearable
+						onClear={() => setSearchInput("")}
+						clearButtonLabel="Suche löschen"
+					/>
 				</div>
 				<div className={classes.weekNav}>
 					<IconButton size="lg" colorVariant="tertiary" onClick={() => stepWeek(-1)} aria-label="Vorherige Woche">

@@ -4,9 +4,10 @@
 import { Table, Center, Loader, Text, Box, LoadingOverlay } from "@mantine/core";
 import { useMemo } from "react";
 
-import styles from "@/components/styles/features/time-entries/TimeEntryTable.module.css";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { TimeEntry } from "@/types/time-entry";
+
+import styles from "@/components/styles/features/time-entries/TimeEntryTable.module.css";
 
 /**
  * Props for {@link TimeEntryTable}.

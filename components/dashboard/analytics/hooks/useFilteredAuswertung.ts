@@ -5,6 +5,7 @@ import Fuse from "fuse.js";
 import { useMemo } from "react";
 
 import { useAuswertungStore } from "@/stores/auswertungStore";
+
 import type { AuswertungUserRow } from "@/types/auswertung";
 
 /** Fuse only needs the searchable field. */

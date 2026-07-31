@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import type { BudgetBoardSettings, BudgetBoardStatus } from "@/lib/abrechnung";
 import { upsertMondayBoard } from "@/lib/database";
 import { requireAdmin } from "@/lib/monday-auth";
 import { supabaseAdmin } from "@/lib/supabase/server";
+
+import type { BudgetBoardSettings, BudgetBoardStatus } from "@/lib/abrechnung";
 
 /**
  * GET /api/admin/boards/[boardId]/budget-config

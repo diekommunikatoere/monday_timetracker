@@ -14,6 +14,7 @@
  */
 
 import { supabaseAdmin } from "@/lib/supabase/server";
+
 import type { AuswertungRateClass, AuswertungRoleBreakdown, AuswertungUserRow, AuswertungDateRange } from "@/types/auswertung";
 import type { GetUsersTimeByRoleResult } from "@/types/database";
 
@@ -64,7 +65,10 @@ export async function getAuswertungData(range: AuswertungDateRange): Promise<Aus
 	// `db:types` script). Cast the whole call rather than hand-editing the
 	// generated file; `GetUsersTimeByRoleResult` (types/database/database.types.ts)
 	// still gives the response its real shape.
-	const [usersResult, rowsResult] = await Promise.all([supabaseAdmin.from("user_profiles").select("id, name, photo_urls").order("name") as unknown as Promise<{ data: UserProfileForAuswertung[] | null; error: any }>, (supabaseAdmin.rpc as any)("get_users_time_by_role", { p_start_date: range.startDate, p_end_date: range.endDate }) as Promise<{ data: GetUsersTimeByRoleResult[] | null; error: any }>]);
+	const [usersResult, rowsResult] = await Promise.all([
+		supabaseAdmin.from("user_profiles").select("id, name, photo_urls").order("name") as unknown as Promise<{ data: UserProfileForAuswertung[] | null; error: any }>,
+		(supabaseAdmin.rpc as any)("get_users_time_by_role", { p_start_date: range.startDate, p_end_date: range.endDate }) as Promise<{ data: GetUsersTimeByRoleResult[] | null; error: any }>,
+	]);
 
 	if (usersResult.error) {
 		console.error("[getAuswertungData] Error loading user_profiles:", usersResult.error);

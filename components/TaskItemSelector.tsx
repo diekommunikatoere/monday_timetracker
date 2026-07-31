@@ -7,9 +7,10 @@ import Fuse, { type FuseResult } from "fuse.js";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 import { Icon, IconButton, Select, TreeSelect } from "@/components";
-import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 import { supabase } from "@/lib/supabase/client";
 import { useMondayStore } from "@/stores/mondayStore";
+
+import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 
 /**
  * Selection payload emitted to the parent whenever the user picks (or clears)

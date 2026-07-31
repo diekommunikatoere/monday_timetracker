@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireAdmin } from "@/lib/monday-auth";
 import { createMondayClient } from "@/lib/monday/client";
 import { registerBoardWebhooks, WEBHOOK_EVENTS } from "@/lib/monday/webhooks";
-import { requireAdmin } from "@/lib/monday-auth";
 
 /**
  * GET /api/admin/boards/[boardId]/webhooks

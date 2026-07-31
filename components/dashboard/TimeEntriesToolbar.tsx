@@ -4,12 +4,13 @@
 import { Tooltip, Collapse } from "@mantine/core";
 import { type DatesRangeValue } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
-import { useEffect, useState } from "react";
 import dayjs from "dayjs";
+import { useEffect, useState } from "react";
 
 import { DatePicker, Input, Select, Button, Icon, IconButton } from "@/components";
-import classes from "@/components/styles/features/time-entries/TimeEntriesToolbar.module.css";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+
+import classes from "@/components/styles/features/time-entries/TimeEntriesToolbar.module.css";
 
 import type { TimeEntriesFilterOption } from "./hooks/useFilteredTimeEntries";
 
@@ -87,7 +88,16 @@ export default function TimeEntriesToolbar({ filterOptions }: TimeEntriesToolbar
 		<div className={classes.container}>
 			<div className={classes.toolbar}>
 				<div className={classes.searchGroup}>
-					<Input placeholder="Aufgabe oder Kommentar suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
+					<Input
+						placeholder="Aufgabe oder Kommentar suchen…"
+						value={searchInput}
+						onChange={(event) => setSearchInput(event.currentTarget.value)}
+						leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />}
+						leftSectionPointerEvents="none"
+						clearable
+						onClear={() => setSearchInput("")}
+						clearButtonLabel="Suche löschen"
+					/>
 					<div className={classes.buttonGroup}>
 						<Tooltip label="Heutige Zeiteinträge" position="top" withArrow>
 							<IconButton size="lg" colorVariant="tertiary" onClick={handleSetDateToToday} aria-label="Heutige Zeiteinträge" className={classes.todayButton} disabled={isToday}>

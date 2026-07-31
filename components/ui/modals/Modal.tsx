@@ -6,12 +6,12 @@
 import { Modal as MantineModal } from "@mantine/core";
 import React from "react";
 
-import styles from "@/components/styles/ui/modals/Modal.module.css";
-
 import { ModalBody } from "./ModalBody";
 import { ModalFooter } from "./ModalFooter";
 import { ModalHeader } from "./ModalHeader";
 import { ModalProps, ModalCompoundComponent } from "./types";
+
+import styles from "@/components/styles/ui/modals/Modal.module.css";
 
 /**
  * Modal root component built on Mantine's `Modal`.

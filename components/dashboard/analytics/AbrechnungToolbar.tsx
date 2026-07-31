@@ -7,8 +7,9 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useEffect, useState } from "react";
 
 import { DatePicker, Input, Select, Button, Icon, IconButton } from "@/components";
-import classes from "@/components/styles/features/abrechnung/AbrechnungToolbar.module.css";
 import { useAbrechnungStore } from "@/stores/abrechnungStore";
+
+import classes from "@/components/styles/features/abrechnung/AbrechnungToolbar.module.css";
 
 import type { AbrechnungBoardOption } from "./hooks/useFilteredAbrechnung";
 
@@ -76,7 +77,16 @@ export default function AbrechnungToolbar({ boardOptions }: AbrechnungToolbarPro
 		<div className={classes.container}>
 			<div className={classes.toolbar}>
 				<div className={classes.searchGroup}>
-					<Input placeholder="Budget-Item oder Projekt suchen…" value={searchInput} onChange={(event) => setSearchInput(event.currentTarget.value)} leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" clearable onClear={() => setSearchInput("")} clearButtonLabel="Suche löschen" />
+					<Input
+						placeholder="Budget-Item oder Projekt suchen…"
+						value={searchInput}
+						onChange={(event) => setSearchInput(event.currentTarget.value)}
+						leftSection={<Icon name="search" size={16} color="var(--color--text-placeholder)" />}
+						leftSectionPointerEvents="none"
+						clearable
+						onClear={() => setSearchInput("")}
+						clearButtonLabel="Suche löschen"
+					/>
 					<Tooltip label={showFilters ? "Filter ausblenden" : "Filter einblenden"} position="top" withArrow>
 						<IconButton size="lg" colorVariant={showFilters ? undefined : "tertiary"} onClick={handleToggleFilters} aria-label={showFilters ? "Filter ausblenden" : "Filter einblenden"}>
 							<Icon name={showFilters ? "filter_alt_off" : "filter_alt"} />
@@ -91,7 +101,19 @@ export default function AbrechnungToolbar({ boardOptions }: AbrechnungToolbarPro
 				<Collapse expanded={showFilters} className={classes.filtersCollapse} transitionDuration={200} keepMounted>
 					<div className={classes.filtersRow}>
 						<Select placeholder="Budget-Board" data={boardOptions.map((b) => ({ value: b.id, label: b.name }))} value={filters.boardId} onChange={(value) => setFilter({ boardId: value })} clearable />
-						<DatePicker type="range" allowSingleDateInRange placeholder="Zeitraum wählen" value={dateRangeInput} onChange={setDateRangeInput} valueFormat="DD.MM.YYYY" clearable leftSection={<Icon name="date_range" size={18} color="var(--color--text-placeholder)" />} leftSectionPointerEvents="none" highlightToday withWeekNumbers />
+						<DatePicker
+							type="range"
+							allowSingleDateInRange
+							placeholder="Zeitraum wählen"
+							value={dateRangeInput}
+							onChange={setDateRangeInput}
+							valueFormat="DD.MM.YYYY"
+							clearable
+							leftSection={<Icon name="date_range" size={18} color="var(--color--text-placeholder)" />}
+							leftSectionPointerEvents="none"
+							highlightToday
+							withWeekNumbers
+						/>
 						<NumberInput placeholder="Auslastung in % von" suffix=" %" min={0} allowNegative={false} clampBehavior="none" value={filters.utilizationMin ?? ""} onChange={(value) => setFilter({ utilizationMin: value === "" ? null : Number(value) })} />
 						<NumberInput placeholder="Auslastung in % bis" suffix=" %" min={0} allowNegative={false} clampBehavior="none" value={filters.utilizationMax ?? ""} onChange={(value) => setFilter({ utilizationMax: value === "" ? null : Number(value) })} />
 					</div>

@@ -5,6 +5,7 @@ import Fuse from "fuse.js";
 import { useMemo } from "react";
 
 import { useAbrechnungStore } from "@/stores/abrechnungStore";
+
 import type { AbrechnungLinkedItem, AbrechnungTableRow } from "@/types/abrechnung";
 
 /** Fuse only needs string fields; linked project/board names are flattened into one field each. */
@@ -87,13 +88,7 @@ export function useFilteredAbrechnung(): UseFilteredAbrechnungResult {
 		});
 	}, [activeBoards]);
 
-	const boardOptions = useMemo(
-		() =>
-			[...activeBoards]
-				.map((board) => ({ id: board.boardId, name: board.boardName }))
-				.sort((a, b) => a.name.localeCompare(b.name)),
-		[activeBoards],
-	);
+	const boardOptions = useMemo(() => [...activeBoards].map((board) => ({ id: board.boardId, name: board.boardName })).sort((a, b) => a.name.localeCompare(b.name)), [activeBoards]);
 
 	const hasActiveFilters = !!(filters.search.trim() || filters.boardId || filters.startDate || filters.endDate || filters.utilizationMin !== null || filters.utilizationMax !== null);
 

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { isPurposeCompatible, isTimePurpose } from "@/lib/monday/utils";
 import { requireAdmin } from "@/lib/monday-auth";
+import { isPurposeCompatible, isTimePurpose } from "@/lib/monday/utils";
 import { supabaseAdmin } from "@/lib/supabase/server";
+
 import type { ColumnSyncConfigInsert, ColumnSyncConfigUpdate, SyncPurpose } from "@/types/database";
 
 /**

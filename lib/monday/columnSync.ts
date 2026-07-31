@@ -23,7 +23,6 @@ import { ClientError } from "@mondaydotcomorg/api";
 import { SyncPurpose, TimeFormat } from "@/types/database";
 
 import { cacheHelper } from "../redis";
-
 import { createMondayClient } from "./client";
 import { COMPATIBLE_COLUMN_TYPES, isPurposeCompatible, isTimePurpose } from "./utils";
 
