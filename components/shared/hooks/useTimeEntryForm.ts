@@ -211,7 +211,11 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 	}, [durationLocked]);
 
 	const toggleDurationLock = useCallback(() => {
-		anchor === "end" ? toggleEndLock() : anchor === "start" ? toggleStartLock() : null;
+		if (anchor === "end") {
+			toggleEndLock();
+		} else if (anchor === "start") {
+			toggleStartLock();
+		}
 		setDurationLocked((prev) => !prev);
 	}, [anchor, durationLocked]);
 
