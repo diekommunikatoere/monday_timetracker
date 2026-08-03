@@ -1,9 +1,8 @@
 // components/dashboard/calendar/calendar-utils.ts
 // Pure helpers bridging TimeEntry (app domain) and @mantine/schedule's event model.
 
-import dayjs from "dayjs";
-
 import { ScheduleEventData } from "@mantine/schedule";
+import dayjs from "dayjs";
 
 import { TimeEntry } from "@/types/time-entry";
 

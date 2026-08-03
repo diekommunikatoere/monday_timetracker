@@ -22,6 +22,7 @@ import { entryToScheduleEvent, filterEntriesForVisibleRange, getEntryFromEvent, 
 import { CalendarEventContextMenu } from "./CalendarEventContextMenu";
 
 import "dayjs/locale/de";
+
 import styles from "@/components/styles/dashboard/calendar/TimeEntriesCalendar.module.css";
 
 const GERMAN_LABELS: ScheduleLabelsOverride = {
