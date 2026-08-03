@@ -3,9 +3,10 @@
 import { create } from "zustand";
 
 import { endOfDay, startOfDay } from "@/lib/time/calculations";
-import type { AbrechnungBoard, ArchivedBudgetPeriod } from "@/types/abrechnung";
 
 import { useMondayStore } from "./mondayStore";
+
+import type { AbrechnungBoard, ArchivedBudgetPeriod } from "@/types/abrechnung";
 
 /**
  * Client-side filter state for the Abrechnung toolbar (`AbrechnungToolbar.tsx`).

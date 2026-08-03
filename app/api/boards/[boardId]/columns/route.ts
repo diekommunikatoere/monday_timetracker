@@ -8,8 +8,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { getBoardColumns, getColumnsForPurpose, MondayColumnOption } from "@/lib/monday/columnSync";
 import { requireAdmin } from "@/lib/monday-auth";
+import { getBoardColumns, getColumnsForPurpose, MondayColumnOption } from "@/lib/monday/columnSync";
 import { SyncPurpose } from "@/types/database";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {

@@ -6,9 +6,9 @@
 import { Pagination as MantinePagination } from "@mantine/core";
 import React from "react";
 
-import styles from "@/components/styles/ui/tables/Pagination.module.css";
-
 import { PaginationProps } from "./types";
+
+import styles from "@/components/styles/ui/tables/Pagination.module.css";
 
 /**
  * Page-number pagination built on Mantine's `Pagination`.

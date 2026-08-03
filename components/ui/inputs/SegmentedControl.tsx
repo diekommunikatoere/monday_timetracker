@@ -1,5 +1,5 @@
-// components/ui/forms/Input.tsx
-// Text input and textarea wrappers with design-system validation styling.
+// components/ui/inputs/SegmentedControl.tsx
+// Segmented control wrapper with design-system styling.
 
 "use client";
 
@@ -14,6 +14,6 @@ import styles from "@/components/styles/ui/inputs/SegmentedControl.module.css";
  * @param props - {@link SegmentedControlProps}, passed through to Mantine.
  * @returns A styled Mantine `SegmentedControl`.
  */
-export const SegmentedControl: React.FC<SegmentedControlProps> = ({ className = "", ...props }) => {
+export const SegmentedControl: React.FC<SegmentedControlProps> = ({ ...props }) => {
 	return <MantineSegmentedControl classNames={{ root: styles.segmentedControl, control: styles.control, input: styles.input, label: styles.label, indicator: styles.indicator, innerLabel: styles.innerLabel }} {...props} />;
 };

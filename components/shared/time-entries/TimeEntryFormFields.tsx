@@ -3,9 +3,10 @@
 import { Flex, Tooltip } from "@mantine/core";
 
 import { Button, ButtonGroup, DatePicker, Input, Icon, IconButton, TimeInput } from "@/components";
-import styles from "@/components/styles/features/time-entries/TimeEntryForm.module.css";
 
 import { RoleSelector } from "./RoleSelector";
+
+import styles from "@/components/styles/features/time-entries/TimeEntryForm.module.css";
 
 /**
  * Descriptor for a single quick-adjust (+/-) button rendered under the duration
@@ -133,7 +134,29 @@ function LockButton({ active, onToggle, tooltip, ariaLabel, disabled }: { active
  * @returns A column `Flex` of Mantine inputs.
  */
 export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
-	const { date, onDateChange, duration, onDurationChange, startTime, onStartTimeChange, endTime, onEndTimeChange, comment, onCommentChange, startLocked, endLocked, durationLocked, onStartLockToggle, onEndLockToggle, onDurationLockToggle, onStartTimeNowClick, onEndTimeNowClick, quickAdjustments, taskSelector, roleSelector } = props;
+	const {
+		date,
+		onDateChange,
+		duration,
+		onDurationChange,
+		startTime,
+		onStartTimeChange,
+		endTime,
+		onEndTimeChange,
+		comment,
+		onCommentChange,
+		startLocked,
+		endLocked,
+		durationLocked,
+		onStartLockToggle,
+		onEndLockToggle,
+		onDurationLockToggle,
+		onStartTimeNowClick,
+		onEndTimeNowClick,
+		quickAdjustments,
+		taskSelector,
+		roleSelector,
+	} = props;
 
 	// Disabled-state matrix (see spec): a locked anchor field is read-only unless
 	// the duration is locked (then the window slides and both times are editable).
@@ -184,7 +207,16 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 
 			{/* Duration + Date */}
 			<Flex gap="sm">
-				<TimeInput label="Dauer" required value={duration} onChange={(event) => onDurationChange(event.currentTarget.value)} disabled={durationLocked} rightSection={<LockButton active={durationLocked} onToggle={onDurationLockToggle} tooltip={durationLocked ? "Dauer entsperren" : "Dauer sperren"} ariaLabel="Dauer sperren" disabled={false} />} className={styles.inputDuration} style={{ flex: 2 }} />
+				<TimeInput
+					label="Dauer"
+					required
+					value={duration}
+					onChange={(event) => onDurationChange(event.currentTarget.value)}
+					disabled={durationLocked}
+					rightSection={<LockButton active={durationLocked} onToggle={onDurationLockToggle} tooltip={durationLocked ? "Dauer entsperren" : "Dauer sperren"} ariaLabel="Dauer sperren" disabled={false} />}
+					className={styles.inputDuration}
+					style={{ flex: 2 }}
+				/>
 				<DatePicker
 					label="Datum"
 					placeholder="Datum auswählen"

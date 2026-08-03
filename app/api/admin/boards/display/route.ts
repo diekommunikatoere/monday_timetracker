@@ -57,11 +57,7 @@ export async function PUT(request: NextRequest) {
 		const enabledIds = boards.map((b) => b.board_id);
 		let disableQuery = (supabaseAdmin.from("board_config") as any).update({ display_enabled: false, sort_order: 0 }).eq("display_enabled", true);
 		if (enabledIds.length > 0) {
-			disableQuery = disableQuery.not(
-				"board_id",
-				"in",
-				`(${enabledIds.map((id) => `"${id}"`).join(",")})`,
-			);
+			disableQuery = disableQuery.not("board_id", "in", `(${enabledIds.map((id) => `"${id}"`).join(",")})`);
 		}
 		const { error: disableError } = await disableQuery;
 

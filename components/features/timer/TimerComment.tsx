@@ -5,7 +5,9 @@ import { Flex, Tooltip } from "@mantine/core";
 import { useState } from "react";
 
 import { Icon, IconButton, Input } from "@/components";
+
 import styles from "@/components/styles/features/timer/TimerCommentField.module.css";
+
 import type { TimerCommentFieldProps } from "@/types/timer.types";
 
 /**

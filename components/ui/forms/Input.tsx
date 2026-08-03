@@ -7,9 +7,10 @@ import { Tooltip, TextInput as MantineTextInput, Textarea as MantineTextarea } f
 import React from "react";
 
 import { Icon, IconButton } from "@/components";
-import styles from "@/components/styles/ui/forms/Input.module.css";
 
 import { InputProps, TextareaProps } from "./types";
+
+import styles from "@/components/styles/ui/forms/Input.module.css";
 
 /**
  * Single-line text field built on Mantine's `TextInput`.

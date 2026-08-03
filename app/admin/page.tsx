@@ -13,6 +13,7 @@ import { Logo } from "@/components/Logo";
 import { canAccessRoute } from "@/lib/permissions";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useUserStore } from "@/stores/userStore";
+
 import type { Role } from "@/types/database";
 
 import "@/public/css/components/AdminPage.css";
@@ -1105,11 +1106,35 @@ export default function AdminPage() {
 						</div>
 					) : budgetBoardForm.board_id ? (
 						<>
-							<Select label="Verknüpfungsspalte (Job-Items)" description="Die board_relation-Spalte, die verknüpfte Job-Items auflistet" placeholder="Spalte auswählen" data={budgetBoardColumns.filter((c) => BUDGET_RELATION_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))} value={budgetBoardForm.job_relation_column_id || null} onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, job_relation_column_id: val || "" })} searchable />
+							<Select
+								label="Verknüpfungsspalte (Job-Items)"
+								description="Die board_relation-Spalte, die verknüpfte Job-Items auflistet"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => BUDGET_RELATION_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.job_relation_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, job_relation_column_id: val || "" })}
+								searchable
+							/>
 
-							<Select label="Budget-Spalte" description="Numbers-, Formula- oder Mirror-Spalte mit dem Budget-Betrag" placeholder="Spalte auswählen" data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))} value={budgetBoardForm.budget_column_id || null} onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_column_id: val || "" })} searchable />
+							<Select
+								label="Budget-Spalte"
+								description="Numbers-, Formula- oder Mirror-Spalte mit dem Budget-Betrag"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.budget_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_column_id: val || "" })}
+								searchable
+							/>
 
-							<Select label="Agenturleistungs-Spalte" description="Numbers-, Formula- oder Mirror-Spalte mit dem Agenturleistungs-Betrag" placeholder="Spalte auswählen" data={budgetBoardColumns.filter((c) => COST_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))} value={budgetBoardForm.cost_column_id || null} onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, cost_column_id: val || "" })} searchable />
+							<Select
+								label="Agenturleistungs-Spalte"
+								description="Numbers-, Formula- oder Mirror-Spalte mit dem Agenturleistungs-Betrag"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => COST_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.cost_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, cost_column_id: val || "" })}
+								searchable
+							/>
 						</>
 					) : (
 						<Text size="sm" c="dimmed">

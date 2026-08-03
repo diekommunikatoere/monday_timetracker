@@ -5,7 +5,6 @@ import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accord
 import { useEffect, useState, useMemo } from "react";
 
 import { Icon } from "@/components";
-import styles from "@/components/styles/features/sidebar/ItemTimeEntriesView.module.css";
 import { useToast } from "@/components/ToastProvider";
 import { formatDuration } from "@/lib/utils";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
@@ -16,6 +15,8 @@ import { TimeEntry } from "@/types/time-entry";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getSidebarColumns } from "../shared/time-entries/TimeEntryTableConfigs";
+
+import styles from "@/components/styles/features/sidebar/ItemTimeEntriesView.module.css";
 
 /**
  * Props for {@link ItemTimeEntriesView}.

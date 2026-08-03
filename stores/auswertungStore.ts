@@ -3,9 +3,10 @@
 import { create } from "zustand";
 
 import { addWeeks, endOfISOWeek, startOfISOWeek } from "@/lib/time/calculations";
-import type { AuswertungUserRow } from "@/types/auswertung";
 
 import { useMondayStore } from "./mondayStore";
+
+import type { AuswertungUserRow } from "@/types/auswertung";
 
 /** Purely client-side filter state for the Auswertung toolbar's search box. */
 export interface AuswertungFilters {

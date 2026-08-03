@@ -4,6 +4,7 @@
 import { Flex, Tooltip } from "@mantine/core";
 
 import { Icon, IconButton } from "@/components";
+
 import type { TimerControlsProps } from "@/types/timer.types";
 
 /**

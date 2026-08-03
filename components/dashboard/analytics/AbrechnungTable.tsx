@@ -5,9 +5,11 @@ import { Table, Center, Loader, Text, Badge, Group, ActionIcon, Stack, Box, Simp
 import { Fragment, useMemo, useState } from "react";
 
 import { Icon } from "@/components";
-import styles from "@/components/styles/ui/tables/Table.module.css";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
+
+import styles from "@/components/styles/ui/tables/Table.module.css";
+
 import type { AbrechnungBudgetItem, AbrechnungLinkedItem, AbrechnungRoleBreakdown, AbrechnungTableRow } from "@/types/abrechnung";
 
 /**

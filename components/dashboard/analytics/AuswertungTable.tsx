@@ -5,9 +5,11 @@ import { Table, Center, Loader, Text, Avatar, Group, ActionIcon, Stack, Box, Sim
 import { Fragment, useMemo, useState } from "react";
 
 import { Icon } from "@/components";
-import styles from "@/components/styles/ui/tables/Table.module.css";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
+
+import styles from "@/components/styles/ui/tables/Table.module.css";
+
 import type { AuswertungRoleBreakdown, AuswertungUserRow } from "@/types/auswertung";
 
 /** Dims a duration cell when its value is `0` so real numbers stand out. */

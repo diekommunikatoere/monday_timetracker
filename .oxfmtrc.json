@@ -1,0 +1,14 @@
+{
+	"useTabs": true,
+	"tabWidth": 4,
+	"printWidth": 320,
+	"proseWrap": "never",
+	"sortImports": {
+		"groups": ["builtin", "external", ["internal", "subpath"], ["parent", "sibling", "index"], "style", "type", "unknown"],
+		"internalPattern": ["~/", "@/", "#", "@api/"],
+		"order": "asc",
+		"ignoreCase": true,
+		"newlinesBetween": true
+	},
+	"ignorePatterns": ["types/database/database.ts", "**/*.md"]
+}

@@ -6,9 +6,9 @@
 import { Modal } from "@mantine/core";
 import React from "react";
 
-import styles from "@/components/styles/ui/modals/ModalHeader.module.css";
-
 import { ModalHeaderProps } from "./types";
+
+import styles from "@/components/styles/ui/modals/ModalHeader.module.css";
 
 /**
  * Header slot for {@link Modal}.

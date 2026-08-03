@@ -10,6 +10,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
+
 import type { Database } from "@/types/database";
 import type { UseTimerReturn, TimerActions, TimerState, ActiveTimer, ActiveTimersResponse } from "@/types/timer.types";
 

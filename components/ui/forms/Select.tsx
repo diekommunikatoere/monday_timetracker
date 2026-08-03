@@ -6,10 +6,10 @@
 import { Select as MantineSelect } from "@mantine/core";
 import React from "react";
 
-import styles from "@/components/styles/ui/forms/Select.module.css";
-
 import { defaultClearButtonProps } from "./clearButton";
 import { SelectProps } from "./types";
+
+import styles from "@/components/styles/ui/forms/Select.module.css";
 
 /**
  * Dropdown select built on Mantine's `Select`.

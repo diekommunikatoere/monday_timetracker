@@ -3,8 +3,9 @@
 // clear button renders identically to Input's hand-built one — both resolve
 // to the same IconButton "tertiary" classes from IconGroup.module.css.
 
-import buttonStyles from "@/components/styles/ui/buttons/IconGroup.module.css";
 import { Icon } from "@/components/ui/icons/Icon";
+
+import buttonStyles from "@/components/styles/ui/buttons/IconGroup.module.css";
 
 /**
  * Mantine's internal `InputClearButton` (used by both `Select`'s Combobox

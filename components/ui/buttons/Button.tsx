@@ -5,9 +5,9 @@
 
 import { Button as MantineButton } from "@mantine/core";
 
-import styles from "@/components/styles/ui/buttons/Button.module.css";
-
 import { ButtonProps } from "./types";
+
+import styles from "@/components/styles/ui/buttons/Button.module.css";
 
 /**
  * Design-system button built on Mantine's `Button`.

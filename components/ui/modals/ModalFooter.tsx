@@ -5,9 +5,9 @@
 
 import React from "react";
 
-import styles from "@/components/styles/ui/modals/ModalFooter.module.css";
-
 import { ModalFooterProps } from "./types";
+
+import styles from "@/components/styles/ui/modals/ModalFooter.module.css";
 
 /**
  * Footer slot for {@link Modal}.
