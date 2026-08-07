@@ -16,11 +16,13 @@ Stack: Next.js 16 (App Router) · React 19 · Supabase · Redis (ioredis) · mon
 npm run dev         # next dev (default port 3000; widget runs at PORT 8301 in monday)
 npm run build       # next build  — also the typecheck gate (noEmitOnError + strict route types)
 npm run start        # production server
+npm run lint         # oxlint
+npm run fmt          # oxfmt (npm run fmt:check for CI-style check-only)
 npm run expose      # mapps tunnel:create -p 8301  (monday Apps CLI tunnel for live widget testing)
 npm run db:migrate  # supabase db push  (apply migrations to the linked Supabase project)
 ```
 
-There is **no test runner and no lint script** configured. `npm run build` is the de-facto verification step — run it to catch type and route errors. Migrations live in `supabase/migrations/` and are applied with the Supabase CLI (`supabase db push` / `supabase db reset` locally, `supabase migration new <name>` to create).
+Linting/formatting migrated from ESLint/Prettier to oxc (`oxlint` + `oxfmt`, config in `.oxlintrc.json` / `.oxfmtrc.json`); see `.git-blame-ignore-revs` for the repo-wide reformat commit. There is still **no test runner** — `npm run build` remains the de-facto correctness gate for types and route errors. Migrations live in `supabase/migrations/` and are applied with the Supabase CLI (`supabase db push` / `supabase db reset` locally, `supabase migration new <name>` to create).
 
 > Note: `SETUP.md` and `.github/copilot-instructions.md` describe a local Docker-Compose + local-Supabase workflow and npm scripts (`db:reset`, `redis:gui`, `services:start`, etc.) that **no longer exist** in `package.json`. Treat those docs as historical. `.env.local` points at a **remote** Supabase project and a `REDIS_URL`; there is no `docker-compose.yml`.
 
@@ -45,15 +47,16 @@ const userProfile = await getUserProfileByMondayId(session.userId);
 
 The older `getMondayContext(request)` (parses the `monday-context` header) still exists in [lib/monday.ts](lib/monday.ts) but is used by only one route (`/api/sync/board/[boardId]`). Prefer the JWT pattern. Webhook (`/api/webhooks/monday`) and cron routes are **not** user-authenticated — see below.
 
-## Timer architecture (3-table model)
+## Timer architecture (2-table model)
 
-A running timer spans three tables (defined in `supabase/migrations/002_tables.sql`, logic in [lib/database.ts](lib/database.ts) and the Postgres RPCs in `003_functions.sql`):
+Originally a 3-table design; migrations 023–032 ("timer 2-table redesign") dropped `timer_session` entirely (030) in favor of a `timer_state` enum on `time_entry` itself. A live timer **is** a non-finalized `time_entry` row — there's no separate session table anymore:
 
-1. **`time_entry`** — the record itself. `is_draft = true` while a timer is live; gets a final `duration`, `task_name`, `comment` when finalized.
-2. **`timer_session`** — one active session per user (unique on `user_id`). Holds `elapsed_time`, `is_paused`, `draft_id`. This table is what the client subscribes to for cross-device real-time sync.
-3. **`timer_segment`** — individual run/pause intervals. **No boolean flags**: a running segment has `end_time IS NULL`; a finished/paused segment has both timestamps. Elapsed time = sum of completed segment durations; pauses are simply the gaps between segments.
+1. **`time_entry`** — the record itself, discriminated by `timer_state` (`running | paused | parked | finalized`), replacing the old `is_draft` boolean. `parked` is what "saved as draft" now means (formerly `is_draft = true` with no session).
+2. **`timer_segment`** — individual run/pause intervals, referencing the owning entry directly via `entry_id` (the old `session_id` FK is gone). **No boolean flags**: a running segment has `end_time IS NULL`; a finished/paused segment has both timestamps. Elapsed time = sum of completed segment durations; pauses are simply the gaps between segments.
 
-Time math and finalization happen in **Postgres RPC functions** (`finalize_segment`, `finalize_time_entry`, `get_timer_session_with_elapsed`, `soft_reset_timer`, …), not in TypeScript — keep the source of truth there. Timer API routes under `app/api/timer/`: `start`, `pause`, `reset` (delete draft+session), `soft-reset` (delete session, keep draft for manual editing), `draft`, `finalize`, `session` (GET active).
+Time math and all state transitions happen in **Postgres RPC functions** (`timer_start`, `timer_pause`, `timer_resume`, `timer_park`, `timer_finalize`, `timer_reset`, `get_active_timers`, defined mainly in `025_timer_functions.sql` and superseded by later migrations in the same series), not in TypeScript — keep the source of truth there. Only one active (`running`/`paused`) timer per user is allowed: `timer_start` raises `ACTIVE_TIMER_EXISTS` (mapped to HTTP 409) if one already exists — a `parked` entry doesn't count as active (interim guard, `027_timer_start_single_timer_guard.sql`; meant to be lifted once multi-timer UI confirmation ships).
+
+Timer API routes under `app/api/timer/`: `GET /` (active timers via `get_active_timers`, replaces the old `GET /session`), `start`, `pause`, `resume`, `park` (save as draft — replaces the old `soft-reset`), `reset` (discard via `timer_reset`, cascades to segments), `comment` (debounced auto-save of the live entry's comment — a direct `UPDATE`, no RPC), `finalize` (promote to a durable finalized entry; pass `asDraft: true` to instead keep it `parked` while still applying the explicit time window/role).
 
 ## Data layer & caching
 
@@ -83,20 +86,21 @@ There is no `vercel.json`; cron scheduling is configured on the deployment platf
 State lives in `stores/*.ts` — Zustand stores that **replaced** an older top-level `hooks/` directory (now deleted; per-feature hooks that survive live co-located under `components/.../hooks/`). Stores don't auto-fetch; trigger fetches from `useEffect`. Each fetching store pulls the token via `useMondayStore.getState().sessionToken`. See [stores/CLAUDE.md](stores/CLAUDE.md) for the full per-store reference.
 
 - `mondayStore` — boots the monday SDK: fetches context + `me` + session token in parallel, calls `/api/auth/monday-user`, populates `userStore`. Entry point for the whole app.
-- `userStore` — monday user + Supabase profile + theme (theme persisted to localStorage **and** the DB via `/api/user/theme`).
-- `timerStore` / `draftStore` — timer + draft comment auto-save.
+- `userStore` — monday user + Supabase profile + theme (theme persisted to localStorage **and** the DB via `/api/user/theme`) + `dashboardViewMode` (table/calendar).
+- `timerStore` — active timer state (`entryId`, elapsed time, status, in-progress comment). Pure state container; no API calls live here (that's `components/features/timer/hooks/useTimer.ts`). There is no separate draft store — in the 2-table model a parked/draft timer is just a `time_entry`, and the comment is auto-saved via `PATCH /api/timer/comment`.
 - `timeEntriesStore` / `itemTimeEntriesStore` — entry lists (global vs per-item).
+- `abrechnungStore` / `auswertungStore` — the two analytics dashboards (budget reconciliation / per-user weekly utilization, see App surfaces below).
 - `appStore`, `modalStore` — UI state.
 
 Persisted stores use `skipHydration: true` + the `useHydration()` helper in [lib/store-utils.ts](lib/store-utils.ts) to avoid SSR hydration mismatches; `components/StoreProvider.tsx` (in the root layout) drives rehydration.
 
 ## App surfaces
 
-Four App-Router entry pages render into different monday widget contexts: `app/dashboards/` (main timer/table widget), `app/dashboards/timerView/`, `app/sidebar/itemView/` (per-item sidebar), and `app/admin/` (board/column-sync/role configuration). `app/page.tsx` is intentionally empty. Components are organized as `components/ui/` (the in-house design system, barrel-exported from `components/index.ts`) and `components/features/`, `components/dashboard/`, `components/sidebar/`. Path aliases: `@/*` → repo root, `@api/*` → `app/api/*`.
+App-Router entry pages render into different monday widget contexts: `app/dashboards/` (main widget — a table/calendar view switcher over time entries, `userStore.dashboardViewMode`), `app/dashboards/analytics/abrechnung/` and `.../auswertung/` (budget reconciliation and per-user weekly-utilization dashboards, gated by `lib/permissions/routes.ts` — admin or `NEXT_PUBLIC_ANALYTICS_TEAM_IDS` allowlist), `app/dashboards/timerView/` (now just redirects client-side to `/dashboards`, kept for monday widget-context compatibility), `app/sidebar/itemView/` (per-item sidebar), and `app/admin/` (board/column-sync/role configuration). `app/page.tsx` is intentionally empty. Components are organized as `components/ui/` (the in-house design system, barrel-exported from `components/index.ts`), `components/features/`, `components/dashboard/` (including `calendar/` and `analytics/`), `components/shared/`, `components/sidebar/`. Path aliases: `@/*` → repo root, `@api/*` → `app/api/*`.
 
 ## Styling
 
-Mantine + custom SCSS. Global: `app/globals.scss`. Component CSS and monday theme mapping under `public/css/`. The app mirrors monday's light/dark/black theme via the context, but a user's explicit theme choice (persisted in the DB) takes precedence over the platform theme — don't reintroduce auto-syncing the platform theme into `userStore` (it caused reversion loops).
+Mantine + custom SCSS. Global: `app/globals.scss`. monday theme mapping and a handful of legacy plain CSS files live under `public/css/`; the bulk of component styling is CSS Modules centralized under `components/styles/` (mirroring the `components/` tree, e.g. `components/styles/dashboard/calendar/TimeEntriesCalendar.module.css`) — not co-located with the component file. The app mirrors monday's light/dark/black theme via the context, but a user's explicit theme choice (persisted in the DB) takes precedence over the platform theme — don't reintroduce auto-syncing the platform theme into `userStore` (it caused reversion loops).
 
 ## Environment variables
 
@@ -110,6 +114,7 @@ NEXT_SUPABASE_SECRET_KEY                          # service role (server)
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY      # anon (client)
 REDIS_URL                                         # ioredis connection string
 CRON_SECRET                                        # optional, gates /api/cron/*
+NEXT_PUBLIC_ANALYTICS_TEAM_IDS                    # comma-separated monday team IDs allowed into /dashboards/analytics/auswertung (see lib/permissions/routes.ts)
 APP_ID, PORT (8301), NODE_ENV
 ```
 

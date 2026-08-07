@@ -19,7 +19,7 @@ Because the provider is in `components/features/timer/` (not here), the context 
 
 Carries a single `refetch: () => void` callback. This is a **page-scoped bridge** to avoid prop-drilling the `timeEntriesStore.refetch(userId)` call through nested components that trigger entry mutations.
 
-- **Provider**: `TimeEntriesProvider` — co-located in this file. Mounted at page level in `app/dashboards/page.tsx` and `app/dashboards/timerView/page.tsx`, both of which pass `() => refetch(userId!)` from `useTimeEntriesStore`.
+- **Provider**: `TimeEntriesProvider` — co-located in this file. Mounted once in `app/dashboards/layout.tsx` (shared by every `/dashboards/*` route — the main table/calendar view, the `timerView` redirect, and the analytics sub-routes), which passes `() => refetch(userId!)` from `useTimeEntriesStore`.
 - **Consumer hook**: `useTimeEntriesRefetch()` — returns the bound `refetch` function. Call it after any mutation (finalize, delete, edit) that should reload the entries list.
 
 Unlike `TimerContext`, this context does not extend to the root layout — it is only available within the dashboard page subtrees.
