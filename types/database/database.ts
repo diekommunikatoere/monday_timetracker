@@ -284,7 +284,29 @@ export type Database = {
           parent_item_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "monday_item_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "monday_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "monday_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "view_monday_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       monday_webhook: {
         Row: {
@@ -472,6 +494,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "time_entry_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "time_entry_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
@@ -588,7 +617,22 @@ export type Database = {
           parent_item_name: string | null
           updated_at: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "monday_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "view_monday_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
