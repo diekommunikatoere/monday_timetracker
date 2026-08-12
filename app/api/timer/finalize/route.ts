@@ -11,11 +11,12 @@
 // the RPC does not handle, so they stay here — and are skipped entirely for asDraft,
 // since a parked row doesn't feed monday totals.
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+
 import { syncAfterFinalize } from "@/lib/columnSync";
-import { verifyMondayJwt } from "@/lib/monday-auth";
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 import { cacheHelper } from "@/lib/redis";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 interface FinalizeRequest {
 	entryId: string;

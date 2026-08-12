@@ -2,8 +2,9 @@
 // Confirms saving a timer/draft whose comment field is empty.
 "use client";
 
-import { useEffect } from "react";
 import { Flex, Text, Group } from "@mantine/core";
+import { useEffect } from "react";
+
 import { Button, Modal, Icon } from "@/components";
 
 /**

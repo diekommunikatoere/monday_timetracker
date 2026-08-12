@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+
 import { getCurrentTimeString, addSecondsToTimeString, subtractSecondsFromTimeString, calculateDurationBetweenTimes, durationToSeconds, secondsToDuration } from "@/lib/utils";
 
 /**
@@ -210,7 +211,11 @@ export function useTimeEntryForm(options: UseTimeEntryFormOptions = {}) {
 	}, [durationLocked]);
 
 	const toggleDurationLock = useCallback(() => {
-		anchor === "end" ? toggleEndLock() : anchor === "start" ? toggleStartLock() : null;
+		if (anchor === "end") {
+			toggleEndLock();
+		} else if (anchor === "start") {
+			toggleStartLock();
+		}
 		setDurationLocked((prev) => !prev);
 	}, [anchor, durationLocked]);
 

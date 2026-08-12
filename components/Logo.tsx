@@ -3,9 +3,9 @@
 
 import Image from "next/image";
 
+import logoBlack from "@/public/img/logo/timetracker_logo_black.svg";
 import logoBrand from "@/public/img/logo/timetracker_logo_brand.svg";
 import logoLight from "@/public/img/logo/timetracker_logo_light.svg";
-import logoBlack from "@/public/img/logo/timetracker_logo_black.svg";
 import logoWhite from "@/public/img/logo/timetracker_logo_white.svg";
 
 /**

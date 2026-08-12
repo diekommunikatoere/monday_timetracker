@@ -1,13 +1,14 @@
 // components/TaskItemSelector.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Flex, Text, ComboboxItem, Skeleton, Tooltip, Loader, TreeSelectProps, type TreeNodeData } from "@mantine/core";
-import { Icon, IconButton, Select, TreeSelect } from "@/components";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMondayStore } from "@/stores/mondayStore";
-import { supabase } from "@/lib/supabase/client";
 import Fuse, { type FuseResult } from "fuse.js";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
+import { Icon, IconButton, Select, TreeSelect } from "@/components";
+import { supabase } from "@/lib/supabase/client";
+import { useMondayStore } from "@/stores/mondayStore";
 
 import styles from "@/components/styles/features/timer/TaskItemSelector.module.css";
 

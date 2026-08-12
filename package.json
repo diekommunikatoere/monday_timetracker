@@ -1,53 +1,61 @@
 {
 	"name": "timetracker",
-	"version": "0.13.7",
+	"version": "0.14.0",
 	"private": true,
-	"engines": {
-		"node": ">=24.0.0"
-	},
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
+		"lint": "oxlint",
+		"lint:fix": "oxlint --fix",
 		"expose": "mapps tunnel:create -p 8301",
-		"db:migrate": "supabase db push"
+		"db:migrate": "supabase db push",
+		"fmt": "oxfmt",
+		"fmt:check": "oxfmt --check"
 	},
 	"dependencies": {
 		"@dnd-kit/core": "^6.3.1",
 		"@dnd-kit/sortable": "^10.0.0",
 		"@dnd-kit/utilities": "^3.2.2",
-		"@mantine/core": "^9.3.0",
-		"@mantine/dates": "^9.3.0",
-		"@mantine/hooks": "^9.3.0",
-		"@mantine/notifications": "^9.3.0",
+		"@mantine/core": "^9.5.0",
+		"@mantine/dates": "^9.5.0",
+		"@mantine/hooks": "^9.5.0",
+		"@mantine/notifications": "^9.5.0",
+		"@mantine/schedule": "^9.5.0",
 		"@mondaydotcomorg/api": "^13.0.0",
 		"@supabase/supabase-js": "^2.106.2",
 		"@tanstack/react-query": "^5.100.14",
+		"dayjs": "^1.11.21",
 		"fuse.js": "^7.4.1",
 		"ioredis": "^5.11.0",
 		"jsonwebtoken": "^9.0.3",
 		"material-symbols": "^0.45.8",
 		"monday-sdk-js": "^0.5.8",
-		"next": "16.2.6",
+		"next": "^16.3.0",
 		"postcss": "^8.5.15",
 		"postcss-preset-mantine": "^1.18.0",
 		"postcss-simple-vars": "^7.0.1",
-		"react": "19.2.7",
-		"react-dom": "19.2.7",
+		"react": "19.2.8",
+		"react-dom": "19.2.8",
 		"sass": "^1.100.0",
 		"zustand": "^5.0.14"
 	},
 	"devDependencies": {
 		"@types/jsonwebtoken": "^9.0.10",
 		"@types/node": "^24",
-		"@types/react": "19.2.16",
+		"@types/react": "19.2.17",
 		"@types/react-dom": "19.2.3",
 		"cross-port-killer": "^1.4.0",
+		"oxfmt": "^0.61.0",
+		"oxlint": "^1.76.0",
 		"supabase": "^2.104.0",
-		"typescript": "^5.9.3"
+		"typescript": "^7.0.2"
 	},
 	"overrides": {
-		"@types/react": "19.2.16",
+		"@types/react": "19.2.17",
 		"@types/react-dom": "19.2.3"
+	},
+	"engines": {
+		"node": ">=24.0.0"
 	}
 }

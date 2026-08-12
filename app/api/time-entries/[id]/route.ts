@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateTimeEntry, softDeleteTimeEntry, getTimeEntryById } from "@/lib/database";
+
 import { syncAfterUpdate, syncAfterDelete } from "@/lib/columnSync";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+import { updateTimeEntry, softDeleteTimeEntry, getTimeEntryById } from "@/lib/database";
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
  * `PATCH /api/time-entries/[id]` — update one time entry's editable fields.

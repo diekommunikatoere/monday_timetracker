@@ -1,5 +1,7 @@
 import { create } from "zustand";
+
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
+
 import { useUserStore, MondayTheme, mapMondayThemeToAppTheme } from "./userStore";
 
 /**

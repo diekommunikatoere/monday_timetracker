@@ -1,26 +1,32 @@
 .input {
-	/* Base input styling */
-	--input-bg: var(--color--input-background);
-	--input-bd: var(--color--input-border);
-	color: var(--color--input-text);
+	input {
+		/* Base input styling */
+		--input-bg: var(--color--input-background);
+		--input-bd: var(--color--input-border);
+		color: var(--color--input-text);
 
-	&:disabled,
-	&[data-disabled="true"] {
-		--input-disabled-bg: var(--color--input-background-disabled);
-		--input-disabled-bd: var(--color--input-border-disabled);
-		color: var(--color--input-text-disabled);
+		&::placeholder {
+			color: var(--color--input-placeholder);
+		}
+
+		&:disabled,
+		&[data-disabled="true"] {
+			--input-disabled-bg: var(--color--input-background-disabled);
+			--input-disabled-bd: var(--color--input-border-disabled);
+			color: var(--color--input-text-disabled);
+		}
 	}
 }
 
-.input--error {
+.inputError {
 	--input-bd: var(--color--error-500);
 }
 
-.input--warning {
+.inputWarning {
 	--input-bd: var(--color--secondary-500);
 }
 
-.input--success {
+.inputSuccess {
 	--input-bd: var(--color--success-500);
 }
 

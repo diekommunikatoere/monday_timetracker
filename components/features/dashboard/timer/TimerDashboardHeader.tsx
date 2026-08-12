@@ -1,19 +1,20 @@
 "use client";
 
+import { Center, Flex, Tooltip, Text } from "@mantine/core";
 import { useCallback, useEffect, useState } from "react";
-import { Logo } from "@/components/Logo";
+
+import { DashboardMenuButton, Icon, Logo, SegmentedControl } from "@/components";
+import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
+import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
+import { ManualTimeEntryModal } from "@/components/features/timer";
 import TimerContainer from "@/components/features/timer/TimerContainer";
 import ManualTimeEntryButton from "@/components/ManualTimeEntryButton";
-import { Flex, Tooltip, Text } from "@mantine/core";
-import { useModalStore } from "@/stores/modalStore";
-import { useUserStore } from "@/stores/userStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
-import { ManualTimeEntryModal } from "@/components/features/timer";
-import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
-import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
 import { useTimerContext } from "@/contexts/TimerContext";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { APP_VERSION } from "@/lib/version";
+import { useModalStore } from "@/stores/modalStore";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
+import { useUserStore } from "@/stores/userStore";
 
 import "@/public/css/components/AppHeader.css";
 
@@ -32,16 +33,14 @@ import "@/public/css/components/AppHeader.css";
  * {@link useTimerContext} to wire the empty-comment confirmation modal's
  * `onConfirm`/`isSaving` props.
  *
- * Note: the function signature declares `variant` but never destructures it, so
- * the rendered `<header>` className always appends `undefined` (a no-op class).
- * Kept as-is; not modified.
- *
  * @returns A header containing the logo, manual-entry button, theme toggle, and
  *          timer, followed by the manual-entry, save, and empty-comment modals.
  */
-export function TimerDashboardHeader(variant?) {
+export function TimerDashboardHeader() {
 	const { allEntries } = useTimeEntriesStore();
 	const userId = useUserStore((state) => state.supabaseUser?.id);
+	const dashboardViewMode = useUserStore((state) => state.dashboardViewMode);
+	const setDashboardViewMode = useUserStore((state) => state.setDashboardViewMode);
 	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
 	const { showTimerSave, closeTimerSave, showEmptyCommentConfirmation, closeEmptyCommentConfirmation } = useModalStore((s) => s);
 	const { actions, state } = useTimerContext();
@@ -67,33 +66,63 @@ export function TimerDashboardHeader(variant?) {
 
 	return (
 		<>
-			<header id="appHeader" className={`widget-header ${variant}`}>
-				<Flex align="center" gap={16} className="header-left-section">
-					<Flex align="center" gap={16} className="logo-container">
-						{/* Logo for light/dark mode */}
-						<Tooltip label={`v${APP_VERSION}`} position="bottom">
-							<Logo size={{ height: 27 }} style={logoStyle} loading="eager" />
-						</Tooltip>
+			<header id="app-header">
+				<Flex gap="sm" className="header-left-section">
+					<Flex gap="sm" className="section-left-inner">
+						<DashboardMenuButton />
 
+						<Tooltip label={`v${APP_VERSION}`} position="bottom">
+							<Logo size={{ height: 21 }} style={logoStyle} loading="eager" />
+						</Tooltip>
+					</Flex>
+					<Flex align="center" gap="sm" className="section-right-inner">
+						<Flex className="total-hours-today" align="center" gap={8} style={{ backgroundColor: "var(--color--background-secondary)", padding: ".5rem 1rem", borderRadius: 4 }} wrap="wrap">
+							{/* Total hours today */}
+							<Text className="text-today" size="sm" fw={600} ta="center">
+								Heute:
+							</Text>
+							<Text size="sm" fw={600} ff="mono" ta="center">
+								{totalHoursToday.toFixed(2)} h
+							</Text>
+						</Flex>
 						<ManualTimeEntryButton
 							onClick={() => {
 								handleManualTimeModalOpen();
 							}}
 						/>
 					</Flex>
-
-					<ThemeToggle />
-					<Flex align="center" gap={8} style={{ backgroundColor: "var(--color--background-secondary)", padding: ".5rem 1rem", borderRadius: 4 }} wrap="wrap">
-						{/* Total hours today */}
-						<Text size="sm" fw={600} ta="center">
-							Heute:
-						</Text>
-						<Text size="sm" fw={600} ff="mono" ta="center">
-							{totalHoursToday.toFixed(2)} h
-						</Text>
-					</Flex>
 				</Flex>
-				<TimerContainer />
+				<div className="header-right-section">
+					<TimerContainer />
+				</div>
+
+				<div className="header-view-switch">
+					<SegmentedControl
+						data={[
+							{
+								value: "table",
+								label: (
+									<Center style={{ gap: 4 }}>
+										<Icon name="table" size={16} />
+										<span>Tabelle</span>
+									</Center>
+								),
+							},
+							{
+								value: "calendar",
+								label: (
+									<Center style={{ gap: 4 }}>
+										<Icon name="event_note" size={16} />
+										<span>Kalender</span>
+									</Center>
+								),
+							},
+						]}
+						value={dashboardViewMode === "table" ? "table" : "calendar"}
+						onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
+						radius="md"
+					/>
+				</div>
 			</header>
 			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
 			<SaveTimerModal show={showTimerSave} onClose={closeTimerSave} />

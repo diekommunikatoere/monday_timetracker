@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { Logo } from "@/components/Logo";
-import { Accordion, TextInput, NumberInput, Switch, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Checkbox, ScrollArea } from "@mantine/core";
-import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
-import { notifications } from "@mantine/notifications";
-import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import type { Role } from "@/types/database";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Accordion, TextInput, NumberInput, Switch, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Checkbox, ScrollArea, Select, SegmentedControl, Table } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState, useCallback } from "react";
+
+import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
+import { Logo } from "@/components/Logo";
+import { canAccessRoute } from "@/lib/permissions";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+
+import type { Role } from "@/types/database";
 
 import "@/public/css/components/AdminPage.css";
 
@@ -37,6 +41,29 @@ interface DisplayBoardRow {
 	sync_enabled: boolean;
 	config_status: "GREEN" | "YELLOW";
 }
+
+/** Minimal monday column shape used by the Budget-Boards column pickers. */
+interface BudgetColumnOption {
+	id: string;
+	title: string;
+	type: string;
+}
+
+/** A `board_config` row tagged as a budget board (`settings.budget_board_status` set), for the list below the picker. */
+interface BudgetBoardRow {
+	board_id: string;
+	board_name: string;
+	workspace_name: string;
+	status: "active" | "archived";
+	label: string | null;
+	job_relation_column_id: string | null;
+	cost_column_id: string | null;
+	budget_column_id: string | null;
+}
+
+const BUDGET_RELATION_COLUMN_TYPES = ["board_relation", "connect_boards"];
+const COST_COLUMN_TYPES = ["numbers", "formula", "mirror"];
+const BUDGET_COLUMN_TYPES = ["numbers", "formula", "mirror"];
 
 /** Draggable row in the "Boards verwalten" sortable list. */
 function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemove: (boardId: string) => void }) {
@@ -106,7 +133,26 @@ export default function AdminPage() {
 	const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set());
 	const [savingBoards, setSavingBoards] = useState(false);
 
+	// Budget-board modal state
+	const [budgetBoardModalOpen, setBudgetBoardModalOpen] = useState(false);
+	const [editingBudgetBoardId, setEditingBudgetBoardId] = useState<string | null>(null);
+	const [budgetBoardForm, setBudgetBoardForm] = useState({
+		board_id: "",
+		board_name: "",
+		workspace_id: undefined as string | undefined,
+		budget_board_status: "active" as "active" | "archived",
+		label: "",
+		job_relation_column_id: "",
+		cost_column_id: "",
+		budget_column_id: "",
+	});
+	const [budgetBoardColumns, setBudgetBoardColumns] = useState<BudgetColumnOption[]>([]);
+	const [budgetBoardColumnsLoading, setBudgetBoardColumnsLoading] = useState(false);
+	const [savingBudgetBoard, setSavingBudgetBoard] = useState(false);
+
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+	const pathname = usePathname();
 
 	// Monday context
 	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError, sessionToken } = useMondayStore();
@@ -393,6 +439,199 @@ export default function AdminPage() {
 		saveDisplayBoards(reordered);
 	};
 
+	// Budget-board handlers
+	const budgetBoardRows: BudgetBoardRow[] = useMemo(() => {
+		return allBoardConfigs
+			.filter((b: any) => !!b.settings?.budget_board_status)
+			.map((b: any) => {
+				const workspaceId: string | null = b.monday_board?.workspace_id ?? null;
+				return {
+					board_id: b.board_id,
+					board_name: b.monday_board?.name || b.board_id,
+					workspace_name: (workspaceId && workspaceNameById[workspaceId]) || "Hauptbereich",
+					status: b.settings.budget_board_status as "active" | "archived",
+					label: b.settings.label ?? null,
+					job_relation_column_id: b.settings.job_relation_column_id ?? null,
+					cost_column_id: b.settings.cost_column_id ?? null,
+					budget_column_id: b.settings.budget_column_id ?? null,
+				};
+			})
+			.sort((a: BudgetBoardRow, b: BudgetBoardRow) => a.board_name.localeCompare(b.board_name));
+	}, [allBoardConfigs, workspaceNameById]);
+
+	const activeBudgetBoards = useMemo(() => budgetBoardRows.filter((b) => b.status === "active"), [budgetBoardRows]);
+	const archivedBudgetBoards = useMemo(() => budgetBoardRows.filter((b) => b.status === "archived"), [budgetBoardRows]);
+
+	// Budget-board board picker: every monday board, flattened with its workspace name for the label.
+	const budgetBoardSelectOptions = useMemo(
+		() =>
+			pickerGroups.flatMap((group) =>
+				group.boards.map((b) => ({
+					value: b.value,
+					label: `${b.label} (${group.workspaceName})`,
+				})),
+			),
+		[pickerGroups],
+	);
+
+	const fetchBudgetBoardColumns = useCallback(
+		async (boardId: string) => {
+			if (!sessionToken || !boardId) return;
+			setBudgetBoardColumnsLoading(true);
+			try {
+				const response = await fetch(`/api/boards/${boardId}/columns`, {
+					headers: { Authorization: `Bearer ${sessionToken}` },
+				});
+				const data = await response.json();
+
+				if (!response.ok) {
+					throw new Error(data.error || "Spalten konnten nicht geladen werden");
+				}
+
+				setBudgetBoardColumns(data.columns || []);
+			} catch (err) {
+				notifications.show({
+					title: "Fehler",
+					message: err instanceof Error ? err.message : "Spalten konnten nicht geladen werden",
+					color: "red",
+				});
+				setBudgetBoardColumns([]);
+			} finally {
+				setBudgetBoardColumnsLoading(false);
+			}
+		},
+		[sessionToken],
+	);
+
+	const handleOpenBudgetBoardModal = (existing?: BudgetBoardRow) => {
+		if (existing) {
+			setEditingBudgetBoardId(existing.board_id);
+			setBudgetBoardForm({
+				board_id: existing.board_id,
+				board_name: existing.board_name,
+				workspace_id: undefined,
+				budget_board_status: existing.status,
+				label: existing.label || "",
+				job_relation_column_id: existing.job_relation_column_id || "",
+				cost_column_id: existing.cost_column_id || "",
+				budget_column_id: existing.budget_column_id || "",
+			});
+			fetchBudgetBoardColumns(existing.board_id);
+		} else {
+			setEditingBudgetBoardId(null);
+			setBudgetBoardForm({
+				board_id: "",
+				board_name: "",
+				workspace_id: undefined,
+				budget_board_status: "active",
+				label: "",
+				job_relation_column_id: "",
+				cost_column_id: "",
+				budget_column_id: "",
+			});
+			setBudgetBoardColumns([]);
+		}
+		setBudgetBoardModalOpen(true);
+	};
+
+	const handleSelectBudgetBoardBoard = (boardId: string | null) => {
+		if (!boardId) return;
+		const selected = budgetBoardSelectOptions.find((b) => b.value === boardId);
+		const pickerBoard = allPickerBoardsById.get(boardId);
+		setBudgetBoardForm((prev) => ({
+			...prev,
+			board_id: boardId,
+			board_name: pickerBoard?.label || selected?.label || boardId,
+			workspace_id: pickerBoard?.workspaceId === DEFAULT_WORKSPACE_ID ? undefined : pickerBoard?.workspaceId,
+			job_relation_column_id: "",
+			cost_column_id: "",
+			budget_column_id: "",
+		}));
+		fetchBudgetBoardColumns(boardId);
+	};
+
+	const handleSaveBudgetBoard = async () => {
+		if (!budgetBoardForm.board_id) {
+			notifications.show({ title: "Validierungsfehler", message: "Bitte ein Board auswählen", color: "red" });
+			return;
+		}
+		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.cost_column_id || !budgetBoardForm.budget_column_id) {
+			notifications.show({ title: "Validierungsfehler", message: "Bitte Verknüpfungs-, Agenturleistungs- und Budget-Spalte auswählen", color: "red" });
+			return;
+		}
+
+		setSavingBudgetBoard(true);
+		try {
+			const response = await fetch(`/api/admin/boards/${budgetBoardForm.board_id}/budget-config`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify({
+					board_name: budgetBoardForm.board_name,
+					workspace_id: budgetBoardForm.workspace_id,
+					budget_board_status: budgetBoardForm.budget_board_status,
+					label: budgetBoardForm.budget_board_status === "archived" ? budgetBoardForm.label : null,
+					job_relation_column_id: budgetBoardForm.job_relation_column_id,
+					cost_column_id: budgetBoardForm.cost_column_id,
+					budget_column_id: budgetBoardForm.budget_column_id,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Budget-Board konnte nicht gespeichert werden");
+			}
+
+			notifications.show({
+				title: "Erfolg",
+				message: editingBudgetBoardId ? "Budget-Board aktualisiert" : "Budget-Board hinzugefügt",
+				color: "green",
+			});
+
+			setBudgetBoardModalOpen(false);
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Budget-Board konnte nicht gespeichert werden",
+				color: "red",
+			});
+		} finally {
+			setSavingBudgetBoard(false);
+		}
+	};
+
+	const handleRemoveBudgetBoard = async (board: BudgetBoardRow) => {
+		if (!confirm(`Möchtest du das Budget-Board "${board.board_name}" wirklich entfernen?`)) {
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/admin/boards?boardId=${board.board_id}`, {
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${sessionToken}` },
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Budget-Board konnte nicht entfernt werden");
+			}
+
+			notifications.show({ title: "Erfolg", message: "Budget-Board entfernt", color: "green" });
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Budget-Board konnte nicht entfernt werden",
+				color: "red",
+			});
+		}
+	};
+
 	// Role handlers
 	const handleOpenRoleModal = (role?: Role) => {
 		if (role) {
@@ -514,6 +753,16 @@ export default function AdminPage() {
 					</Flex>
 				</header>
 				<LoadingState />
+			</div>
+		);
+	}
+
+	if (!canAccessRoute(pathname, { isAdmin })) {
+		return (
+			<div id="admin-app">
+				<div className="admin-error">
+					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
+				</div>
 			</div>
 		);
 	}
@@ -642,6 +891,119 @@ export default function AdminPage() {
 				)}
 			</div>
 
+			{/* Budget-Boards */}
+			<div className="admin-section">
+				<div className="admin-section-header">
+					<div>
+						<h2>Budget-Boards</h2>
+						<p className="admin-section-description">Boards mit Budget-Items (z. B. „Retainer") für die Abrechnungs-Ansicht konfigurieren. Jedes Jahr wird ein archiviertes Board neu hinzugefügt, sobald Budget-Items ans Archiv-Board verschoben werden.</p>
+					</div>
+					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBudgetBoardModal()}>
+						Budget-Board hinzufügen
+					</Button>
+				</div>
+
+				{loading ? (
+					<div className="admin-loading">
+						<Loader />
+					</div>
+				) : budgetBoardRows.length === 0 ? (
+					<div className="empty-state">
+						<div className="empty-state-title">Keine Budget-Boards konfiguriert</div>
+						<p className="empty-state-description">Füge das Budget-Board (z. B. „Retainer") hinzu, um die Abrechnungs-Ansicht zu befüllen.</p>
+						<Button onClick={() => handleOpenBudgetBoardModal()}>Budget-Board hinzufügen</Button>
+					</div>
+				) : (
+					<Stack gap="lg">
+						<div>
+							<Text fw={600} size="sm" c="dimmed" mb="xs">
+								Aktiv
+							</Text>
+							{activeBudgetBoards.length === 0 ? (
+								<Text size="sm" c="dimmed">
+									Kein aktives Budget-Board.
+								</Text>
+							) : (
+								<Table withTableBorder>
+									<Table.Thead>
+										<Table.Tr>
+											<Table.Th>Board</Table.Th>
+											<Table.Th>Workspace</Table.Th>
+											<Table.Th>Aktionen</Table.Th>
+										</Table.Tr>
+									</Table.Thead>
+									<Table.Tbody>
+										{activeBudgetBoards.map((board) => (
+											<Table.Tr key={board.board_id}>
+												<Table.Td>
+													<Text fw={500}>{board.board_name}</Text>
+												</Table.Td>
+												<Table.Td>{board.workspace_name}</Table.Td>
+												<Table.Td>
+													<Group gap="xs">
+														<IconButton variant="light" onClick={() => handleOpenBudgetBoardModal(board)}>
+															<Icon name="edit" size={21} />
+														</IconButton>
+														<IconButton variant="light" color="red" onClick={() => handleRemoveBudgetBoard(board)}>
+															<Icon name="delete" size={21} />
+														</IconButton>
+													</Group>
+												</Table.Td>
+											</Table.Tr>
+										))}
+									</Table.Tbody>
+								</Table>
+							)}
+						</div>
+
+						<div>
+							<Text fw={600} size="sm" c="dimmed" mb="xs">
+								Archiviert
+							</Text>
+							{archivedBudgetBoards.length === 0 ? (
+								<Text size="sm" c="dimmed">
+									Keine archivierten Budget-Boards.
+								</Text>
+							) : (
+								<Table withTableBorder>
+									<Table.Thead>
+										<Table.Tr>
+											<Table.Th>Board</Table.Th>
+											<Table.Th>Zeitraum</Table.Th>
+											<Table.Th>Workspace</Table.Th>
+											<Table.Th>Aktionen</Table.Th>
+										</Table.Tr>
+									</Table.Thead>
+									<Table.Tbody>
+										{archivedBudgetBoards.map((board) => (
+											<Table.Tr key={board.board_id}>
+												<Table.Td>
+													<Text fw={500}>{board.board_name}</Text>
+												</Table.Td>
+												<Table.Td>
+													<Badge variant="light">{board.label || "–"}</Badge>
+												</Table.Td>
+												<Table.Td>{board.workspace_name}</Table.Td>
+												<Table.Td>
+													<Group gap="xs">
+														<IconButton variant="light" onClick={() => handleOpenBudgetBoardModal(board)}>
+															<Icon name="edit" size={21} />
+														</IconButton>
+														<IconButton variant="light" color="red" onClick={() => handleRemoveBudgetBoard(board)}>
+															<Icon name="delete" size={21} />
+														</IconButton>
+													</Group>
+												</Table.Td>
+											</Table.Tr>
+										))}
+									</Table.Tbody>
+								</Table>
+							)}
+						</div>
+					</Stack>
+				)}
+			</div>
+
 			{/* Board Picker Modal */}
 			<Modal opened={pickerOpen} onClose={() => setPickerOpen(false)} title="Boards hinzufügen/aktivieren" size="lg">
 				<Stack gap="md">
@@ -709,6 +1071,83 @@ export default function AdminPage() {
 						</Button>
 						<Button onClick={handleSaveRole} loading={savingRole}>
 							{editingRole ? "Rolle aktualisieren" : "Rolle erstellen"}
+						</Button>
+					</Group>
+				</Stack>
+			</Modal>
+
+			{/* Budget-Board Modal */}
+			<Modal opened={budgetBoardModalOpen} onClose={() => setBudgetBoardModalOpen(false)} title={editingBudgetBoardId ? "Budget-Board bearbeiten" : "Budget-Board hinzufügen"} size="lg">
+				<Stack gap="md">
+					{!editingBudgetBoardId && <Select label="Board auswählen" placeholder="Wähle ein monday.com-Board" data={budgetBoardSelectOptions} value={budgetBoardForm.board_id || null} onChange={handleSelectBudgetBoardBoard} searchable />}
+
+					{editingBudgetBoardId && <Input label="Board" value={budgetBoardForm.board_name} disabled />}
+
+					<div>
+						<Text size="sm" fw={500} mb={4}>
+							Status
+						</Text>
+						<SegmentedControl
+							fullWidth
+							value={budgetBoardForm.budget_board_status}
+							onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_board_status: val as "active" | "archived" })}
+							data={[
+								{ label: "Aktiv", value: "active" },
+								{ label: "Archiviert", value: "archived" },
+							]}
+						/>
+					</div>
+
+					{budgetBoardForm.budget_board_status === "archived" && <TextInput label="Zeitraum-Label" placeholder="z. B. 2025" value={budgetBoardForm.label} onChange={(e) => setBudgetBoardForm({ ...budgetBoardForm, label: e.target.value })} />}
+
+					{budgetBoardColumnsLoading ? (
+						<div className="admin-loading">
+							<Loader size="sm" />
+						</div>
+					) : budgetBoardForm.board_id ? (
+						<>
+							<Select
+								label="Verknüpfungsspalte (Job-Items)"
+								description="Die board_relation-Spalte, die verknüpfte Job-Items auflistet"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => BUDGET_RELATION_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.job_relation_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, job_relation_column_id: val || "" })}
+								searchable
+							/>
+
+							<Select
+								label="Budget-Spalte"
+								description="Numbers-, Formula- oder Mirror-Spalte mit dem Budget-Betrag"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.budget_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_column_id: val || "" })}
+								searchable
+							/>
+
+							<Select
+								label="Agenturleistungs-Spalte"
+								description="Numbers-, Formula- oder Mirror-Spalte mit dem Agenturleistungs-Betrag"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => COST_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.cost_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, cost_column_id: val || "" })}
+								searchable
+							/>
+						</>
+					) : (
+						<Text size="sm" c="dimmed">
+							Wähle zuerst ein Board aus, um seine Spalten zu laden.
+						</Text>
+					)}
+
+					<Group justify="flex-end" mt="md">
+						<Button variant="default" onClick={() => setBudgetBoardModalOpen(false)}>
+							Abbrechen
+						</Button>
+						<Button onClick={handleSaveBudgetBoard} loading={savingBudgetBoard}>
+							{editingBudgetBoardId ? "Budget-Board aktualisieren" : "Budget-Board hinzufügen"}
 						</Button>
 					</Group>
 				</Stack>

@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
 import { ApiClient } from "@mondaydotcomorg/api";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import type { MondayGroupInsert } from "@/types/database";
+import { NextRequest, NextResponse } from "next/server";
+
 import { requireAdmin } from "@/lib/monday-auth";
 import { createMondayClient } from "@/lib/monday/client";
+import { supabaseAdmin } from "@/lib/supabase/server";
+
+import type { MondayGroupInsert } from "@/types/database";
 
 /**
  * GET /api/admin/boards/[boardId]/groups

@@ -1,25 +1,27 @@
 // components/dashboard/TimeEntriesTable.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { Flex, Group, Input } from "@mantine/core";
+import { useEffect, useState } from "react";
+
 import { Select, Pagination } from "@/components";
-import { useUserStore } from "@/stores/userStore";
-import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
-import { useMondayStore } from "@/stores/mondayStore";
 import { useToast } from "@/components/ToastProvider";
 import { useHydration } from "@/lib/store-utils";
-import { TimeEntry } from "@/types/time-entry";
 import { secondsToDuration, formatTimeString } from "@/lib/utils";
-import SaveTimerModal from "./SaveTimerModal";
-import EditTimeEntryModal from "./EditTimeEntryModal";
-import EditDraftEntryModal from "./EditDraftEntryModal";
-import BulkActionButtons from "./BulkActionButtons";
-import TimeEntriesToolbar from "./TimeEntriesToolbar";
-import { useFilteredTimeEntries } from "./hooks/useFilteredTimeEntries";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
+import { useUserStore } from "@/stores/userStore";
+import { TimeEntry } from "@/types/time-entry";
+
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getDashboardColumns } from "../shared/time-entries/TimeEntryTableConfigs";
+import BulkActionButtons from "./BulkActionButtons";
+import EditDraftEntryModal from "./EditDraftEntryModal";
+import EditTimeEntryModal from "./EditTimeEntryModal";
+import { useFilteredTimeEntries } from "./hooks/useFilteredTimeEntries";
+import SaveTimerModal from "./SaveTimerModal";
+import TimeEntriesToolbar from "./TimeEntriesToolbar";
 
 /**
  * Props for {@link TimeEntriesTable}.

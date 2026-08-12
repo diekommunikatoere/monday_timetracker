@@ -1,5 +1,6 @@
-import { Button } from "@/components";
 import { Flex } from "@mantine/core";
+
+import { Button } from "@/components";
 
 export default function ErrorState({ message }: { message: string }) {
 	return (

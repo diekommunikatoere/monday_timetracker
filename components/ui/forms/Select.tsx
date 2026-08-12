@@ -3,11 +3,13 @@
 
 "use client";
 
-import React from "react";
 import { Select as MantineSelect } from "@mantine/core";
-import { SelectProps } from "./types";
-import styles from "@/components/styles/ui/forms/Select.module.css";
+import React from "react";
+
 import { defaultClearButtonProps } from "./clearButton";
+import { SelectProps } from "./types";
+
+import styles from "@/components/styles/ui/forms/Select.module.css";
 
 /**
  * Dropdown select built on Mantine's `Select`.

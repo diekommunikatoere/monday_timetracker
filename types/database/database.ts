@@ -284,7 +284,29 @@ export type Database = {
           parent_item_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "monday_item_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "monday_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "monday_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "view_monday_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       monday_webhook: {
         Row: {
@@ -472,6 +494,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "time_entry_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "time_entry_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
@@ -588,7 +617,22 @@ export type Database = {
           parent_item_name: string | null
           updated_at: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "monday_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monday_item_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "view_monday_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -597,7 +641,9 @@ export type Database = {
         Args: {
           p_board_id: string
           p_budget_amount: number
+          p_end_date?: string
           p_item_ids: string[]
+          p_start_date?: string
           p_user_id?: string
         }
         Returns: {
@@ -628,7 +674,12 @@ export type Database = {
         Returns: number
       }
       get_item_time_by_role: {
-        Args: { p_item_ids: string[]; p_user_id?: string }
+        Args: {
+          p_end_date?: string
+          p_item_ids: string[]
+          p_start_date?: string
+          p_user_id?: string
+        }
         Returns: {
           entry_count: number
           role_id: string
@@ -668,8 +719,29 @@ export type Database = {
         }[]
       }
       get_item_total_time: {
-        Args: { p_item_ids: string[]; p_user_id?: string }
+        Args: {
+          p_end_date?: string
+          p_item_ids: string[]
+          p_start_date?: string
+          p_user_id?: string
+        }
         Returns: number
+      }
+      get_items_time_by_role: {
+        Args: {
+          p_end_date?: string
+          p_item_ids: string[]
+          p_start_date?: string
+          p_user_id?: string
+        }
+        Returns: {
+          entry_count: number
+          item_id: string
+          role_id: string
+          role_name: string
+          total_cost: number
+          total_seconds: number
+        }[]
       }
       get_user_time_entries: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
@@ -696,6 +768,18 @@ export type Database = {
           user_id: string
           user_name: string
           user_photo_urls: Json
+        }[]
+      }
+      get_users_time_by_role: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: {
+          entry_count: number
+          hourly_rate: number
+          role_color_hex: string
+          role_id: string
+          role_name: string
+          total_seconds: number
+          user_id: string
         }[]
       }
       purge_trashed_monday_items: {

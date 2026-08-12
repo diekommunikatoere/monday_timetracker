@@ -1,5 +1,6 @@
 .iconButton {
 	border-radius: var(--border-radius-small);
+	border-width: 0;
 
 	&[data-variant="filled"] {
 		background-color: var(--color--button-primary-bg);
@@ -22,6 +23,12 @@
 	&[data-variant="outline"] {
 	}
 	&[data-variant="subtle"] {
+		color: var(--color--text-primary);
+
+		&:hover:not(:disabled):not([data-disabled]) {
+			background-color: var(--color--background-primary-hover);
+			color: var(--color--text-primary);
+		}
 	}
 	&[data-variant="transparent"] {
 	}

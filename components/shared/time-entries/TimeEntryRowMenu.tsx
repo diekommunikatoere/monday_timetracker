@@ -1,10 +1,12 @@
 "use client";
 
 import { Menu } from "@mantine/core";
+
 import { IconButton, Icon } from "@/components";
 import { useUserStore } from "@/stores/userStore";
-import { useTimeEntryPermissions } from "../hooks/useTimeEntryPermissions";
 import { TimeEntry } from "@/types/time-entry";
+
+import { useTimeEntryPermissions } from "../hooks/useTimeEntryPermissions";
 
 /**
  * Props for {@link TimeEntryRowMenu}.

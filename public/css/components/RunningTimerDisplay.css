@@ -1,24 +1,24 @@
-.timer-display {
+.timer--display {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	padding: 4px 4px 4px 32px;
-	background-color: var(--color--background-secondary);
-	border-radius: var(--border-radius-small);
 
-	.timer-time {
+	.timer--time {
 		font-size: 1.4rem;
 		line-height: 1;
 		font-weight: 500;
 		color: var(--color--text-disabled);
 		font-family: var(--font--mono);
+		background-color: var(--color--background-secondary);
+		border-radius: var(--border-radius-small);
 
-		&.active {
+		&.isActive {
 			color: var(--color--text-primary);
 			animation: none;
 		}
 
-		&.paused {
+		&.isPaused {
 			color: var(--color--text-disabled);
 			animation: blink 1.5s step-start infinite;
 		}

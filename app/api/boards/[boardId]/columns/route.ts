@@ -7,9 +7,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+import { requireAdmin } from "@/lib/monday-auth";
 import { getBoardColumns, getColumnsForPurpose, MondayColumnOption } from "@/lib/monday/columnSync";
 import { SyncPurpose } from "@/types/database";
-import { requireAdmin } from "@/lib/monday-auth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {

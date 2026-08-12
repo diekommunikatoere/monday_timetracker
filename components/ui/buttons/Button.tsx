@@ -4,7 +4,9 @@
 "use client";
 
 import { Button as MantineButton } from "@mantine/core";
+
 import { ButtonProps } from "./types";
+
 import styles from "@/components/styles/ui/buttons/Button.module.css";
 
 /**

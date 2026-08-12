@@ -2,7 +2,8 @@
 // Primary button that opens the manual time-entry modal.
 
 import { Tooltip } from "@mantine/core";
-import { Button, Icon } from "@/components";
+
+import { IconButton, Icon } from "@/components";
 
 /**
  * A primary call-to-action button labelled "Zeit eintragen" ("Enter time")
@@ -17,9 +18,9 @@ import { Button, Icon } from "@/components";
 export default function ManualTimeEntryButton(props: { onClick: () => void }) {
 	return (
 		<Tooltip label="Manuell Zeit eintragen" position="top" withArrow>
-			<Button onClick={props.onClick} aria-label="Manuelle Zeiteingabe" aria-controls="manualTimeEntryModal" iconLeft={<Icon name="add" size={18} weight="bold" />}>
-				Zeit eintragen
-			</Button>
+			<IconButton onClick={props.onClick} aria-label="Manuelle Zeiteingabe" aria-controls="manualTimeEntryModal" size="lg">
+				<Icon name="add" size={18} weight="bold" />
+			</IconButton>
 		</Tooltip>
 	);
 }

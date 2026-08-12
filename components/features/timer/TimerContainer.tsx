@@ -2,8 +2,10 @@
 "use client";
 
 import { Box, Flex } from "@mantine/core";
-import { useTimerContext } from "@/contexts/TimerContext";
+
 import { TimerComment, TimerControls, TimerDisplay } from "@/components/features/timer";
+import { useTimerContext } from "@/contexts/TimerContext";
+
 import styles from "@/components/styles/features/timer/TimerContainer.module.css";
 
 /**
@@ -27,7 +29,7 @@ import styles from "@/components/styles/features/timer/TimerContainer.module.css
  *
  * @returns A styled box laying out the timer display, controls, and comment field.
  */
-export function TimerContainer() {
+export function TimerContainer(props) {
 	// Get all timer state and actions from the unified hook
 	const { state, actions, hasSession } = useTimerContext();
 
@@ -43,20 +45,18 @@ export function TimerContainer() {
 	};
 
 	return (
-		<Box className={styles.timerContainer}>
-			<Flex direction="row" align="stretch" justify="stretch" columnGap="xl" rowGap="sm" wrap={"wrap"}>
-				<Flex direction="row" align="stretch" justify="center" gap="lg">
-					{/* Timer Display - shows elapsed time and reset button */}
-					<TimerDisplay elapsedTime={state.elapsedTime} status={state.status} onReset={actions.reset} disabled={!hasSession || state.isSaving} />
+		<Flex className={styles.timerContainer} columnGap={8} rowGap="sm">
+			<Flex className={styles.timerContainerInner} direction="row" align="stretch" justify="center" gap={8}>
+				{/* Timer Display - shows elapsed time and reset button */}
+				<TimerDisplay elapsedTime={state.elapsedTime} status={state.status} onReset={actions.reset} disabled={!hasSession || state.isSaving} />
 
-					{/* Timer Controls - play/pause, save as draft, save buttons */}
-					<TimerControls status={state.status} hasSession={hasSession} hasComment={!!state.comment} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSave={actions.openSaveModal} />
-				</Flex>
-
-				{/* Comment Field */}
-				<TimerComment value={state.comment} onChange={actions.updateComment} disabled={!hasSession} hasSession={hasSession} isSaving={state.isSaving} onSaveAsDraft={actions.saveAsDraft} />
+				{/* Timer Controls - play/pause, save as draft, save buttons */}
+				<TimerControls status={state.status} hasSession={hasSession} hasComment={!!state.comment} isSaving={state.isSaving} onPlayPause={handlePlayPause} onSave={actions.openSaveModal} />
 			</Flex>
-		</Box>
+
+			{/* Comment Field */}
+			<TimerComment value={state.comment} onChange={actions.updateComment} disabled={!hasSession} hasSession={hasSession} isSaving={state.isSaving} onSaveAsDraft={actions.saveAsDraft} />
+		</Flex>
 	);
 }
 

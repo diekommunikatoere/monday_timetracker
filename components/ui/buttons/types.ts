@@ -1,8 +1,8 @@
 // components/ui/buttons/types.ts
 // Shared prop types for the button design-system components.
 
-import React from "react";
 import { ButtonProps as MantineButtonProps, ButtonGroupProps as MantineButtonGroupProps, ActionIconProps as MantineActionIconProps } from "@mantine/core";
+import React from "react";
 
 /**
  * Props for the {@link Button} component.

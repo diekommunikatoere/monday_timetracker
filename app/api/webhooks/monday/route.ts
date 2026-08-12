@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { getItemDetails } from "@/lib/monday";
+
 import { syncItemColumns } from "@/lib/columnSync";
+import { getItemDetails } from "@/lib/monday";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * After an item is trashed or restored, the parent item's budget/time columns in

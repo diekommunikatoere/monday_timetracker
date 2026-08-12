@@ -1,8 +1,10 @@
 // components/dashboard/hooks/useFilteredTimeEntries.ts
 "use client";
 
-import { useMemo } from "react";
 import Fuse from "fuse.js";
+import { useMemo } from "react";
+
+import { endOfDay, startOfDay } from "@/lib/time/calculations";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { TimeEntry } from "@/types/time-entry";
 
@@ -130,18 +132,4 @@ export function useFilteredTimeEntries(): UseFilteredTimeEntriesResult {
 	const pageEntries = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize]);
 
 	return { pageEntries, total, pageCount, filterOptions };
-}
-
-/** Midnight of the given local day — used as the inclusive lower bound of a date-range filter. */
-function startOfDay(date: Date): Date {
-	const d = new Date(date);
-	d.setHours(0, 0, 0, 0);
-	return d;
-}
-
-/** The last instant of the given local day — used as the inclusive upper bound of a date-range filter. */
-function endOfDay(date: Date): Date {
-	const d = new Date(date);
-	d.setHours(23, 59, 59, 999);
-	return d;
 }

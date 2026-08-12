@@ -3,11 +3,13 @@
 
 "use client";
 
-import React from "react";
 import { TreeSelect as MantineTreeSelect } from "@mantine/core";
-import { TreeSelectProps } from "./types";
-import styles from "@/components/styles/ui/forms/TreeSelect.module.css";
+import React from "react";
+
 import { defaultClearButtonProps } from "./clearButton";
+import { TreeSelectProps } from "./types";
+
+import styles from "@/components/styles/ui/forms/TreeSelect.module.css";
 
 /**
  * Tree-structured dropdown built on Mantine's `TreeSelect`.

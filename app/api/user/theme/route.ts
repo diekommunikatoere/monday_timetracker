@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { updateUserThemeByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 

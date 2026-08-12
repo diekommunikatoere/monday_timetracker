@@ -1,40 +1,39 @@
 .wrapper {
 	width: 100%;
-
-	.input {
-		font-size: 0.9rem;
-		border-color: var(--color--border-ui);
-		border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
-		transition: border-color 0.3s ease;
-
-		&::placeholder {
-			color: var(--color--text-placeholder);
-		}
-
-		&[data-disabled] {
-			background-color: var(--color--background-disabled);
-			cursor: not-allowed;
-
-			&::placeholder {
-				color: var(--color--text-disabled);
-			}
-		}
-	}
-
-	.input {
-		&:focus-within {
-			border-color: var(--color--primary);
-		}
-
-		&::placeholder {
-			color: var(--color--text-placeholder);
-		}
-	}
+	flex: 1 1 0;
 }
 
-.timerIconButton {
+.button {
 	aspect-ratio: 1 / 1;
 	height: 100%;
 	width: auto;
 	border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
+}
+
+.commentInput {
+	flex: 1 1 0;
+	min-width: clamp(min(200px, 100vw), 25vw, 450px);
+
+	input {
+		--input-bg: var(--color--input-background);
+		--input-bd: var(--color--input-border);
+		color: var(--color--input-text);
+
+		&::placeholder {
+			color: var(--color--input-placeholder);
+		}
+
+		&:disabled,
+		&[data-disabled="true"] {
+			--input-disabled-bg: var(--color--input-background-disabled);
+			--input-disabled-bd: var(--color--input-border-disabled);
+			color: var(--color--input-text-disabled);
+		}
+	}
+}
+
+.input {
+	&:focus-within {
+		border-color: var(--color--primary);
+	}
 }

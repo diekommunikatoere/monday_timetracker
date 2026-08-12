@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/monday-auth";
+
 import { upsertMondayBoard } from "@/lib/database";
+import { requireAdmin } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * GET /api/admin/boards
@@ -30,11 +31,14 @@ export async function GET(request: NextRequest) {
 		}
 
 		const boardIds = boards?.map((b) => b.board_id) || [];
-		let lastSyncs: Record<string, any> = {};
+		const lastSyncs: Record<string, any> = {};
 		let boardsWithBudgetMapping = new Set<string>();
 
 		if (boardIds.length > 0) {
-			const [{ data: syncLogs }, { data: budgetMappings }] = await Promise.all([supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false }), supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true)]);
+			const [{ data: syncLogs }, { data: budgetMappings }] = await Promise.all([
+				supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false }),
+				supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true),
+			]);
 
 			// Group by board_id and take the first (latest) one
 			if (syncLogs) {

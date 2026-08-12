@@ -4,9 +4,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+
+import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
-import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 
 /**
  * Rehydrates the app's persisted Zustand stores (`timerStore`, `userStore`,

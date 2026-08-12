@@ -1,0 +1,176 @@
+/* components/styles/dashboard/calendar/TimeEntriesCalendar.module.css
+   Mirrors the table's fill-parent-height layout (flex: 1; min-height: 0) so the
+   Schedule scrolls within the widget instead of the page. The Schedule itself
+   follows Mantine's forceColorScheme via design tokens, so this file only adds
+   the draft/parked-entry accent to match the table's draft-row highlight. */
+
+.calendarContainer {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+}
+
+.schedule {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.weekView,
+.dayView {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.viewHeader {
+	padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+
+.viewScrollArea {
+	min-height: 0;
+	height: 100%;
+}
+
+/* Event card */
+
+.event {
+	container-type: size;
+	--event-bg: var(--color--calendar-event-background) !important;
+	--event-hover: var(--color--calendar-event-background-hover) !important;
+	--event-radius: var(--border-radius--sm) !important;
+
+	&[data-timer-state="parked"] {
+		outline: 1px dashed var(--color--border-ui);
+		outline-offset: -1px;
+		--event-bg: var(--color--calendar-event-draft-background) !important;
+		--event-hover: var(--color--calendar-event-draft-background-hover) !important;
+	}
+}
+
+.eventBody {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	width: 100%;
+	height: 100%;
+}
+
+.eventNameContainer {
+	display: flex;
+	width: 100%;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.eventTaskName {
+	font-size: 0.6rem;
+	line-height: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-height: 2em;
+	color: var(--color--calendar-event-text);
+
+	&[data-timer-state="parked"] {
+		color: var(--color--calendar-event-text-draft);
+	}
+}
+
+.eventParentItemName {
+	display: none;
+	font-size: 0.75em;
+	line-height: 1;
+	font-style: italic;
+	font-weight: 500;
+	color: var(--color--calendar-event-text-muted);
+}
+
+.eventComment {
+	display: flex;
+	flex: 0 0 auto;
+}
+
+/* Hover card */
+
+.cardDropdown {
+	background-color: var(--color--calendar-card-background);
+	border-radius: var(--border-radius--md);
+	padding: 8px;
+	width: 100%;
+	max-width: 300px;
+}
+
+.cardInnerContainer {
+	display: flex;
+	flex-shrink: 1;
+	flex-direction: column;
+	width: 100%;
+}
+
+.cardNameContainer {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 0.8rem;
+}
+
+.cardTaskName {
+	font-weight: 600;
+}
+
+.cardParentItemName {
+	font-size: 0.9em;
+	font-style: italic;
+	color: var(--color--text-secondary);
+}
+
+.cardInfoContainer {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.boardName,
+.roleName,
+.comment,
+.duration,
+.startEndTime {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 4px;
+}
+
+.boardName {
+}
+
+.roleName {
+}
+
+@container (min-height: 18px) {
+	.eventBody {
+		align-items: flex-start;
+	}
+}
+
+@container (min-height: 32px) {
+	.eventTaskName {
+		white-space: normal;
+		max-height: none;
+	}
+}
+
+@container (min-height: 32px) and (min-width: 100px) {
+	.eventTaskName {
+		font-size: 0.7rem;
+	}
+
+	.eventParentItemName {
+		display: initial;
+	}
+}

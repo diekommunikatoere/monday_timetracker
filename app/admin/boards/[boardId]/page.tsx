@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { Icon, Input, Logo } from "@/components";
 import { Tabs, NumberInput, Switch, Select, Modal, Loader, Badge, Table, Group, Stack, Text, Flex, Breadcrumbs, Anchor, Progress, Card } from "@mantine/core";
-import { Button, IconButton } from "@/components";
 import { notifications } from "@mantine/notifications";
-import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType, MondayGroup } from "@/types/database";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+
+import { Icon, Input, Logo, ErrorState } from "@/components";
+import { Button, IconButton } from "@/components";
 import { isTimePurpose } from "@/lib/monday/utils";
+import { canAccessRoute } from "@/lib/permissions";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+
+import type { BoardConfig, Role, BoardRoleOverride, ColumnSyncConfig, SyncPurpose, TimeFormat, SyncColumnType, MondayGroup } from "@/types/database";
 
 import "@/public/css/components/AdminPage.css";
 
@@ -48,6 +52,19 @@ interface SyncResult {
 }
 
 export default function BoardConfigPage() {
+	const pathname = usePathname();
+	const mondayIsAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
+
+	if (!canAccessRoute(pathname, { isAdmin: mondayIsAdmin })) {
+		return (
+			<div id="admin-app">
+				<div className="admin-error">
+					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
+				</div>
+			</div>
+		);
+	}
+
 	const params = useParams();
 	const router = useRouter();
 	const boardId = params.boardId as string;
@@ -453,7 +470,14 @@ export default function BoardConfigPage() {
 		}
 	};
 
-	// Bulk sync handler
+	// Bulk sync handler. The API only syncs one page of items per call (a large
+	// board can have far more finalized items than fit in one request's time
+	// budget), so this loops on the returned cursor until the API reports
+	// `done`. Re-calling without a cursor always restarts from the same first
+	// page, so the loop — not just the button — is what makes a full-board sync
+	// actually complete.
+	const MAX_SYNC_PAGES = 100; // safety valve against a runaway loop, not an expected ceiling
+
 	const handleBulkSync = async () => {
 		if (!mondayContext || !sessionToken) {
 			notifications.show({
@@ -465,34 +489,57 @@ export default function BoardConfigPage() {
 		}
 
 		setSyncing(true);
-		setSyncProgress(10);
+		setSyncProgress(0);
 		setSyncResults(null);
 
+		const approxTotal = syncStats?.itemsWithTimeEntries || 0;
+		const accumulatedResults: SyncResult[] = [];
+		let cursor: string | null = null;
+		let totalSynced = 0;
+		let totalFailed = 0;
+		let pages = 0;
+
 		try {
-			const response = await fetch(`/api/sync/board/${boardId}`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"monday-context": JSON.stringify(mondayContext),
-					Authorization: `Bearer ${sessionToken}`,
-				},
-			});
+			for (;;) {
+				pages++;
+				if (pages > MAX_SYNC_PAGES) {
+					throw new Error(`Sync abgebrochen nach ${MAX_SYNC_PAGES} Seiten — bitte erneut starten, um fortzufahren.`);
+				}
 
-			setSyncProgress(90);
+				const url = `/api/sync/board/${boardId}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`;
+				const response = await fetch(url, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"monday-context": JSON.stringify(mondayContext),
+						Authorization: `Bearer ${sessionToken}`,
+					},
+				});
 
-			const data = await response.json();
+				const data = await response.json();
 
-			if (!response.ok) {
-				throw new Error(data.error || "Board-Synchronisierung fehlgeschlagen");
+				if (!response.ok) {
+					throw new Error(data.error || "Board-Synchronisierung fehlgeschlagen");
+				}
+
+				totalSynced += data.itemsSynced || 0;
+				totalFailed += data.itemsFailed || 0;
+				accumulatedResults.push(...(data.results || []));
+				setSyncResults([...accumulatedResults]);
+				setSyncProgress(approxTotal > 0 ? Math.min(99, Math.round(((totalSynced + totalFailed) / approxTotal) * 100)) : Math.min(90, pages * 10));
+
+				// Treat a missing `done` as "stop" rather than loop forever against an
+				// older/unexpected response shape.
+				if (data.done !== false || !data.nextCursor) break;
+				cursor = data.nextCursor;
 			}
 
 			setSyncProgress(100);
-			setSyncResults(data.results || []);
 
 			notifications.show({
-				title: data.success ? "Sync abgeschlossen" : "Sync mit Fehlern abgeschlossen",
-				message: data.message,
-				color: data.success ? "green" : "yellow",
+				title: totalFailed === 0 ? "Sync abgeschlossen" : "Sync mit Fehlern abgeschlossen",
+				message: `${totalSynced} Items synchronisiert${totalFailed > 0 ? `, ${totalFailed} fehlgeschlagen` : ""} (${pages} Seite${pages === 1 ? "" : "n"})`,
+				color: totalFailed === 0 ? "green" : "yellow",
 			});
 
 			// Refresh stats
@@ -1300,7 +1347,15 @@ export default function BoardConfigPage() {
 
 					{editingOverride && <Input label="Rolle" value={editingOverride.role?.name || "Unbekannte Rolle"} disabled />}
 
-					<NumberInput label="Überschreibungs-Stundensatz (€)" description="Dieser Satz wird anstelle des Standards für dieses Board verwendet" placeholder="0.00" value={overrideForm.hourly_rate} onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })} min={0} decimalScale={2} />
+					<NumberInput
+						label="Überschreibungs-Stundensatz (€)"
+						description="Dieser Satz wird anstelle des Standards für dieses Board verwendet"
+						placeholder="0.00"
+						value={overrideForm.hourly_rate}
+						onChange={(val) => setOverrideForm({ ...overrideForm, hourly_rate: Number(val) || 0 })}
+						min={0}
+						decimalScale={2}
+					/>
 
 					<Switch label="Aktiv" description="Legt fest, ob diese Überschreibung angewendet wird" checked={overrideForm.is_enabled} onChange={(e) => setOverrideForm({ ...overrideForm, is_enabled: e.currentTarget.checked })} />
 

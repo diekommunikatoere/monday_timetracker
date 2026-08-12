@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { getItemTimeEntries } from "@/lib/database";
 import { getItemDetails } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 		const { itemId } = await params;
 		const { searchParams } = new URL(request.url);
-		let boardId = searchParams.get("boardId");
+		const boardId = searchParams.get("boardId");
 		const startDate = searchParams.get("startDate") || undefined;
 		const endDate = searchParams.get("endDate") || undefined;
 

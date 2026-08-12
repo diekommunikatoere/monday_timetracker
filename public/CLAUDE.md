@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What's here
 
-Static assets served directly by Next.js: component stylesheets, self-hosted fonts, SVG logos and icons. Design tokens have moved out of this directory — see below.
+Static assets served directly by Next.js: component stylesheets, self-hosted fonts, SVG logos. Design tokens have moved out of this directory — see below. `img/icons/` is a near-empty leftover (one orphaned `add.svg`, unreferenced) — icon rendering moved to a Material Symbols webfont via `components/ui/icons/Icon.tsx` (see `components/CLAUDE.md`), not SVG files here.
 
 ## CSS tokens (not in `public/`)
 
-All design tokens are defined in [components/ui/theme/tokens.ts](../components/ui/theme/tokens.ts) as a Mantine `CSSVariablesResolver`, injected via `MantineProvider` in `app/layout.tsx`. The only CSS file loaded from `public/` is `fonts.css`.
+All design tokens are defined in [components/ui/theme/tokens.ts](../components/ui/theme/tokens.ts) as a Mantine `CSSVariablesResolver`, injected via `MantineProvider` in `app/layout.tsx`. Two CSS files are loaded directly from `public/` in `app/layout.tsx`: `fonts.css` and `mondayThemeMapping.css` (the platform token bridge described below).
 
 Token groups:
 
@@ -36,9 +36,9 @@ Font files live in `fonts/`. To add a new weight: drop the file in the appropria
 
 ## Component CSS (`css/components/`)
 
-Component-scoped stylesheets loaded globally. They use semantic tokens rather than raw values. New component CSS files go here and must be imported from the Next.js app (e.g., in `app/globals.scss` or the component itself).
+Component-scoped stylesheets loaded globally. They use semantic tokens rather than raw values. New component CSS files go here and must be imported from the Next.js app — in practice every current file is imported directly by its component, not via `app/globals.scss` (which has no `@import`s).
 
-`RunningTimerDisplay.css` uses CSS nesting (`&.active`, `&.paused`) — this requires a modern browser or a PostCSS nesting plugin.
+Half of the six files here are now orphaned — the components they styled were renamed or restyled and never dropped the import, then the import itself was later removed: **`RunningTimerDisplay.css`** (the component became `TimerDisplay`), **`TimerActionButtons.css`** (became `TimerControls`), and **`toast.css`** (`ToastProvider` moved to Mantine's own `notifications` styling) all have zero importers. Only `SaveTimerModal.css`, `AdminPage.css`, and `AppHeader.css` are live. Don't take a file's presence here as evidence it's loaded — grep for its importer first.
 
 ## Logos
 

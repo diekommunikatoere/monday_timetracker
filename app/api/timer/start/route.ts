@@ -10,9 +10,10 @@
 // and start a new one" behavior 025 originally shipped, which is meant to return once the
 // multi-timer O2 confirm dialog exists.
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
 	console.log("[API /timer/start] Received start timer request");

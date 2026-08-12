@@ -1,18 +1,20 @@
 // components/sidebar/ItemManualEntryModal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
 import { Group, Flex, Text } from "@mantine/core";
+import { useState, useEffect } from "react";
+
 import { Button, Modal } from "@/components";
-import { useUserStore } from "@/stores/userStore";
-import { useMondayStore } from "@/stores/mondayStore";
-import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useToast } from "@/components/ToastProvider";
-import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
-import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
-import { useRoles } from "../shared/hooks/useRoles";
-import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
+import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
+import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+
+import { useRoles } from "../shared/hooks/useRoles";
+import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
+import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
 
 /**
  * Props for {@link ItemManualEntryModal}.

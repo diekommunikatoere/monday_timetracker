@@ -4,7 +4,9 @@
 "use client";
 
 import React from "react";
+
 import { ModalFooterProps } from "./types";
+
 import styles from "@/components/styles/ui/modals/ModalFooter.module.css";
 
 /**

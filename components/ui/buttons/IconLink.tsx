@@ -4,9 +4,10 @@
 "use client";
 
 import { ActionIcon } from "@mantine/core";
-import styles from "@/components/styles/ui/buttons/IconLink.module.css";
 
 import { IconLinkProps } from "./types";
+
+import styles from "@/components/styles/ui/buttons/IconLink.module.css";
 
 /**
  * Icon-only hyperlink built on Mantine's `ActionIcon` with `component="a"`.

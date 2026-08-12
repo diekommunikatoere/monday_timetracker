@@ -4,9 +4,10 @@
 "use client";
 
 import { ActionIcon } from "@mantine/core";
-import styles from "@/components/styles/ui/buttons/IconGroup.module.css";
 
 import { IconButtonProps } from "./types";
+
+import styles from "@/components/styles/ui/buttons/IconGroup.module.css";
 
 /**
  * Icon-only action button built on Mantine's `ActionIcon`.
@@ -53,7 +54,7 @@ export function IconButton({ children, colorVariant, onClick, href, ...props }: 
 	}
 
 	return (
-		<ActionIcon classNames={{ root: `${styles.iconButton} ${styles[buttonVariant]}` }} onClick={onClick} {...props}>
+		<ActionIcon classNames={{ root: `${styles.iconButton} ${styles[buttonVariant]}${props.className ? ` ${props.className}` : ""}` }} onClick={onClick} {...props}>
 			{children}
 		</ActionIcon>
 	);

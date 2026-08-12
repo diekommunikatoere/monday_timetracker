@@ -3,8 +3,9 @@
 
 "use client";
 
-import { ButtonGroupProps } from "@/components/ui/buttons/types";
 import { Button } from "@mantine/core";
+
+import { ButtonGroupProps } from "@/components/ui/buttons/types";
 
 import styles from "@/components/styles/ui/buttons/ButtonGroup.module.css";
 

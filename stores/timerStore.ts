@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
+
 import type { TimerStore } from "@/types/timer.types";
 
 /** Initial state, also re-applied by `reset()`. */

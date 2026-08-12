@@ -4,6 +4,7 @@
 // to the same IconButton "tertiary" classes from IconGroup.module.css.
 
 import { Icon } from "@/components/ui/icons/Icon";
+
 import buttonStyles from "@/components/styles/ui/buttons/IconGroup.module.css";
 
 /**

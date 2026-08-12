@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { invalidateAllBoardCaches } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 

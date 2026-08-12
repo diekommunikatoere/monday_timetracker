@@ -13,6 +13,7 @@
 // All DB access uses `supabaseAdmin` (service-role, RLS-bypassing).
 
 import { supabaseAdmin } from "@/lib/supabase/server";
+
 import type { Database } from "@/types/database";
 
 /** Raw `user_profiles` table row from the generated DB types. */

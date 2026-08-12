@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { softDeleteTimeEntry } from "@/lib/database";
+
 import { syncAfterDelete } from "@/lib/columnSync";
-import { verifyMondayJwt } from "@/lib/monday-auth";
+import { softDeleteTimeEntry } from "@/lib/database";
 import { getUserProfileByMondayId } from "@/lib/database/users";
+import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
  * POST /api/time-entries/bulk-delete

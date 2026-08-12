@@ -1,18 +1,34 @@
 /* components/features/timer/TimerDisplay.module.css */
+.timerDisplay {
+	width: 100%;
+}
 
-.time {
-	font: var(--font--size-xxl)/var(--font--line-height-xxl) var(--font--mono);
+.timerTime {
+	display: block;
+	width: 100%;
+	height: 100%;
+	font: var(--font--size-xl)/100% var(--font--mono);
 	font-weight: var(--font--weight-bold);
+	text-align: center;
 	color: var(--color--text-disabled);
 	transition: var(--transition);
+	padding: 8px;
+	background-color: var(--color--background-secondary);
+	border-radius: var(--border-radius--md);
+
+	&.isActive {
+		color: var(--color--text-primary);
+	}
+
+	&.isPaused {
+		animation: blink 1.5s step-start infinite;
+	}
 }
 
-.isActive {
-	color: var(--color--text-primary);
-}
-
-.isPaused {
-	animation: blink 1.5s step-start infinite;
+@media (min-width: 900px) {
+	.timerDisplay {
+		width: fit-content;
+	}
 }
 
 @keyframes blink {

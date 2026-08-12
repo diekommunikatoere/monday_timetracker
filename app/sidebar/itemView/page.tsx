@@ -1,18 +1,19 @@
 // app/sidebar/itemView/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { Flex, Loader, Center, Text, Card, Group, Divider } from "@mantine/core";
-import { useMondayStore } from "@/stores/mondayStore";
-import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
+import { useEffect, useState } from "react";
+
+import { ErrorState, LoadingState } from "@/components";
+import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
+import { ItemManualEntryModal } from "@/components/sidebar/ItemManualEntryModal";
 import { ItemSidebarHeader } from "@/components/sidebar/ItemSidebarHeader";
 import { ItemTimeEntriesView } from "@/components/sidebar/ItemTimeEntriesView";
-import { ItemManualEntryModal } from "@/components/sidebar/ItemManualEntryModal";
-import { ErrorState, LoadingState } from "@/components";
-import { TimeEntry } from "@/types/time-entry";
-import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
-import { useUserStore } from "@/stores/userStore";
 import { formatDuration } from "@/lib/utils";
+import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
+import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+import { TimeEntry } from "@/types/time-entry";
 
 export default function ItemViewPage() {
 	const userId = useUserStore((state) => state.supabaseUser?.id);

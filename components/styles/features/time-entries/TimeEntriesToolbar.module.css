@@ -34,22 +34,42 @@
  */
 .searchGroup {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto; /* search | toggle */
+	grid-template-columns: minmax(0, 1fr); /* search | toggle */
+	grid-template-rows: minmax(0, 1fr); /* reset button drops to its own row when narrow */
+	grid-auto-flow: row; /* reset button drops to its own row when narrow */
 	align-items: center;
 	gap: var(--mantine-spacing-sm);
 	width: 100%;
-	max-width: 500px;
+	max-width: 750px;
+
+	.mantine-TextInput-root {
+		min-width: 0; /* shrink to the grid track instead of overflowing */
+		max-width: 350px;
+	}
+}
+
+.buttonGroup {
+	display: flex;
+	flex-direction: row;
+	gap: var(--mantine-spacing-sm);
+	grid-column: 1 / 2;
+	grid-row: 2;
+	height: 100%;
+}
+
+.todayButton {
 }
 
 /* Reset button: its own full-width row below, at natural width, left-aligned. */
 .resetButton {
-	grid-column: 1 / -1;
-	justify-self: start;
+	width: 100%;
 }
 
 /* Filters panel. */
 .filtersCollapse {
 	width: 100%;
+	grid-column: 2;
+	grid-row: 2;
 }
 
 /*
@@ -72,26 +92,26 @@
 	min-width: 0; /* shrink to the grid track instead of overflowing */
 }
 
-@container time-entries-toolbar (min-width: 1200px) {
-	.toolbar {
-		flex-direction: row;
-		align-items: center;
-		gap: var(--mantine-spacing-sm);
-	}
-
-	/*
-	 * Side-by-side: fixed-width search column so the input never resizes when the
-	 * reset button appears; toggle and reset sit inline on the same row.
-	 */
+@container time-entries-toolbar (min-width: 750px) {
 	.searchGroup {
-		grid-template-columns: 500px auto auto; /* search | toggle | reset */
+		grid-template-columns: 400px auto; /* search | toggle | reset */
+		grid-template-rows: 1fr; /* reset button sits inline with the toggle */
 		width: auto;
 		flex: 0 0 auto; /* don't shrink when the filters panel expands beside it */
 		max-width: none; /* don't constrain to 500px when the toolbar is wider */
 	}
 
-	.resetButton {
-		grid-column: auto;
+	.buttonGroup {
+		grid-column: 2;
+		grid-row: 1;
+	}
+}
+
+@container time-entries-toolbar (min-width: 1200px) {
+	.toolbar {
+		/* flex-direction: row;
+		align-items: center; */
+		gap: var(--mantine-spacing-sm);
 	}
 
 	.filtersCollapse {

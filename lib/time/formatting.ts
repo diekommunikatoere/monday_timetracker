@@ -44,7 +44,7 @@ export function formatDuration(seconds: number): string {
 		parts.push(`${remainingSeconds} s`);
 	}
 
-	return parts.join(" ") || "0 s";
+	return parts.join(" ") || "0 m";
 }
 
 /**

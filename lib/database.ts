@@ -1,5 +1,5 @@
 // lib/database.ts
-// Core data-access layer for time entries, timer segments, and the
+// Core data-access layer for time entries and the
 // monday.com dimension tables (monday_board, monday_item).
 //
 // Architecture notes:
@@ -15,13 +15,15 @@
 //     The cleanup cron drains that queue. Undo cancels the Redis key within
 //     the 5 s window.
 
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { cacheHelper } from "@/lib/redis";
 import { SELF_EDITABLE_TIME_ENTRY_FIELDS } from "@/lib/permissions";
-import type { Database } from "@/types/database";
+import { cacheHelper } from "@/lib/redis";
+import { supabaseAdmin } from "@/lib/supabase/server";
 import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
-import { roundDuration } from "./utils";
+
 import { fetchAllWithRange, fetchAllWithKeyset } from "./supabase/pagination";
+import { roundDuration } from "./utils";
+
+import type { Database } from "@/types/database";
 
 /** Raw `time_entry` table row from the generated DB types. */
 type TimeEntry = Database["public"]["Tables"]["time_entry"]["Row"];
@@ -31,8 +33,6 @@ type TimeEntryWithRole = FrontendTimeEntry;
 type TimeEntryInsert = Database["public"]["Tables"]["time_entry"]["Insert"];
 /** Update shape for `time_entry`. */
 type TimeEntryUpdate = Database["public"]["Tables"]["time_entry"]["Update"];
-/** Insert shape for `timer_segment`. */
-type TimerSegmentInsert = Database["public"]["Tables"]["timer_segment"]["Insert"];
 
 // ============================================
 // Dimension Management Helpers

@@ -2,17 +2,19 @@
 
 import "@mantine/core/styles.css";
 import "@mantine/dates/styles.css";
+import "@mantine/schedule/styles.css";
 import "@mantine/notifications/styles.css";
 import "@/public/css/mondayThemeMapping.css";
 import "@/public/css/fonts.css";
-import { themeTokens } from "@/components/ui/theme/tokens";
 import "./globals.scss";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ToastProvider } from "@/components/ToastProvider";
-import { StoreProvider } from "@/components/StoreProvider";
-import { TimerProvider } from "@/components/features/timer/TimerProvider";
 import { createTheme, MantineProvider, ColorSchemeScript, colorsTuple } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { TimerProvider } from "@/components/features/timer/TimerProvider";
+import { StoreProvider } from "@/components/StoreProvider";
+import { ToastProvider } from "@/components/ToastProvider";
+import { themeTokens } from "@/components/ui/theme/tokens";
 import { useUserStore } from "@/stores/userStore";
 
 const theme = createTheme({

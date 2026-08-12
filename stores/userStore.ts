@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useMondayStore } from "./mondayStore";
+
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
+
+import { useMondayStore } from "./mondayStore";
 
 /** Raw theme value as reported by the monday context. */
 export type MondayTheme = "black" | "light" | "dark";
@@ -46,6 +48,8 @@ type MondayUser = {
 type SupabaseUser = {
 	id: string;
 	email: string;
+	team_ids?: string[] | null;
+	is_admin?: boolean | null;
 } | null;
 
 /**
@@ -68,12 +72,16 @@ interface UserState {
 	/** Theme actually rendered, derived from `theme`. */
 	appTheme: AppTheme;
 
+	/** Dashboard view mode: table or calendar. */
+	dashboardViewMode: "table" | "calendar";
+
 	authenticated: boolean;
 
 	setMondayUser: (user: UserState["mondayUser"]) => void;
 	setSupabaseUser: (user: UserState["supabaseUser"]) => void;
 	/** Flip light/dark, update derived `appTheme`, and persist to the DB via `/api/user/theme`. */
-	toggleTheme: () => Promise<void>;
+	setTheme: (newTheme: AppTheme) => Promise<void>;
+	setDashboardViewMode: (newMode: "table" | "calendar") => void;
 }
 
 export const useUserStore = create<UserState>()(
@@ -83,6 +91,7 @@ export const useUserStore = create<UserState>()(
 			supabaseUser: null,
 			theme: "black",
 			appTheme: "dark",
+			dashboardViewMode: "table",
 			authenticated: false,
 
 			/**
@@ -122,16 +131,17 @@ export const useUserStore = create<UserState>()(
 				const user = {
 					id: useUserStore.getState().mondayUser!.id,
 					email: useUserStore.getState().mondayUser!.email || "",
+					is_admin: useUserStore.getState().mondayUser!.isAdmin || false,
 				};
 				set({ supabaseUser: user });
 			},
-			toggleTheme: async () => {
+			setTheme: async (newTheme: AppTheme) => {
 				const currentTheme = get().theme;
-				const newTheme: MondayTheme = currentTheme === "light" ? "dark" : "light";
-				const appTheme = mapMondayThemeToAppTheme(newTheme);
+				const mondayTheme: MondayTheme = newTheme === "light" ? "light" : "dark";
+				const appTheme = mapMondayThemeToAppTheme(mondayTheme);
 
 				// Update local state synchronously
-				set({ theme: newTheme, appTheme });
+				set({ theme: mondayTheme, appTheme });
 
 				// Persist to database asynchronously
 				try {
@@ -151,11 +161,15 @@ export const useUserStore = create<UserState>()(
 							"monday-context": JSON.stringify(context),
 							Authorization: `Bearer ${sessionToken}`,
 						},
-						body: JSON.stringify({ theme: newTheme }),
+						body: JSON.stringify({ theme: mondayTheme }),
 					});
 				} catch (error) {
 					console.error("Failed to persist theme change:", error);
 				}
+			},
+			setDashboardViewMode: (newMode: "table" | "calendar") => {
+				set({ dashboardViewMode: newMode });
+				console.log(`Dashboard view mode set to: ${newMode}`);
 			},
 			/**
 			 * Find or create the Supabase user for the current monday session via

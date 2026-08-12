@@ -134,3 +134,97 @@ export const secondsToDuration = (seconds: number): string => {
 	const minutes = Math.floor((seconds % 3600) / 60);
 	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
+
+/**
+ * Midnight of the given local day — the inclusive lower bound of a date-range
+ * filter. Shared by `useFilteredTimeEntries` (client-side filtering) and
+ * `abrechnungStore` (server-side rollup range), so both interpret a picked
+ * "start day" identically.
+ *
+ * @param date - Any `Date`; only its local calendar day is used.
+ * @returns A new `Date` at `00:00:00.000` local time on that day.
+ */
+export const startOfDay = (date: Date): Date => {
+	const d = new Date(date);
+	d.setHours(0, 0, 0, 0);
+	return d;
+};
+
+/**
+ * The last instant of the given local day — the inclusive upper bound of a
+ * date-range filter. See {@link startOfDay}.
+ *
+ * @param date - Any `Date`; only its local calendar day is used.
+ * @returns A new `Date` at `23:59:59.999` local time on that day.
+ */
+export const endOfDay = (date: Date): Date => {
+	const d = new Date(date);
+	d.setHours(23, 59, 59, 999);
+	return d;
+};
+
+/**
+ * Monday 00:00:00.000 local time of the ISO week containing `date` — the
+ * inclusive lower bound of a work-week filter. Used by `auswertungStore` to
+ * turn the selected week into a server-side rollup range (see
+ * `get_users_time_by_role` in `supabase/migrations/041_users_time_by_role.sql`).
+ *
+ * ISO weeks start on Monday, matching German convention and the
+ * `withWeekNumbers` numbering already shown by `DatePicker`.
+ *
+ * @param date - Any `Date`; only its local calendar day is used.
+ * @returns A new `Date` at `00:00:00.000` local time on that week's Monday.
+ */
+export const startOfISOWeek = (date: Date): Date => {
+	const d = startOfDay(date);
+	const isoDayIndex = (d.getDay() + 6) % 7; // Mon=0 .. Sun=6
+	d.setDate(d.getDate() - isoDayIndex);
+	return d;
+};
+
+/**
+ * The last instant of the ISO week containing `date` — the inclusive upper
+ * bound of a work-week filter. See {@link startOfISOWeek}.
+ *
+ * @param date - Any `Date`; only its local calendar day is used.
+ * @returns A new `Date` at `23:59:59.999` local time on that week's Sunday.
+ */
+export const endOfISOWeek = (date: Date): Date => {
+	const monday = startOfISOWeek(date);
+	const sunday = new Date(monday);
+	sunday.setDate(sunday.getDate() + 6);
+	return endOfDay(sunday);
+};
+
+/**
+ * Adds (or, with a negative count, subtracts) whole weeks to a date. Used by
+ * the Auswertung toolbar's ◀ / ▶ week stepper.
+ *
+ * @param date  - The base date.
+ * @param weeks - Number of weeks to add; negative steps backwards.
+ * @returns A new `Date` shifted by `weeks * 7` days.
+ */
+export const addWeeks = (date: Date, weeks: number): Date => {
+	const d = new Date(date);
+	d.setDate(d.getDate() + weeks * 7);
+	return d;
+};
+
+/**
+ * ISO 8601 week number and week-year for `date` (the "KW 31" label convention).
+ * Uses the standard Thursday method: shift to the Thursday of the same ISO
+ * week, then count weeks from that year's first Thursday. The returned `year`
+ * can differ from `date.getFullYear()` for dates in the first/last days of
+ * January/December that belong to an adjacent ISO week-year.
+ *
+ * @param date - Any `Date`.
+ * @returns `{ week, year }` — `week` is 1–53, `year` is the ISO week-year.
+ */
+export const getISOWeek = (date: Date): { week: number; year: number } => {
+	const d = startOfDay(date);
+	const isoDayIndex = (d.getDay() + 6) % 7; // Mon=0 .. Sun=6
+	d.setDate(d.getDate() - isoDayIndex + 3); // Thursday of this ISO week
+	const isoYearStart = new Date(d.getFullYear(), 0, 1);
+	const week = Math.ceil(((d.getTime() - isoYearStart.getTime()) / 86400000 + 1) / 7);
+	return { week, year: d.getFullYear() };
+};

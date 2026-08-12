@@ -3,9 +3,9 @@
 
 "use client";
 
-import React, { createContext, useContext, useCallback } from "react";
-import { notifications } from "@mantine/notifications";
 import { Button } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import React, { createContext, useContext, useCallback } from "react";
 
 /**
  * Visual severity of a toast. Maps to a Mantine notification `color`:

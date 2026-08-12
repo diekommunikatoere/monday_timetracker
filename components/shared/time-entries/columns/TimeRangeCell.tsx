@@ -1,5 +1,6 @@
 // components/shared/time-entries/columns/TimeRangeCell.tsx
 import { Text } from "@mantine/core";
+
 import { TimeEntry } from "@/types/time-entry";
 
 /**

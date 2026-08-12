@@ -80,6 +80,53 @@ export interface GetItemTimeByRoleResult {
 	role_id: string;
 	role_name: string;
 	total_seconds: number;
+	total_cost: number;
+	entry_count: number;
+}
+
+/**
+ * One row from `get_items_time_by_role` — like {@link GetItemTimeByRoleResult}, but grouped
+ * per item (not collapsed across the whole `p_item_ids` set), and with `total_cost` actually
+ * populated (tracked time × effective hourly rate, same expression as `calculate_remaining_budget`).
+ * A job item's subitem time is attributed to the job item, matching the other rollup RPCs.
+ *
+ * @property item_id       - The (job) item this row's time is attributed to.
+ * @property role_id       - `null` for role-less time entries — still counted in `total_seconds`/
+ *                            `total_cost` but excluded from any per-role breakdown by the caller.
+ * @property total_seconds - Summed duration for this item+role, in **seconds**.
+ * @property total_cost    - Tracked time × effective hourly rate (currency units); `0` for role-less rows.
+ * @property entry_count   - Number of time entries contributing to the total.
+ */
+export interface GetItemsTimeByRoleResult {
+	item_id: string;
+	role_id: string | null;
+	role_name: string | null;
+	total_seconds: number;
+	total_cost: number;
+	entry_count: number;
+}
+
+/**
+ * One row from `get_users_time_by_role` — time tracked by a user, grouped by role.
+ * Powers the Auswertung view (`lib/auswertung.ts`), which classifies each row as
+ * billable/non-billable/role-less from `hourly_rate`/`role_id` itself rather than
+ * from a column this RPC returns — there's no per-row classification flag.
+ *
+ * @property role_id        - `null` for role-less time entries — still counted in a
+ *                             user's total but excluded from any per-role breakdown by the caller.
+ * @property hourly_rate    - The role's **global** `role.hourly_rate` (not the per-board
+ *                             effective rate `get_items_time_by_role` uses) — `null` for
+ *                             role-less rows. `0`/`null` means non-billable.
+ * @property total_seconds  - Summed duration for this user+role, in **seconds**.
+ * @property entry_count    - Number of time entries contributing to the total.
+ */
+export interface GetUsersTimeByRoleResult {
+	user_id: string;
+	role_id: string | null;
+	role_name: string | null;
+	role_color_hex: string | null;
+	hourly_rate: number | null;
+	total_seconds: number;
 	entry_count: number;
 }
 

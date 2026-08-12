@@ -3,8 +3,8 @@
 // Auth identity comes from the monday.com JWT session; `currentUserId` here is
 // the internal Supabase `user_profiles.id`, not the monday user id.
 
-import { TimeEntry } from "@/types/time-entry";
 import { Database } from "@/types/database";
+import { TimeEntry } from "@/types/time-entry";
 
 type TimeEntryColumn = keyof Database["public"]["Tables"]["time_entry"]["Update"];
 

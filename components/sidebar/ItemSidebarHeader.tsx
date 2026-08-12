@@ -3,9 +3,10 @@
 "use client";
 
 import { Flex, Tooltip } from "@mantine/core";
+
 import { Logo, Button, Icon } from "@/components";
-import { useUserStore } from "@/stores/userStore";
 import { APP_VERSION } from "@/lib/version";
+import { useUserStore } from "@/stores/userStore";
 
 /**
  * Props for {@link ItemSidebarHeader}.

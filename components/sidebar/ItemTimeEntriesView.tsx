@@ -1,18 +1,20 @@
 // components/sidebar/ItemTimeEntriesView.tsx
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
 import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accordion, Avatar } from "@mantine/core";
+import { useEffect, useState, useMemo } from "react";
+
 import { Icon } from "@/components";
+import { useToast } from "@/components/ToastProvider";
+import { formatDuration } from "@/lib/utils";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
-import { useUserStore } from "@/stores/userStore";
 import { useMondayStore } from "@/stores/mondayStore";
+import { useUserStore } from "@/stores/userStore";
+import { TimeEntry } from "@/types/time-entry";
+
+import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getSidebarColumns } from "../shared/time-entries/TimeEntryTableConfigs";
-import { formatDuration } from "@/lib/utils";
-import { TimeEntry } from "@/types/time-entry";
-import { useToast } from "@/components/ToastProvider";
-import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 
 import styles from "@/components/styles/features/sidebar/ItemTimeEntriesView.module.css";
 
