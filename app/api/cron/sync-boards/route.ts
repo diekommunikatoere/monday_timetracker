@@ -17,7 +17,15 @@ export async function GET(request: NextRequest) {
 		// 1. Verify cron secret (if set)
 		const authHeader = request.headers.get("authorization");
 		const cronSecret = process.env.CRON_SECRET;
-		if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+
+		// Check if cron secret is set
+		if (!cronSecret) {
+			console.error("[Sync Boards] CRON_SECRET is not set in environment variables.");
+			return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 401 });
+		}
+
+		// Check if authorization header matches the cron secret
+		if (authHeader !== `Bearer ${cronSecret}`) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 

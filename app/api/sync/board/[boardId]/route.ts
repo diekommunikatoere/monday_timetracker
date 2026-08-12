@@ -4,6 +4,7 @@ import { syncItemColumns, getBoardConfig } from "@/lib/columnSync";
 import { getMondayContext } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { fetchAllWithKeyset } from "@/lib/supabase/pagination";
 
 interface Props {
 	params: Promise<{
@@ -11,9 +12,24 @@ interface Props {
 	}>;
 }
 
+// Cap how many items a single call will attempt, so a board with thousands of
+// items can't make one call run long enough to hit a platform/request timeout.
+const MAX_PAGE_SIZE = 300;
+const DEFAULT_PAGE_SIZE = 100;
+
 /**
  * POST /api/sync/board/:boardId
- * Bulk sync all items on a board that have time entries
+ * Bulk sync one page of items on a board that have time entries, ordered by
+ * `item_id` and resumed via `?cursor=<lastItemId>`.
+ *
+ * A board can have far more finalized items than fit in a single request's
+ * time budget, so this only ever processes up to `?limit=` (default
+ * {@link DEFAULT_PAGE_SIZE}, max {@link MAX_PAGE_SIZE}) items per call. The
+ * response's `done`/`nextCursor` tell the caller whether to call again —
+ * see `handleBulkSync` in `app/admin/boards/[boardId]/page.tsx` for the loop
+ * that drives this. Without looping, a large board will only ever get its
+ * first page synced no matter how many times this is called, since re-calling
+ * without a cursor always restarts from the same beginning.
  */
 export async function POST(request: NextRequest, { params }: Props) {
 	try {
@@ -48,29 +64,91 @@ export async function POST(request: NextRequest, { params }: Props) {
 			return NextResponse.json({ error: "Sync is disabled for this board" }, { status: 400 });
 		}
 
-		console.log(`[BulkSync] Starting bulk sync for board ${boardId}`);
+		const { searchParams } = new URL(request.url);
+		const cursor = searchParams.get("cursor"); // last item_id from the previous page, exclusive
+		const requestedLimit = parseInt(searchParams.get("limit") || "", 10);
+		const pageSize = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
 
-		// Get all unique item IDs that have time entries on this board
-		const { data: itemIds, error: itemError } = await supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("timer_state", "finalized").not("item_id", "is", null);
+		console.log(`[BulkSync] Starting bulk sync page for board ${boardId} (cursor=${cursor ?? "start"}, target=${pageSize} items)`);
 
-		if (itemError) {
-			console.error("Error fetching items:", itemError);
-			return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
+		// Collect one page of DISTINCT item IDs, ordered by item_id so a cursor can
+		// resume exactly where this page left off. A single item can have many rows
+		// (e.g. boards backfilled from the 7pace import average ~13 rows/item), so
+		// this walks row-chunks and keeps going until `pageSize` distinct items are
+		// found — capping by raw row count alone would under-fill pages on
+		// row-heavy boards and turn what should be ~25 calls into 100+.
+		// ROW_SCAN_CAP bounds worst-case work if items are pathologically row-heavy.
+		const ROW_SCAN_CHUNK = 1000; // Supabase's per-query cap
+		const ROW_SCAN_CAP = 20000;
+
+		const uniqueItemIds: string[] = [];
+		const seenItemIds = new Set<string>();
+		let scanCursor = cursor;
+		let rowsScanned = 0;
+		let tableExhausted = false;
+
+		while (uniqueItemIds.length < pageSize && rowsScanned < ROW_SCAN_CAP) {
+			let rowQuery = supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("timer_state", "finalized").not("item_id", "is", null).order("item_id", { ascending: true }).limit(ROW_SCAN_CHUNK);
+			if (scanCursor) {
+				rowQuery = rowQuery.gt("item_id", scanCursor);
+			}
+			const { data: rows, error: rowError } = await rowQuery;
+
+			if (rowError) {
+				console.error("Error fetching items:", rowError);
+				return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
+			}
+			if (!rows || rows.length === 0) {
+				tableExhausted = true;
+				break;
+			}
+
+			rowsScanned += rows.length;
+			for (const row of rows) {
+				if (row.item_id && !seenItemIds.has(row.item_id)) {
+					seenItemIds.add(row.item_id);
+					uniqueItemIds.push(row.item_id);
+				}
+			}
+			scanCursor = rows[rows.length - 1].item_id;
+
+			if (rows.length < ROW_SCAN_CHUNK) {
+				tableExhausted = true;
+				break;
+			}
 		}
 
-		// Get unique item IDs
-		const uniqueItemIds = [...new Set(itemIds?.map((row) => row.item_id).filter(Boolean) as string[])];
+		// A single ROW_SCAN_CHUNK can itself contain well over `pageSize` distinct
+		// items (row density varies across the item_id space), so trim back to the
+		// target and resume from the exact cutoff — otherwise a page could balloon
+		// past its intended sync workload and risk the very timeout this is meant
+		// to avoid. Only "done" once the underlying row scan truly ran out; hitting
+		// the item-count target (before or after trimming) or the row-scan safety
+		// cap both mean more items remain.
+		let pageExhausted: boolean;
+		let nextCursor: string | null;
+		if (uniqueItemIds.length > pageSize) {
+			nextCursor = uniqueItemIds[pageSize - 1];
+			uniqueItemIds.length = pageSize;
+			pageExhausted = false;
+		} else {
+			pageExhausted = tableExhausted;
+			nextCursor = pageExhausted ? null : scanCursor;
+		}
 
 		if (uniqueItemIds.length === 0) {
 			return NextResponse.json({
 				success: true,
-				message: "No items with time entries found on this board",
+				message: cursor ? "No more items to sync on this board" : "No items with time entries found on this board",
 				itemsSynced: 0,
+				itemsFailed: 0,
 				results: [],
+				done: true,
+				nextCursor: null,
 			});
 		}
 
-		console.log(`[BulkSync] Found ${uniqueItemIds.length} unique items to sync`);
+		console.log(`[BulkSync] Found ${uniqueItemIds.length} unique items in this page (done=${pageExhausted})`);
 
 		// Sync each item (with rate limiting to avoid API overload)
 		const results: Array<{
@@ -117,14 +195,16 @@ export async function POST(request: NextRequest, { params }: Props) {
 		const successCount = results.filter((r) => r.success).length;
 		const failureCount = results.filter((r) => !r.success).length;
 
-		console.log(`[BulkSync] Completed: ${successCount} succeeded, ${failureCount} failed`);
+		console.log(`[BulkSync] Page completed: ${successCount} succeeded, ${failureCount} failed, done=${pageExhausted}`);
 
 		return NextResponse.json({
 			success: failureCount === 0,
-			message: `Synced ${successCount} of ${uniqueItemIds.length} items`,
+			message: `Synced ${successCount} of ${uniqueItemIds.length} items in this page` + (pageExhausted ? " — board fully synced" : " (more items remain — continue with nextCursor)"),
 			itemsSynced: successCount,
 			itemsFailed: failureCount,
 			results,
+			done: pageExhausted,
+			nextCursor,
 		});
 	} catch (error) {
 		console.error("Error in bulk sync endpoint:", error);
@@ -172,14 +252,19 @@ export async function GET(request: NextRequest, { params }: Props) {
 		const successCount = stats?.filter((s) => s.success).length || 0;
 		const failureCount = stats?.filter((s) => !s.success).length || 0;
 
-		// Get unique items synced
-		const { data: itemCount, error: itemCountError } = await supabaseAdmin.from("time_entry").select("item_id").eq("board_id", boardId).eq("timer_state", "finalized").not("item_id", "is", null);
+		// Get unique items synced. A board can have far more than 1000 finalized
+		// entries (Supabase's per-query cap), so this paginates via `id` (unique)
+		// rather than a plain .select() — otherwise this stat silently undercounts
+		// on larger boards.
+		const itemCountResult = await fetchAllWithKeyset(supabaseAdmin, "time_entry", "id", "id, item_id", {
+			eq: { board_id: boardId, timer_state: "finalized" },
+		});
 
-		if (itemCountError) {
-			console.error("Error fetching item count:", itemCountError);
+		if (!itemCountResult.success) {
+			console.error("Error fetching item count:", itemCountResult.error);
 		}
 
-		const uniqueItems = [...new Set(itemCount?.map((row) => row.item_id).filter(Boolean))];
+		const uniqueItems = [...new Set(itemCountResult.data.map((row: { item_id: string | null }) => row.item_id).filter(Boolean))];
 
 		return NextResponse.json({
 			boardId,
