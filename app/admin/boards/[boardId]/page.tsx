@@ -830,7 +830,7 @@ export default function BoardConfigPage() {
 					<Button leftSection={<Icon name="chevron_left" size={21} />} onClick={() => router.back()}>
 						Zurück
 					</Button>
-					<Logo size={{ width: 150, height: 26 }} style="brand" loading="eager" />
+					<Logo size={{ height: 21 }} style="brand" loading="eager" />
 				</Flex>
 			</header>
 

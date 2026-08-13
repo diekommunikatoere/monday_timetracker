@@ -756,7 +756,7 @@ export default function AdminPage() {
 			<div id="admin-app">
 				<header className="admin-header">
 					<Flex align="center" gap={16}>
-						<Logo size={{ width: 180, height: 32 }} style="brand" />
+						<Logo size={{ height: 21 }} style="brand" loading="eager" />
 						<Text size="lg" fw={600} c="dimmed">
 							/ Admin Settings
 						</Text>
@@ -801,9 +801,12 @@ export default function AdminPage() {
 		<div id="admin-app">
 			<header className="admin-header">
 				<Flex align="center" gap={16}>
-					<Logo size={{ height: 27 }} style="brand" />
+					<Logo size={{ height: 21 }} style="brand" loading="eager" />
 					<Text size="lg" fw={600} c="dimmed">
-						/ Admin-Einstellungen
+						/
+					</Text>
+					<Text size="lg" fw={600} c="dimmed">
+						Admin-Verwaltung
 					</Text>
 				</Flex>
 			</header>
@@ -818,7 +821,7 @@ export default function AdminPage() {
 						<p className="admin-section-description">Boards für die Zeiterfassung freigeben und ihre Reihenfolge in der Board-Auswahl festlegen.</p>
 					</div>
 					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={handleOpenPicker}>
-						Board hinzufügen/aktivieren
+						Board hinzufügen
 					</Button>
 				</div>
 
@@ -830,7 +833,7 @@ export default function AdminPage() {
 					<div className="empty-state">
 						<div className="empty-state-title">Keine Boards aktiviert</div>
 						<p className="empty-state-description">Aktivieren Sie ein Board, damit es in der Zeiterfassung ausgewählt werden kann.</p>
-						<Button onClick={handleOpenPicker}>Board hinzufügen/aktivieren</Button>
+						<Button onClick={handleOpenPicker}>Board hinzufügen</Button>
 					</div>
 				) : (
 					<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -909,7 +912,7 @@ export default function AdminPage() {
 						<p className="admin-section-description">Boards mit Budget-Items (z. B. „Retainer") für die Abrechnungs-Ansicht konfigurieren. Jedes Jahr wird ein archiviertes Board neu hinzugefügt, sobald Budget-Items ans Archiv-Board verschoben werden.</p>
 					</div>
 					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBudgetBoardModal()}>
-						Budget-Board hinzufügen
+						Board hinzufügen
 					</Button>
 				</div>
 
@@ -921,7 +924,7 @@ export default function AdminPage() {
 					<div className="empty-state">
 						<div className="empty-state-title">Keine Budget-Boards konfiguriert</div>
 						<p className="empty-state-description">Füge das Budget-Board (z. B. „Retainer") hinzu, um die Abrechnungs-Ansicht zu befüllen.</p>
-						<Button onClick={() => handleOpenBudgetBoardModal()}>Budget-Board hinzufügen</Button>
+						<Button onClick={() => handleOpenBudgetBoardModal()}>Board hinzufügen</Button>
 					</div>
 				) : (
 					<Stack gap="lg">
@@ -1015,7 +1018,7 @@ export default function AdminPage() {
 			</div>
 
 			{/* Board Picker Modal */}
-			<Modal opened={pickerOpen} onClose={() => setPickerOpen(false)} title="Boards hinzufügen/aktivieren" size="lg">
+			<Modal opened={pickerOpen} onClose={() => setPickerOpen(false)} title="Boards hinzufügen" size="lg">
 				<Stack gap="md">
 					<Input placeholder="Board suchen…" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} leftSection={<Icon name="search" size={18} />} clearable onClear={() => setPickerSearch("")} />
 
@@ -1087,7 +1090,7 @@ export default function AdminPage() {
 			</Modal>
 
 			{/* Budget-Board Modal */}
-			<Modal opened={budgetBoardModalOpen} onClose={() => setBudgetBoardModalOpen(false)} title={editingBudgetBoardId ? "Budget-Board bearbeiten" : "Budget-Board hinzufügen"} size="lg">
+			<Modal opened={budgetBoardModalOpen} onClose={() => setBudgetBoardModalOpen(false)} title={editingBudgetBoardId ? "Board bearbeiten" : "Board hinzufügen"} size="lg">
 				<Stack gap="md">
 					{!editingBudgetBoardId && <Select label="Board auswählen" placeholder="Wähle ein monday.com-Board" data={budgetBoardSelectOptions} value={budgetBoardForm.board_id || null} onChange={handleSelectBudgetBoardBoard} searchable />}
 
@@ -1157,7 +1160,7 @@ export default function AdminPage() {
 							Abbrechen
 						</Button>
 						<Button onClick={handleSaveBudgetBoard} loading={savingBudgetBoard}>
-							{editingBudgetBoardId ? "Budget-Board aktualisieren" : "Budget-Board hinzufügen"}
+							{editingBudgetBoardId ? "Board aktualisieren" : "Board hinzufügen"}
 						</Button>
 					</Group>
 				</Stack>
