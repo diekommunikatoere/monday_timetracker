@@ -30,12 +30,14 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Failed to fetch boards" }, { status: 500 });
 		}
 
-		const boards = (data || []).map((row: any) => ({
-			value: row.board_id,
-			label: row.monday_board?.name || row.board_id,
-			jobsSelectable: row.settings?.["jobs_selectable"] ?? false,
-			sortOrder: row.sort_order,
-		}));
+		const boards = (data || [])
+			.filter((row: any) => row.settings?.["board_selectable"] === true)
+			.map((row: any) => ({
+				value: row.board_id,
+				label: row.monday_board?.name || row.board_id,
+				jobsSelectable: row.settings?.["jobs_selectable"] ?? false,
+				sortOrder: row.sort_order,
+			}));
 
 		return NextResponse.json({ boards });
 	} catch (error) {

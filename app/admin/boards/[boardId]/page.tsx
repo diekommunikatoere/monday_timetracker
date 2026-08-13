@@ -53,17 +53,15 @@ interface SyncResult {
 
 export default function BoardConfigPage() {
 	const pathname = usePathname();
-	const mondayIsAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
 
-	if (!canAccessRoute(pathname, { isAdmin: mondayIsAdmin })) {
-		return (
-			<div id="admin-app">
-				<div className="admin-error">
-					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
-				</div>
-			</div>
-		);
-	}
+	// Monday context
+	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError, rawContext: mondayContext, sessionToken } = useMondayStore();
+	const isAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
+
+	// Initialize Monday context on mount
+	useEffect(() => {
+		initializeMondayContext().catch((err) => console.error("Error initializing Monday context:", err));
+	}, [initializeMondayContext]);
 
 	const params = useParams();
 	const router = useRouter();
@@ -113,15 +111,6 @@ export default function BoardConfigPage() {
 		is_enabled: true,
 	});
 	const [savingOverride, setSavingOverride] = useState(false);
-
-	// Monday context
-	const { initializeMondayContext, isLoading: mondayLoading, error: mondayError, rawContext: mondayContext, sessionToken } = useMondayStore();
-	const isAdmin = useUserStore((state) => state.mondayUser?.isAdmin);
-
-	// Initialize Monday context on mount
-	useEffect(() => {
-		initializeMondayContext().catch((err) => console.error("Error initializing Monday context:", err));
-	}, [initializeMondayContext]);
 
 	// Fetch board config
 	const fetchBoardConfig = useCallback(async () => {
@@ -816,12 +805,11 @@ export default function BoardConfigPage() {
 	}
 
 	// Check admin access
-	if (!isAdmin) {
+	if (!canAccessRoute(pathname, { isAdmin: isAdmin })) {
 		return (
 			<div id="admin-app">
 				<div className="admin-error">
-					<Text fw={600}>Zugriff verweigert</Text>
-					<Text size="sm">Du benötigst Administratorrechte, um auf diese Seite zuzugreifen.</Text>
+					<ErrorState message="Zugriff verweigert: Du hast keine Administratorrechte." />
 				</div>
 			</div>
 		);
@@ -895,6 +883,18 @@ export default function BoardConfigPage() {
 						</div>
 
 						<Stack gap="md">
+							<Switch
+								label="Board auswählbar"
+								description="Legt fest, ob Nutzer dieses Board auswählen können. Die Spalten-Synchronisierung bleibt davon unberührt."
+								checked={!!boardConfig.settings?.["board_selectable"]}
+								onChange={(event) => {
+									updateBoardConfig({
+										settings: {
+											board_selectable: event.currentTarget.checked,
+										},
+									});
+								}}
+							/>
 							<Switch
 								label="Jobs auswählbar"
 								checked={!!boardConfig.settings?.["jobs_selectable"]}

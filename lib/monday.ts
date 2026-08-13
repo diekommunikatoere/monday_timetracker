@@ -252,7 +252,7 @@ export async function getConnectedBoards(boardIds: string[]): Promise<Array<Boar
 			console.error("ClientError in getConnectedBoards:", error.response?.errors);
 		}
 		console.error("Error in getConnectedBoards:", error);
-		throw new Error("Failed to fetch connected boards");
+		throw new Error("Failed to fetch connected boards", { cause: error });
 	}
 }
 
@@ -940,7 +940,7 @@ export async function getMondayContext(request: NextRequest) {
 		}
 		return context.data;
 	} catch (error) {
-		throw new Error("Failed to parse monday context");
+		throw new Error("Failed to parse monday context", { cause: error });
 	}
 }
 

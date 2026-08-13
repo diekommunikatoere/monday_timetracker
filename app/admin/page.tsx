@@ -39,6 +39,7 @@ interface DisplayBoardRow {
 	workspace_id: string | null;
 	workspace_name: string;
 	sync_enabled: boolean;
+	board_selectable: boolean;
 	config_status: "GREEN" | "YELLOW";
 }
 
@@ -84,6 +85,13 @@ function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemov
 				<span className="board-row-workspace">{board.workspace_name}</span>
 			</div>
 			<div className="board-row-actions">
+				{!board.board_selectable && (
+					<Tooltip label="Board kann nicht ausgewählt werden">
+						<Badge size="xs" color="grey" variant="light">
+							Board nicht auswählbar
+						</Badge>
+					</Tooltip>
+				)}
 				{board.sync_enabled && board.config_status === "YELLOW" && (
 					<Tooltip label="Sync aktiv, aber keine Budget-verwendet-Spalte zugeordnet">
 						<Badge size="xs" color="yellow" variant="light">
@@ -281,6 +289,7 @@ export default function AdminPage() {
 					workspace_id: workspaceId,
 					workspace_name: (workspaceId && workspaceNameById[workspaceId]) || "Hauptbereich",
 					sync_enabled: !!b.sync_enabled,
+					board_selectable: !!b.settings?.["board_selectable"],
 					config_status: (b.config_status as "GREEN" | "YELLOW") || "GREEN",
 				};
 			});
@@ -388,6 +397,7 @@ export default function AdminPage() {
 				workspace_id: b.workspaceId === DEFAULT_WORKSPACE_ID ? null : b.workspaceId,
 				workspace_name: b.workspaceName,
 				sync_enabled: true,
+				board_selectable: false, // matches the server default: absent settings key = not selectable
 				config_status: "YELLOW" as const,
 			})),
 		];
