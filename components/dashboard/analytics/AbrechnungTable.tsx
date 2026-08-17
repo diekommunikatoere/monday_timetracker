@@ -1,12 +1,13 @@
 // components/dashboard/analytics/AbrechnungTable.tsx
 "use client";
 
-import { Table, Center, Loader, Text, Badge, Group, ActionIcon, Stack, Box, SimpleGrid, Card } from "@mantine/core";
+import { Table, Center, Loader, Text, Badge, Group, ActionIcon, Stack, Box, SimpleGrid, Card, Tooltip, Flex } from "@mantine/core";
 import { Fragment, useMemo, useState } from "react";
 
-import { Icon } from "@/components";
+import { Icon, IconButton } from "@/components";
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
+import { useAbrechnungStore } from "@/stores/abrechnungStore";
 
 import styles from "@/components/styles/ui/tables/Table.module.css";
 
@@ -32,12 +33,18 @@ function formatEuro(value: number | null): string {
  *   Used for the single flat active-view table (multiple boards share one table there); the
  *   Archiv section renders one table per board with the board name as a heading instead, so
  *   it omits this (default `false`) to avoid a redundant column.
+ * @property enableItemRefresh - Adds a per-row "Aktualisieren" action that re-fetches just
+ *   that budget item (`useAbrechnungStore`'s `refreshBudgetItem`). Only wired up for the
+ *   active view (default `false`): the store action patches `activeBoards` and reuses the
+ *   active view's date-range filter, neither of which apply to the Archiv section's separate,
+ *   intentionally date-filter-free `selectedArchiveBoards` state.
  */
 export interface AbrechnungTableProps {
 	items: AbrechnungTableRow[];
 	loading?: boolean;
 	error?: string | null;
 	showBoardColumn?: boolean;
+	enableItemRefresh?: boolean;
 }
 
 /**
@@ -53,8 +60,10 @@ export interface AbrechnungTableProps {
  * `components/shared/time-entries/TimeEntryTable.tsx`, extended with a local
  * expand/collapse row state (not something the generic time-entry table needs).
  */
-export function AbrechnungTable({ items, loading, error, showBoardColumn = false }: AbrechnungTableProps) {
+export function AbrechnungTable({ items, loading, error, showBoardColumn = false, enableItemRefresh = false }: AbrechnungTableProps) {
 	const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+	const refreshBudgetItem = useAbrechnungStore((state) => state.refreshBudgetItem);
+	const refreshingItemIds = useAbrechnungStore((state) => state.refreshingItemIds);
 
 	const toggleExpand = (id: string) => {
 		setExpandedIds((prev) => {
@@ -72,20 +81,44 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 		() => [
 			{
 				id: "name",
-				header: "Budget-Item",
+				header: `Budget-Item`,
 				minWidth: 400,
 				cell: ({ row }) => (
-					<Group gap="xs" wrap="nowrap">
-						<ActionIcon variant="subtle" size="sm" onClick={() => toggleExpand(row.id)} aria-label={expandedIds.has(row.id) ? "Details ausblenden" : "Details anzeigen"}>
-							<Icon name={expandedIds.has(row.id) ? "expand_more" : "chevron_right"} size={18} />
-						</ActionIcon>
-						<Text fw={500} size="sm" style={{ display: "inline-flex", gap: "8px", alignItems: "center" }} title={row.name}>
-							{row.name}{" "}
-							<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
-								{row.linkedItems.length}
-							</Badge>
-						</Text>
-					</Group>
+					<Flex gap="xs" align="center" justify="space-between" style={{ width: "100%" }}>
+						<Group gap="xs" wrap="nowrap">
+							<IconButton variant="subtle" size="sm" onClick={() => toggleExpand(row.id)} aria-label={expandedIds.has(row.id) ? "Details ausblenden" : "Details anzeigen"}>
+								<Icon name={expandedIds.has(row.id) ? "expand_more" : "chevron_right"} size={18} />
+							</IconButton>
+							<Text fw={500} size="sm" style={{ display: "inline-flex", gap: "8px", alignItems: "center" }} title={row.name}>
+								{row.name}{" "}
+								<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
+									{row.linkedItems.length}
+								</Badge>
+							</Text>
+						</Group>
+						<Group gap={4} wrap="nowrap">
+							<Tooltip label="Budget-Item aktualisieren" position="top" withArrow>
+								<IconButton variant="subtle" size="md" loading={refreshingItemIds.has(`${row.boardId}:${row.id}`)} onClick={() => refreshBudgetItem(row.boardId, row.id)} aria-label="Budget-Item aktualisieren">
+									<Icon name="refresh" size={16} />
+								</IconButton>
+							</Tooltip>
+							<Tooltip label="Monday-Item öffnen" position="top" withArrow>
+								<IconButton colorVariant="tertiary" size="md" loading={refreshingItemIds.has(`${row.boardId}:${row.id}`)} onClick={() => window.open(row.itemUrl, "_blank")} aria-label="Monday-Item öffnen">
+									<Icon name="open_in_new" size={16} />
+								</IconButton>
+							</Tooltip>
+						</Group>
+					</Flex>
+				),
+			},
+			{
+				id: "status",
+				header: "Status",
+				minWidth: 200,
+				cell: ({ row }) => (
+					<Text fw={500} size="sm" title={row.status?.text ?? ""} c={"white"} ta="center">
+						{row.status?.text ?? ""}
+					</Text>
 				),
 			},
 			{
@@ -161,7 +194,7 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 				},
 			},
 		],
-		[expandedIds],
+		[expandedIds, showBoardColumn, enableItemRefresh, refreshingItemIds, refreshBudgetItem],
 	);
 
 	const visibleColumns = useMemo(() => columns.filter((col) => !col.hidden), [columns]);
@@ -216,7 +249,7 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 						<Fragment key={item.id}>
 							<Table.Tr className={expandedIds.has(item.id) ? styles.expandedRow : styles.bodyRow}>
 								{visibleColumns.map((col) => (
-									<Table.Td key={col.id} ta={col.align || "left"} style={{ minWidth: col.minWidth }}>
+									<Table.Td key={col.id} ta={col.align || "left"} style={{ backgroundColor: col.id === "status" ? item.status?.color : undefined, minWidth: col.minWidth }}>
 										{col.cell({ row: item, index: rowIndex })}
 									</Table.Td>
 								))}
@@ -350,14 +383,22 @@ function LinkedItemsTable({ linkedItems }: { linkedItems: AbrechnungLinkedItem[]
 						<Fragment key={linked.id}>
 							<Table.Tr className={styles.bodyRow}>
 								<Table.Td>
-									<Group gap="xs" wrap="nowrap">
-										<ActionIcon variant="subtle" size="sm" disabled={!hasBreakdown} onClick={() => toggleLinkedExpand(linked.id)} aria-label={isExpanded ? "Details ausblenden" : "Details anzeigen"}>
-											<Icon name={isExpanded ? "expand_more" : "chevron_right"} size={16} />
-										</ActionIcon>
-										<Text fw={500} size="xs">
-											{linked.name}
-										</Text>
-									</Group>
+									<Flex gap="xs" align="center" justify="space-between" style={{ width: "100%" }}>
+										<Group gap="xs" wrap="nowrap">
+											<IconButton variant="subtle" size="sm" disabled={!hasBreakdown} onClick={() => toggleLinkedExpand(linked.id)} aria-label={isExpanded ? "Details ausblenden" : "Details anzeigen"}>
+												<Icon name={isExpanded ? "expand_more" : "chevron_right"} size={16} />
+											</IconButton>
+											<Text fw={500} size="xs">
+												{linked.name}
+											</Text>
+										</Group>
+
+										<Tooltip label="Monday-Item öffnen" position="top" withArrow>
+											<IconButton colorVariant="tertiary" size="md" onClick={() => window.open(linked.itemUrl, "_blank")} aria-label="Monday-Item öffnen">
+												<Icon name="open_in_new" size={16} />
+											</IconButton>
+										</Tooltip>
+									</Flex>
 								</Table.Td>
 								<Table.Td>
 									<Text fw={500} size="xs">

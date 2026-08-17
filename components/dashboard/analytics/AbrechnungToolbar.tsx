@@ -1,7 +1,7 @@
 // components/dashboard/analytics/AbrechnungToolbar.tsx
 "use client";
 
-import { Tooltip, Collapse, NumberInput } from "@mantine/core";
+import { Tooltip, Collapse, NumberInput, Loader } from "@mantine/core";
 import { type DatesRangeValue } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useEffect, useState } from "react";
@@ -20,9 +20,14 @@ import type { AbrechnungBoardOption } from "./hooks/useFilteredAbrechnung";
  *   `useFilteredAbrechnung`), so the Budget-Board dropdown lists no dead values. Passed in
  *   rather than recomputed here so the filter pass only runs once per render, in the parent —
  *   same reasoning as `TimeEntriesToolbar`'s `filterOptions` prop.
+ * @property statusOptions - Statuses present in `activeBoards` (from `useFilteredAbrechnung`),
+ *   so the Status dropdown lists no dead values. Passed in rather than recomputed here so the
+ *   filter pass only runs once per render, in the parent — same reasoning as
+ *   `TimeEntriesToolbar`'s `filterOptions` prop.
  */
 interface AbrechnungToolbarProps {
 	boardOptions: AbrechnungBoardOption[];
+	statusOptions: { id: string; name: string }[];
 }
 
 /**
@@ -35,9 +40,10 @@ interface AbrechnungToolbarProps {
  * Only affects the active (current-year) table — the Archiv section below it is
  * intentionally never filtered, so this toolbar renders above the active section only.
  */
-export default function AbrechnungToolbar({ boardOptions }: AbrechnungToolbarProps) {
-	const { filters, setFilter, resetFilters } = useAbrechnungStore();
+export default function AbrechnungToolbar({ boardOptions, statusOptions }: AbrechnungToolbarProps) {
+	const { filters, setFilter, resetFilters, fetchActiveBudgetData } = useAbrechnungStore();
 	const [showFilters, setShowFilters] = useState(false);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	// Local, un-debounced input state so the text box feels responsive; the store's
 	// `filters.search` (and therefore the Fuse search in `useFilteredAbrechnung`) only
@@ -73,6 +79,18 @@ export default function AbrechnungToolbar({ boardOptions }: AbrechnungToolbarPro
 		setShowFilters((prev) => !prev);
 	};
 
+	// Bypasses getBudgetBoardItems's monday-layer cache (?refresh=1) for when a budget/status
+	// value was just edited directly in monday and the cache's 10-minute TTL hasn't lapsed yet.
+	const handleRefresh = async () => {
+		if (isRefreshing) return;
+		setIsRefreshing(true);
+		try {
+			await fetchActiveBudgetData(true);
+		} finally {
+			setIsRefreshing(false);
+		}
+	};
+
 	return (
 		<div className={classes.container}>
 			<div className={classes.toolbar}>
@@ -87,20 +105,28 @@ export default function AbrechnungToolbar({ boardOptions }: AbrechnungToolbarPro
 						onClear={() => setSearchInput("")}
 						clearButtonLabel="Suche löschen"
 					/>
-					<Tooltip label={showFilters ? "Filter ausblenden" : "Filter einblenden"} position="top" withArrow>
-						<IconButton size="lg" colorVariant={showFilters ? undefined : "tertiary"} onClick={handleToggleFilters} aria-label={showFilters ? "Filter ausblenden" : "Filter einblenden"}>
-							<Icon name={showFilters ? "filter_alt_off" : "filter_alt"} />
-						</IconButton>
-					</Tooltip>
-					{hasActiveFilters && (
-						<Button variant="default" onClick={handleReset} className={classes.resetButton}>
-							Filter zurücksetzen
-						</Button>
-					)}
+					<div className={classes.buttonGroup}>
+						<Tooltip label={showFilters ? "Filter ausblenden" : "Filter einblenden"} position="top" withArrow>
+							<IconButton size="lg" colorVariant={showFilters ? undefined : "tertiary"} onClick={handleToggleFilters} aria-label={showFilters ? "Filter ausblenden" : "Filter einblenden"} className={classes.filterToggleButton}>
+								<Icon name={showFilters ? "filter_alt_off" : "filter_alt"} />
+							</IconButton>
+						</Tooltip>
+						<Tooltip label="Daten aktualisieren" position="top" withArrow>
+							<IconButton size="lg" colorVariant="tertiary" onClick={handleRefresh} disabled={isRefreshing} aria-label="Daten aktualisieren">
+								{isRefreshing ? <Loader size={16} /> : <Icon name="refresh" />}
+							</IconButton>
+						</Tooltip>
+						{hasActiveFilters && (
+							<Button variant="default" onClick={handleReset} className={classes.resetButton}>
+								Filter zurücksetzen
+							</Button>
+						)}
+					</div>
 				</div>
 				<Collapse expanded={showFilters} className={classes.filtersCollapse} transitionDuration={200} keepMounted>
 					<div className={classes.filtersRow}>
 						<Select placeholder="Budget-Board" data={boardOptions.map((b) => ({ value: b.id, label: b.name }))} value={filters.boardId} onChange={(value) => setFilter({ boardId: value })} clearable />
+						<Select placeholder="Status" data={statusOptions.map((s) => ({ value: s.id, label: s.name }))} value={filters.status} onChange={(value) => setFilter({ status: value })} clearable />
 						<DatePicker
 							type="range"
 							allowSingleDateInRange

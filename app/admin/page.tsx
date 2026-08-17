@@ -14,9 +14,9 @@ import { canAccessRoute } from "@/lib/permissions";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useUserStore } from "@/stores/userStore";
 
-import type { Role } from "@/types/database";
-
 import "@/public/css/components/AdminPage.css";
+
+import type { Role } from "@/types/database";
 
 const DEFAULT_WORKSPACE_ID = "__default__";
 
@@ -60,11 +60,13 @@ interface BudgetBoardRow {
 	job_relation_column_id: string | null;
 	cost_column_id: string | null;
 	budget_column_id: string | null;
+	status_column_id: string | null;
 }
 
 const BUDGET_RELATION_COLUMN_TYPES = ["board_relation", "connect_boards"];
 const COST_COLUMN_TYPES = ["numbers", "formula", "mirror"];
 const BUDGET_COLUMN_TYPES = ["numbers", "formula", "mirror"];
+const STATUS_COLUMN_TYPES = ["status", "dropdown"];
 
 /** Draggable row in the "Boards verwalten" sortable list. */
 function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemove: (boardId: string) => void }) {
@@ -153,6 +155,7 @@ export default function AdminPage() {
 		job_relation_column_id: "",
 		cost_column_id: "",
 		budget_column_id: "",
+		status_column_id: "",
 	});
 	const [budgetBoardColumns, setBudgetBoardColumns] = useState<BudgetColumnOption[]>([]);
 	const [budgetBoardColumnsLoading, setBudgetBoardColumnsLoading] = useState(false);
@@ -464,6 +467,7 @@ export default function AdminPage() {
 					job_relation_column_id: b.settings.job_relation_column_id ?? null,
 					cost_column_id: b.settings.cost_column_id ?? null,
 					budget_column_id: b.settings.budget_column_id ?? null,
+					status_column_id: b.settings.status_column_id ?? null,
 				};
 			})
 			.sort((a: BudgetBoardRow, b: BudgetBoardRow) => a.board_name.localeCompare(b.board_name));
@@ -525,6 +529,7 @@ export default function AdminPage() {
 				job_relation_column_id: existing.job_relation_column_id || "",
 				cost_column_id: existing.cost_column_id || "",
 				budget_column_id: existing.budget_column_id || "",
+				status_column_id: existing.status_column_id || "",
 			});
 			fetchBudgetBoardColumns(existing.board_id);
 		} else {
@@ -538,6 +543,7 @@ export default function AdminPage() {
 				job_relation_column_id: "",
 				cost_column_id: "",
 				budget_column_id: "",
+				status_column_id: "",
 			});
 			setBudgetBoardColumns([]);
 		}
@@ -556,6 +562,7 @@ export default function AdminPage() {
 			job_relation_column_id: "",
 			cost_column_id: "",
 			budget_column_id: "",
+			status_column_id: "",
 		}));
 		fetchBudgetBoardColumns(boardId);
 	};
@@ -565,8 +572,8 @@ export default function AdminPage() {
 			notifications.show({ title: "Validierungsfehler", message: "Bitte ein Board auswählen", color: "red" });
 			return;
 		}
-		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.cost_column_id || !budgetBoardForm.budget_column_id) {
-			notifications.show({ title: "Validierungsfehler", message: "Bitte Verknüpfungs-, Agenturleistungs- und Budget-Spalte auswählen", color: "red" });
+		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.cost_column_id || !budgetBoardForm.budget_column_id || !budgetBoardForm.status_column_id) {
+			notifications.show({ title: "Validierungsfehler", message: "Bitte Verknüpfungs-, Agenturleistungs-, Budget- und Status-Spalte auswählen", color: "red" });
 			return;
 		}
 
@@ -586,6 +593,7 @@ export default function AdminPage() {
 					job_relation_column_id: budgetBoardForm.job_relation_column_id,
 					cost_column_id: budgetBoardForm.cost_column_id,
 					budget_column_id: budgetBoardForm.budget_column_id,
+					status_column_id: budgetBoardForm.status_column_id,
 				}),
 			});
 
@@ -1146,6 +1154,16 @@ export default function AdminPage() {
 								data={budgetBoardColumns.filter((c) => COST_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
 								value={budgetBoardForm.cost_column_id || null}
 								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, cost_column_id: val || "" })}
+								searchable
+							/>
+
+							<Select
+								label="Status-Spalte"
+								description="Status-Spalte, die den Status des Budget-Items anzeigt"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => STATUS_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.status_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, status_column_id: val || "" })}
 								searchable
 							/>
 						</>

@@ -4,7 +4,7 @@ import { getAbrechnungData } from "@/lib/abrechnung";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
- * GET /api/analytics/abrechnung?from=<ISO>&to=<ISO>
+ * GET /api/analytics/abrechnung?from=<ISO>&to=<ISO>&refresh=1
  *
  * Returns the current fiscal year's budget boards, each with its budget items
  * rolled up (tracked time / cost / remaining budget across all linked job items).
@@ -16,6 +16,10 @@ import { verifyMondayJwt } from "@/lib/monday-auth";
  * `lib/time/calculations.ts`), not bare `YYYY-MM-DD` strings. Unparseable or missing
  * values are silently treated as unbounded on that side rather than erroring, since
  * an all-time rollup is a safe default.
+ *
+ * `refresh=1` bypasses `getBudgetBoardItems`'s Redis cache (see `lib/monday.ts`) and
+ * rewrites it — the toolbar's "Aktualisieren" button, for when a budget/status value was
+ * just edited directly in monday and the cache's TTL hasn't lapsed yet.
  */
 export async function GET(request: NextRequest) {
 	try {
@@ -33,8 +37,13 @@ export async function GET(request: NextRequest) {
 		const toParam = request.nextUrl.searchParams.get("to");
 		const startDate = fromParam && !isNaN(new Date(fromParam).getTime()) ? fromParam : null;
 		const endDate = toParam && !isNaN(new Date(toParam).getTime()) ? toParam : null;
+		const forceRefresh = request.nextUrl.searchParams.get("refresh") === "1";
 
-		const boards = await getAbrechnungData("active", undefined, { startDate, endDate });
+		const boards = await getAbrechnungData("active", undefined, { startDate, endDate }, forceRefresh);
+
+		console.log(`GET /api/analytics/abrechnung: returning ${boards.length} boards (refresh=${forceRefresh})`);
+		console.log(`GET /api/analytics/abrechnung: returning boards: ${boards.map((b) => b.boardName).join(", ")}`);
+		console.log(`GET /api/analytics/abrechnung: returning boards with items: ${boards.map((b) => `${b.items.map((i) => JSON.stringify(i)).join(", ")}`).join(", ")}`);
 
 		return NextResponse.json({ boards });
 	} catch (error) {

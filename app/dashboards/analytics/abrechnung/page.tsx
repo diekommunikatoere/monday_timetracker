@@ -62,7 +62,7 @@ export default function AbrechnungPage() {
 	const selectedArchiveError = useAbrechnungStore((state) => state.selectedArchiveError);
 	const selectArchivePeriod = useAbrechnungStore((state) => state.selectArchivePeriod);
 
-	const { rows, boardOptions, hasActiveFilters } = useFilteredAbrechnung();
+	const { rows, boardOptions, statusOptions, hasActiveFilters } = useFilteredAbrechnung();
 
 	// Fetch the active view once the monday session is ready — mirrors the
 	// no-auto-fetch convention in stores/CLAUDE.md.
@@ -93,7 +93,7 @@ export default function AbrechnungPage() {
 
 	return (
 		<div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-			<AbrechnungToolbar boardOptions={boardOptions} />
+			<AbrechnungToolbar boardOptions={boardOptions} statusOptions={statusOptions} />
 			<div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 32 }}>
 				{activeError && <ErrorState message={activeError} />}
 
@@ -104,14 +104,7 @@ export default function AbrechnungPage() {
 				) : hasActiveFilters && rows.length === 0 ? (
 					<Text c="dimmed">Keine Budget-Items für diese Filter gefunden.</Text>
 				) : (
-					<Stack gap="xs">
-						{startDate && endDate && (
-							<Text size="sm" c="dimmed">
-								Zahlen für {formatDateDe(startDate)} – {formatDateDe(endDate)}
-							</Text>
-						)}
-						<AbrechnungTable items={rows} showBoardColumn loading={activeLoading} error={null} />
-					</Stack>
+					<AbrechnungTable items={rows} showBoardColumn enableItemRefresh loading={activeLoading} error={null} />
 				)}
 
 				<Accordion variant="separated" chevronPosition="right" onChange={handleArchiveAccordionChange}>

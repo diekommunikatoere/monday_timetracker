@@ -23,6 +23,8 @@ export interface AbrechnungFilters {
 	search: string;
 	/** Restrict to a single budget board by `boardId`. Client-side; never triggers a refetch. */
 	boardId: string | null;
+	/** Restrict to a single status by its text. Client-side; never triggers a refetch. */
+	status: string | null;
 	/** Inclusive rollup range start (local day, converted to an ISO instant on fetch). Triggers a refetch. */
 	startDate: Date | null;
 	/** Inclusive rollup range end (local day, through end-of-day). Triggers a refetch. */
@@ -36,6 +38,7 @@ export interface AbrechnungFilters {
 const EMPTY_ABRECHNUNG_FILTERS: AbrechnungFilters = {
 	search: "",
 	boardId: null,
+	status: null,
 	startDate: null,
 	endDate: null,
 	utilizationMin: null,
@@ -87,8 +90,15 @@ export interface AbrechnungState {
 	 */
 	_activeRequestId: number;
 
-	/** `GET /api/analytics/abrechnung` — the active view. Call from the page's mount `useEffect`. */
-	fetchActiveBudgetData: () => Promise<void>;
+	/** Budget item ids (`boardId:itemId`) with an in-flight per-row refresh — see `refreshBudgetItem`. Drives the row's loading spinner in `AbrechnungTable`. */
+	refreshingItemIds: Set<string>;
+
+	/**
+	 * `GET /api/analytics/abrechnung` — the active view. Call from the page's mount `useEffect`.
+	 * @param forceRefresh - Adds `?refresh=1`, bypassing `getBudgetBoardItems`'s monday-layer
+	 *   cache — the toolbar's "Aktualisieren" button.
+	 */
+	fetchActiveBudgetData: (forceRefresh?: boolean) => Promise<void>;
 	/**
 	 * Merge a partial filter update. Changing `startDate`/`endDate` re-runs
 	 * `fetchActiveBudgetData` (they change what the server returns); `search`/
@@ -103,6 +113,13 @@ export interface AbrechnungState {
 	selectArchivePeriod: (boardId: string) => Promise<void>;
 	/** Clears the currently-selected archived period (e.g. when collapsing back to the year list). */
 	clearArchiveSelection: () => void;
+	/**
+	 * `GET /api/analytics/abrechnung/item` — refreshes one budget item in place, patching it
+	 * into `activeBoards` immutably without touching the rest of the board/report. Independent
+	 * of `_activeRequestId`: a per-item patch can't be made stale by a concurrent full refetch
+	 * the way two full-board responses can race each other.
+	 */
+	refreshBudgetItem: (boardId: string, itemId: string) => Promise<void>;
 }
 
 export const useAbrechnungStore = create<AbrechnungState>()((set, get) => ({
@@ -124,7 +141,9 @@ export const useAbrechnungStore = create<AbrechnungState>()((set, get) => ({
 
 	_activeRequestId: 0,
 
-	fetchActiveBudgetData: async () => {
+	refreshingItemIds: new Set(),
+
+	fetchActiveBudgetData: async (forceRefresh = false) => {
 		const sessionToken = useMondayStore.getState().sessionToken;
 		if (!sessionToken) return;
 
@@ -136,6 +155,7 @@ export const useAbrechnungStore = create<AbrechnungState>()((set, get) => ({
 			const params = new URLSearchParams();
 			if (startDate) params.set("from", startOfDay(startDate).toISOString());
 			if (endDate) params.set("to", endOfDay(endDate).toISOString());
+			if (forceRefresh) params.set("refresh", "1");
 			const query = params.toString();
 
 			const response = await fetch(`/api/analytics/abrechnung${query ? `?${query}` : ""}`, {
@@ -235,5 +255,46 @@ export const useAbrechnungStore = create<AbrechnungState>()((set, get) => ({
 
 	clearArchiveSelection: () => {
 		set({ selectedArchiveBoardId: null, selectedArchiveBoards: [], selectedArchiveError: null });
+	},
+
+	refreshBudgetItem: async (boardId: string, itemId: string) => {
+		const sessionToken = useMondayStore.getState().sessionToken;
+		if (!sessionToken) return;
+
+		const key = `${boardId}:${itemId}`;
+		set((state) => ({ refreshingItemIds: new Set(state.refreshingItemIds).add(key) }));
+
+		try {
+			const { startDate, endDate } = get().filters;
+			const params = new URLSearchParams({ boardId, itemId });
+			if (startDate) params.set("from", startOfDay(startDate).toISOString());
+			if (endDate) params.set("to", endOfDay(endDate).toISOString());
+
+			const response = await fetch(`/api/analytics/abrechnung/item?${params.toString()}`, {
+				headers: { Authorization: `Bearer ${sessionToken}` },
+			});
+
+			if (!response.ok) {
+				throw new Error("Budget-Item konnte nicht aktualisiert werden");
+			}
+
+			const data = await response.json();
+			const refreshedItem = data.item;
+
+			// Patch just this item into activeBoards, immutably — a full-board refetch
+			// would clobber concurrent edits elsewhere, and is what this button exists
+			// to avoid paying for.
+			set((state) => ({
+				activeBoards: state.activeBoards.map((board) => (board.boardId !== boardId ? board : { ...board, items: board.items.map((item) => (item.id !== itemId ? item : refreshedItem)) })),
+			}));
+		} catch (err) {
+			console.error(`[abrechnungStore] Failed to refresh budget item ${itemId} on board ${boardId}:`, err);
+		} finally {
+			set((state) => {
+				const next = new Set(state.refreshingItemIds);
+				next.delete(key);
+				return { refreshingItemIds: next };
+			});
+		}
 	},
 }));

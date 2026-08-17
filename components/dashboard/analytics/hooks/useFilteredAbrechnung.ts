@@ -40,6 +40,8 @@ export interface UseFilteredAbrechnungResult {
 	 * `rows`, so picking a board doesn't collapse the dropdown down to just that one option.
 	 */
 	boardOptions: AbrechnungBoardOption[];
+	/** Every status present in `activeBoards`, alphabetically sorted — the toolbar's Status `Select` options. */
+	statusOptions: { id: string; name: string }[];
 	/** Whether any toolbar filter (search, board, date range, or utilization bound) is currently set. */
 	hasActiveFilters: boolean;
 	/** `rows.length` — for an optional match-count display. */
@@ -90,7 +92,21 @@ export function useFilteredAbrechnung(): UseFilteredAbrechnungResult {
 
 	const boardOptions = useMemo(() => [...activeBoards].map((board) => ({ id: board.boardId, name: board.boardName })).sort((a, b) => a.name.localeCompare(b.name)), [activeBoards]);
 
-	const hasActiveFilters = !!(filters.search.trim() || filters.boardId || filters.startDate || filters.endDate || filters.utilizationMin !== null || filters.utilizationMax !== null);
+	const statusOptions = useMemo(() => {
+		const statusSet = new Set<string>();
+		activeBoards.forEach((board) => {
+			board.items.forEach((item) => {
+				if (item.status?.text) {
+					statusSet.add(item.status.text);
+				}
+			});
+		});
+		return Array.from(statusSet)
+			.sort()
+			.map((statusText) => ({ id: statusText, name: statusText }));
+	}, [activeBoards]);
+
+	const hasActiveFilters = !!(filters.search.trim() || filters.boardId || filters.status || filters.startDate || filters.endDate || filters.utilizationMin !== null || filters.utilizationMax !== null);
 
 	const rows = useMemo(() => {
 		const query = filters.search.trim();
@@ -111,6 +127,7 @@ export function useFilteredAbrechnung(): UseFilteredAbrechnungResult {
 
 		const filtered = flattened.filter((row) => {
 			if (filters.boardId && row.boardId !== filters.boardId) return false;
+			if (filters.status && row.status?.text !== filters.status) return false;
 			if (matchedKeys && !matchedKeys.has(`${row.boardId}:${row.id}`)) return false;
 			if (hasUtilizationBound) {
 				// "Budget fehlt" (utilizationPercent === null) is excluded whenever a bound is set —
@@ -125,7 +142,7 @@ export function useFilteredAbrechnung(): UseFilteredAbrechnungResult {
 		// Primary sort by item name, board name as a tie-break — the board is a display/filter
 		// column here, not a grouping key, so rows from different boards interleave.
 		return filtered.sort((a, b) => a.name.localeCompare(b.name) || a.boardName.localeCompare(b.boardName));
-	}, [activeBoards, filters.search, filters.boardId, filters.utilizationMin, filters.utilizationMax, fuseIndex]);
+	}, [activeBoards, filters.search, filters.boardId, filters.status, filters.utilizationMin, filters.utilizationMax, fuseIndex]);
 
-	return { rows, boardOptions, hasActiveFilters, matchCount: rows.length };
+	return { rows, boardOptions, statusOptions, hasActiveFilters, matchCount: rows.length };
 }

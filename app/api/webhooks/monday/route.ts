@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { syncItemColumns } from "@/lib/columnSync";
-import { getItemDetails } from "@/lib/monday";
+import { clearBudgetBoardItemsCache, getItemDetails } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
+
+/**
+ * Clears the Abrechnung monday-layer cache ({@link clearBudgetBoardItemsCache}) for a
+ * board a create/update/delete webhook just fired on. Cheap and safe to call
+ * unconditionally — clearing a non-budget board's (nonexistent) cache entries is a no-op,
+ * and this avoids an extra `board_config` lookup per webhook just to check first.
+ */
+async function invalidateBudgetItemsCache(boardId: string | null | undefined): Promise<void> {
+	if (!boardId) return;
+	await clearBudgetBoardItemsCache(boardId);
+}
 
 /**
  * After an item is trashed or restored, the parent item's budget/time columns in
@@ -129,6 +140,11 @@ export async function POST(request: NextRequest) {
 					is_active: true,
 					updated_at: new Date().toISOString(),
 				});
+
+				// A new budget item (or a new job item, whose board isn't this one) doesn't
+				// matter to the cache either way — invalidating a non-budget board's cache
+				// is a no-op, so this stays unconditional rather than checking board_config first.
+				await invalidateBudgetItemsCache(effectiveBoardId);
 				break;
 			}
 
@@ -141,6 +157,8 @@ export async function POST(request: NextRequest) {
 						updated_at: new Date().toISOString(),
 					})
 					.eq("id", event.pulseId?.toString());
+
+				await invalidateBudgetItemsCache(event.boardId?.toString());
 				break;
 			}
 
@@ -207,6 +225,11 @@ export async function POST(request: NextRequest) {
 				const deletedItemId = (event.itemId || event.pulseId)?.toString();
 				const trashedAt = new Date().toISOString();
 
+				// Board id for the cache invalidation below — the event payload doesn't
+				// reliably carry one for this event type, so read it before the row is
+				// (still non-destructively) updated.
+				const { data: deletedItemRow } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", deletedItemId).maybeSingle();
+
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
@@ -230,6 +253,7 @@ export async function POST(request: NextRequest) {
 
 				// Re-push the parent's budget column now that this item's time is excluded.
 				await resyncItemBudget(deletedItemId, false);
+				await invalidateBudgetItemsCache(event.boardId?.toString() || deletedItemRow?.board_id);
 				break;
 			}
 

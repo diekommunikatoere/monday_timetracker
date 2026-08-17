@@ -19,6 +19,7 @@ export type BudgetBoardStatus = "active" | "archived";
  * @property job_relation_column_id - The board_relation/connect_boards column listing linked job items.
  * @property budget_column_id       - The numbers/formula/mirror column holding the total budget figure.
  * @property cost_column_id         - The numbers/formula/mirror column holding the cost figure, labeled "Agenturleistungs-Spalte" in the UI.
+ * @property status_column_id         - The status column holding the budget item's current status, labeled "Status-Spalte" in the UI.
  */
 export interface BudgetBoardSettings {
 	budget_board_status?: BudgetBoardStatus;
@@ -26,6 +27,7 @@ export interface BudgetBoardSettings {
 	job_relation_column_id?: string;
 	budget_column_id?: string;
 	cost_column_id?: string;
+	status_column_id?: string;
 }
 
 /** Per-role time breakdown for one budget item, enriched with the role's display color. */
@@ -48,6 +50,7 @@ export interface AbrechnungRoleBreakdown {
 export interface AbrechnungLinkedItem {
 	id: string;
 	name: string;
+	itemUrl: string;
 	board: { id: string; name: string } | null;
 	totalSeconds: number;
 	totalCost: number;
@@ -61,6 +64,8 @@ export interface AbrechnungLinkedItem {
 export interface AbrechnungBudgetItem {
 	id: string;
 	name: string;
+	itemUrl: string;
+	status: { text: string | null; color: string | null };
 	budget: number | null;
 	totalSeconds: number;
 	totalCost: number;

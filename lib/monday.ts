@@ -13,6 +13,7 @@ const CACHE_TTL = {
 	BOARDS: 60 * 60, // 1 hour - board names rarely change
 	TASKS: 60 * 30, // 30 minutes - items may update more frequently
 	USER_TEAMS: 60 * 60 * 24, // 24 hours - team membership is stable
+	BUDGET_ITEMS: 60 * 10, // 10 minutes - deliberately moderate: no webhook covers change_column_value, so a budget/status edit made directly in monday stays stale for up to this long; the per-item refresh button is the escape hatch
 };
 
 // Inline type definitions for API responses
@@ -1215,6 +1216,7 @@ export async function findLinkedItems(boardId: string, itemId: string, targetBoa
 export interface BudgetBoardLinkedItem {
 	id: string;
 	name: string;
+	itemUrl: string;
 	board: { id: string; name: string } | null;
 	totalCost: number;
 }
@@ -1234,12 +1236,14 @@ export interface BudgetBoardLinkedItem {
 export interface BudgetBoardItem {
 	id: string;
 	name: string;
+	itemUrl: string;
 	budgetText: string | null;
 	budget: number | null;
 	costText: string | null;
 	cost: number | null;
 	linkedItemIds: string[];
 	linkedItems: BudgetBoardLinkedItem[];
+	status: { text: string | null; color: string | null };
 }
 
 /** Raw response shape for the initial `items_page` query in {@link getBudgetBoardItems}. */
@@ -1268,13 +1272,82 @@ type BudgetBoardNextItemsPageResponse = {
 type RawBudgetBoardItem = {
 	id: string;
 	name: string;
+	url: string;
 	column_values: Array<{
 		id: string;
 		text: string | null;
 		linked_item_ids?: string[];
-		linked_items?: Array<{ id: string; name: string; board: { id: string; name: string } | null }>;
+		linked_items?: Array<{ id: string; name: string; url: string; board: { id: string; name: string } | null }>;
+		label_style?: {
+			color: string | null;
+		};
 	}>;
 };
+
+/**
+ * Shared `column_values` selection for both {@link getBudgetBoardItems} and
+ * {@link getBudgetBoardItem} — kept as one string (rather than duplicated per query) so the
+ * two can never drift out of sync on what a "budget board item" looks like.
+ */
+const BUDGET_BOARD_COLUMN_VALUES_FRAGMENT = `
+	column_values(ids: [$relationColumnId, $budgetColumnId, $costColumnId, $statusColumnId]) {
+		id
+		text
+		... on BoardRelationValue {
+			linked_item_ids
+			linked_items {
+				id
+				name
+				board {
+					id
+					name
+					}
+				url
+			}
+		}
+		... on StatusValue {
+			text
+			label_style {
+		 		color
+		 	}
+		}
+	}
+`;
+
+/** Maps one {@link RawBudgetBoardItem} (from either {@link getBudgetBoardItems} or {@link getBudgetBoardItem}) to a {@link BudgetBoardItem}. */
+function mapRawBudgetBoardItem(item: RawBudgetBoardItem, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string): BudgetBoardItem {
+	const relationValue = item.column_values.find((cv) => cv.id === relationColumnId);
+	const budgetValue = item.column_values.find((cv) => cv.id === budgetColumnId);
+	const costValue = item.column_values.find((cv) => cv.id === costColumnId);
+	const statusValue = item.column_values.find((cv) => cv.id === statusColumnId);
+
+	// totalCost is a placeholder — lib/abrechnung.ts overwrites it (along with
+	// totalSeconds/byRole, which AbrechnungLinkedItem adds on top of this monday-only
+	// shape) with the real per-item rollup from get_items_time_by_role.
+	const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, itemUrl: li.url, board: li.board, totalCost: 0 }));
+	const linkedItemIds = relationValue?.linked_item_ids ?? linkedItems.map((li) => li.id);
+
+	return {
+		id: item.id,
+		name: item.name,
+		itemUrl: item.url,
+		budgetText: budgetValue?.text ?? null,
+		budget: parseNumericColumnText(budgetValue?.text),
+		costText: costValue?.text ?? null,
+		cost: parseNumericColumnText(costValue?.text),
+		linkedItemIds,
+		linkedItems,
+		status: {
+			text: statusValue?.text ?? null,
+			color: statusValue?.label_style?.color ?? "var(--color--background-secondary)", // fallback to a neutral color if missing
+		},
+	};
+}
+
+/** Builds the Redis cache key for one budget board's {@link getBudgetBoardItems} result — column ids are part of the key so an admin config change misses naturally instead of serving stale-shaped data. */
+function budgetBoardItemsCacheKey(boardId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string): string {
+	return `monday:budget-items:${boardId}:${relationColumnId}:${budgetColumnId}:${costColumnId}:${statusColumnId}`;
+}
 
 /**
  * Fetches every item on a budget board (e.g. "Retainer"), with its budget amount
@@ -1291,45 +1364,44 @@ type RawBudgetBoardItem = {
  * currently lives on (including archived/moved boards) without maintaining a
  * separate "job board" registry.
  *
+ * Results are cached in Redis under {@link budgetBoardItemsCacheKey} for
+ * {@link CACHE_TTL.BUDGET_ITEMS} seconds (10 minutes — deliberately shorter than the other
+ * `monday.ts` caches, since monday fires no webhook this app handles for
+ * `change_column_value`, so a budget/status edit made directly in monday would otherwise
+ * stay stale for the whole TTL; {@link getBudgetBoardItem}'s per-item refresh is the escape
+ * hatch). Pass `forceRefresh: true` to bypass the cache and rewrite the entry.
+ *
  * @param boardId          - The budget board's monday.com ID.
  * @param relationColumnId - The `board_relation`/`connect_boards` column listing linked job items.
  * @param budgetColumnId   - The `numbers`/`formula`/`mirror` column holding the total budget figure.
  * @param costColumnId     - The `numbers`/`formula`/`mirror` column holding the cost ("Agenturleistung") figure.
+ * @param statusColumnId   - The `status`/`dropdown` column holding the budget item's status.
+ * @param forceRefresh     - Bypasses the cache and rewrites it with a fresh fetch. Default `false`.
  * @returns One {@link BudgetBoardItem} per item on the board, in API order.
  * @throws If `boardId` is not a valid positive integer, or on unrecoverable API errors.
  */
-export async function getBudgetBoardItems(boardId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string): Promise<BudgetBoardItem[]> {
+export async function getBudgetBoardItems(boardId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string, forceRefresh = false): Promise<BudgetBoardItem[]> {
 	if (!boardId || isNaN(Number(boardId)) || Number(boardId) <= 0) {
 		throw new Error("boardId must be a valid positive integer");
 	}
 
-	const columnValuesFragment = `
-		column_values(ids: [$relationColumnId, $budgetColumnId, $costColumnId]) {
-			id
-			text
-			... on BoardRelationValue {
-				linked_item_ids
-				linked_items {
-					id
-					name
-					board {
-						id
-						name
-					}
-				}
-			}
-		}
-	`;
+	const cacheKey = budgetBoardItemsCacheKey(boardId, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+
+	if (!forceRefresh) {
+		const cached = await cacheHelper.get<BudgetBoardItem[]>(cacheKey);
+		if (cached) return cached;
+	}
 
 	const initialQuery = `
-		query ($boardId: ID!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!) {
+		query ($boardId: ID!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!, $statusColumnId: String!) {
 			boards(ids: [$boardId]) {
 				items_page(limit: 100) {
 					cursor
 					items {
 						id
 						name
-						${columnValuesFragment}
+						url
+						${BUDGET_BOARD_COLUMN_VALUES_FRAGMENT}
 					}
 				}
 			}
@@ -1340,13 +1412,14 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	`;
 
 	const nextPageQuery = `
-		query ($cursor: String!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!) {
+		query ($cursor: String!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!, $statusColumnId: String!) {
 			next_items_page(limit: 100, cursor: $cursor) {
 				cursor
 				items {
 					id
 					name
-					${columnValuesFragment}
+					url
+					${BUDGET_BOARD_COLUMN_VALUES_FRAGMENT}
 				}
 			}
 			complexity {
@@ -1358,7 +1431,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	const rawItems: RawBudgetBoardItem[] = [];
 
 	try {
-		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, relationColumnId, budgetColumnId, costColumnId });
+		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, relationColumnId, budgetColumnId, costColumnId, statusColumnId });
 
 		if (response.error) {
 			throw new Error(response.error?.message || "Failed to fetch budget board items");
@@ -1373,7 +1446,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 		let cursor = itemsPage.cursor;
 
 		while (cursor) {
-			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, relationColumnId, budgetColumnId, costColumnId });
+			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, relationColumnId, budgetColumnId, costColumnId, statusColumnId });
 
 			if (pageResponse.error) {
 				console.warn(`[getBudgetBoardItems] Pagination error for board ${boardId}: ${pageResponse.error.message}`);
@@ -1394,28 +1467,80 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 		throw error;
 	}
 
-	return rawItems.map((item) => {
-		const relationValue = item.column_values.find((cv) => cv.id === relationColumnId);
-		const budgetValue = item.column_values.find((cv) => cv.id === budgetColumnId);
-		const costValue = item.column_values.find((cv) => cv.id === costColumnId);
+	const result = rawItems.map((item) => mapRawBudgetBoardItem(item, relationColumnId, budgetColumnId, costColumnId, statusColumnId));
 
-		// totalCost is a placeholder — lib/abrechnung.ts overwrites it (along with
-		// totalSeconds/byRole, which AbrechnungLinkedItem adds on top of this monday-only
-		// shape) with the real per-item rollup from get_items_time_by_role.
-		const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, board: li.board, totalCost: 0 }));
-		const linkedItemIds = relationValue?.linked_item_ids ?? linkedItems.map((li) => li.id);
+	await cacheHelper.set(cacheKey, result, CACHE_TTL.BUDGET_ITEMS);
+	return result;
+}
 
-		return {
-			id: item.id,
-			name: item.name,
-			budgetText: budgetValue?.text ?? null,
-			budget: parseNumericColumnText(budgetValue?.text),
-			costText: costValue?.text ?? null,
-			cost: parseNumericColumnText(costValue?.text),
-			linkedItemIds,
-			linkedItems,
-		};
-	});
+/**
+ * Fetches a single budget board item by id — the data source for the Abrechnung view's
+ * per-row "Aktualisieren" refresh action (`refreshBudgetItem` in `lib/abrechnung.ts`), the
+ * cheap escape hatch around {@link getBudgetBoardItems}'s cache TTL.
+ *
+ * As a side effect, patches the refreshed item into {@link getBudgetBoardItems}'s cached
+ * board array (if present) so the refreshed values survive until the next full board load
+ * instead of being silently overwritten by stale cached data on its next hit.
+ *
+ * @param boardId          - The budget board's monday.com ID (used only to key the cache patch).
+ * @param itemId           - The budget item's monday.com ID.
+ * @param relationColumnId - Same as {@link getBudgetBoardItems}.
+ * @param budgetColumnId   - Same as {@link getBudgetBoardItems}.
+ * @param costColumnId     - Same as {@link getBudgetBoardItems}.
+ * @param statusColumnId   - Same as {@link getBudgetBoardItems}.
+ * @returns The refreshed {@link BudgetBoardItem}, or `null` if the item no longer exists.
+ */
+export async function getBudgetBoardItem(boardId: string, itemId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string): Promise<BudgetBoardItem | null> {
+	const query = `
+		query ($itemId: [ID!], $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!, $statusColumnId: String!) {
+			items(ids: $itemId) {
+				id
+				name
+				url
+				${BUDGET_BOARD_COLUMN_VALUES_FRAGMENT}
+			}
+		}
+	`;
+
+	type BudgetBoardItemResponse = { items: RawBudgetBoardItem[]; error?: APIError };
+
+	try {
+		const response: BudgetBoardItemResponse = await client.request(query, { itemId: [itemId], relationColumnId, budgetColumnId, costColumnId, statusColumnId });
+
+		if (response.error) {
+			throw new Error(response.error?.message || "Failed to fetch budget board item");
+		}
+
+		const raw = response.items?.[0];
+		if (!raw) return null;
+
+		const result = mapRawBudgetBoardItem(raw, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+
+		const cacheKey = budgetBoardItemsCacheKey(boardId, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+		const cachedBoard = await cacheHelper.get<BudgetBoardItem[]>(cacheKey);
+		if (cachedBoard) {
+			const patched = cachedBoard.map((existing) => (existing.id === result.id ? result : existing));
+			await cacheHelper.set(cacheKey, patched, CACHE_TTL.BUDGET_ITEMS);
+		}
+
+		return result;
+	} catch (error) {
+		if (error instanceof ClientError) {
+			console.error("ClientError in getBudgetBoardItem:", error.response?.errors);
+		}
+		console.error(`Error fetching budget board item ${itemId}:`, error);
+		throw error;
+	}
+}
+
+/**
+ * Clears the Redis cache for a budget board's items ({@link getBudgetBoardItems}), across
+ * every column-id combination that board has ever been cached under. Call after a budget
+ * board's column config changes (the admin budget-config PATCH route) or a monday item
+ * lifecycle event on that board (create/delete/rename — see `app/api/webhooks/monday/route.ts`).
+ */
+export async function clearBudgetBoardItemsCache(boardId: string): Promise<void> {
+	await cacheHelper.clearPattern(`monday:budget-items:${boardId}:*`);
 }
 
 /**
