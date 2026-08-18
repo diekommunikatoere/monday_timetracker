@@ -10,7 +10,7 @@ import { useFilteredAbrechnung } from "@/components/dashboard/analytics/hooks/us
 import { useAbrechnungStore } from "@/stores/abrechnungStore";
 import { useMondayStore } from "@/stores/mondayStore";
 
-import type { AbrechnungBoard, AbrechnungLinkedItem } from "@/types/abrechnung";
+import type { AbrechnungBoard, AbrechnungLinkedItem, AbrechnungThirdPartyItem } from "@/types/abrechnung";
 
 /**
  * Abrechnung (budget rollup) view — a single flat table across every active budget
@@ -32,8 +32,9 @@ import type { AbrechnungBoard, AbrechnungLinkedItem } from "@/types/abrechnung";
 function sortBoardsByName(boards: AbrechnungBoard[]): AbrechnungBoard[] {
 	const sortByName = <T extends { name: string }>(list: T[]): T[] => [...list].sort((a, b) => a.name.localeCompare(b.name));
 	const sortLinkedItems = (linkedItems: AbrechnungLinkedItem[]): AbrechnungLinkedItem[] => sortByName(linkedItems);
+	const sortThirdPartyItems = (thirdPartyItems: AbrechnungThirdPartyItem[]): AbrechnungThirdPartyItem[] => sortByName(thirdPartyItems);
 
-	return [...boards].sort((a, b) => a.boardName.localeCompare(b.boardName)).map((board) => ({ ...board, items: sortByName(board.items).map((item) => ({ ...item, linkedItems: sortLinkedItems(item.linkedItems) })) }));
+	return [...boards].sort((a, b) => a.boardName.localeCompare(b.boardName)).map((board) => ({ ...board, items: sortByName(board.items).map((item) => ({ ...item, linkedItems: sortLinkedItems(item.linkedItems), thirdPartyItems: sortThirdPartyItems(item.thirdPartyItems) })) }));
 }
 
 /** `DD.MM.YYYY`, matching the toolbar's `DatePicker` `valueFormat`. */
@@ -62,7 +63,7 @@ export default function AbrechnungPage() {
 	const selectedArchiveError = useAbrechnungStore((state) => state.selectedArchiveError);
 	const selectArchivePeriod = useAbrechnungStore((state) => state.selectArchivePeriod);
 
-	const { rows, boardOptions, statusOptions, hasActiveFilters } = useFilteredAbrechnung();
+	const { rows, boardOptions, statusOptions, linkedStatusOptions, hasActiveFilters } = useFilteredAbrechnung();
 
 	// Fetch the active view once the monday session is ready — mirrors the
 	// no-auto-fetch convention in stores/CLAUDE.md.
@@ -93,7 +94,7 @@ export default function AbrechnungPage() {
 
 	return (
 		<div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-			<AbrechnungToolbar boardOptions={boardOptions} statusOptions={statusOptions} />
+			<AbrechnungToolbar boardOptions={boardOptions} statusOptions={statusOptions} linkedStatusOptions={linkedStatusOptions} />
 			<div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 32 }}>
 				{activeError && <ErrorState message={activeError} />}
 

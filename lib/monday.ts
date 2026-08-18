@@ -1,5 +1,7 @@
 // lib/monday.ts — monday.com GraphQL API client: boards, items, subitems, user details, linked items.
 
+import { createHash } from "crypto";
+
 import { ClientError } from "@mondaydotcomorg/api";
 import { NextRequest } from "next/server";
 
@@ -1212,6 +1214,10 @@ export async function findLinkedItems(boardId: string, itemId: string, targetBoa
  * @property board - The board the linked item currently lives on (`null` if monday
  *                    omitted it), used to resolve archived/moved job boards dynamically
  *                    rather than tracking them in `board_config`.
+ * @property status - The linked item's status on its own job board, resolved via
+ *                     {@link BudgetBoardColumnConfig.jobStatusColumnIdsByBoardId}. Both
+ *                     fields `null` when the item's board has no mapping configured, or
+ *                     the mapped column doesn't exist on that board.
  */
 export interface BudgetBoardLinkedItem {
 	id: string;
@@ -1219,6 +1225,71 @@ export interface BudgetBoardLinkedItem {
 	itemUrl: string;
 	board: { id: string; name: string } | null;
 	totalCost: number;
+	status: { text: string | null; color: string | null };
+}
+
+/**
+ * A Fremdleistungs-item (third-party item) linked to a budget item via the **separate**
+ * {@link BudgetBoardColumnConfig.thirdPartyRelationColumnId}, as returned by
+ * {@link getBudgetBoardItems}. Unlike {@link BudgetBoardLinkedItem}, `cost` is the item's real
+ * parsed value straight off its own Fremdkosten-Board column — there are no time entries to
+ * roll up, so nothing downstream overwrites it. Shaped identically to `AbrechnungThirdPartyItem`
+ * in `@/types/abrechnung` so `lib/abrechnung.ts` can assign it through unchanged.
+ *
+ * @property id     - monday.com item ID of the linked Fremdleistungs-item.
+ * @property name   - Display name of the linked item.
+ * @property board  - The board the linked item currently lives on (`null` if monday omitted it).
+ * @property cost   - Parsed from {@link BudgetBoardColumnConfig.thirdPartyCostColumnIdsByBoardId}'s
+ *                    mapped column on the item's own board, via {@link parseNumericColumnText}.
+ *                    `null` when the item's board has no mapping, or the mapped column is empty.
+ * @property status - The linked item's status on its own Fremdkosten-Board, resolved via
+ *                    {@link BudgetBoardColumnConfig.thirdPartyStatusColumnIdsByBoardId}.
+ */
+export interface BudgetBoardThirdPartyItem {
+	id: string;
+	name: string;
+	itemUrl: string;
+	board: { id: string; name: string } | null;
+	cost: number | null;
+	status: { text: string | null; color: string | null };
+}
+
+/**
+ * Column-id configuration for {@link getBudgetBoardItems} / {@link getBudgetBoardItem},
+ * collapsing what used to be four positional string args (plus a fifth for linked-item
+ * job statuses) into one object — kept as a single param so the growing arg list can't be
+ * miswired at a call site.
+ *
+ * @property relationColumnId - The `board_relation`/`connect_boards` column listing linked Agentur-Projekte (job items).
+ * @property thirdPartyRelationColumnId - A **separate** `board_relation`/`connect_boards` column listing linked
+ *   Fremdleistungen (third-party items) — `null` when the budget board has no Fremdleistungen configured.
+ * @property agencyBudgetColumnId - The `numbers`/`formula`/`mirror` column holding the total (agency) budget figure.
+ * @property agencyCostColumnId   - The `numbers`/`formula`/`mirror` column holding the cost ("Agenturleistung") figure.
+ * @property thirdPartyBudgetColumnId - The `numbers`/`formula`/`mirror` column holding the "Fremdkosten-Budget" figure,
+ *   read as-is off the budget item itself. `null` when unconfigured.
+ * @property thirdPartyCostColumnId   - The `numbers`/`formula`/`mirror` column holding the "Fremdkosten-IST" figure,
+ *   read as-is off the budget item itself. `null` when unconfigured.
+ * @property statusColumnId   - The `status`/`dropdown` column holding the budget item's own status.
+ * @property jobStatusColumnIdsByBoardId - monday board id → that board's configured status
+ *   column id, for every job board with a `job_status_column_id` mapping (see
+ *   `JobBoardSettings` in `@/types/abrechnung`). Empty = no linked job-item statuses fetched.
+ * @property thirdPartyStatusColumnIdsByBoardId - monday board id → that Fremdkosten-Board's configured
+ *   status column id (see `ThirdPartyBoardSettings`). Empty = no linked third-party-item statuses fetched.
+ * @property thirdPartyCostColumnIdsByBoardId - monday board id → that Fremdkosten-Board's configured
+ *   `third_party_item_cost_column_id` (see `ThirdPartyBoardSettings`). Empty = no linked
+ *   third-party-item costs fetched.
+ */
+export interface BudgetBoardColumnConfig {
+	relationColumnId: string;
+	thirdPartyRelationColumnId: string | null;
+	agencyBudgetColumnId: string;
+	agencyCostColumnId: string;
+	thirdPartyBudgetColumnId: string | null;
+	thirdPartyCostColumnId: string | null;
+	statusColumnId: string;
+	jobStatusColumnIdsByBoardId: Record<string, string>;
+	thirdPartyStatusColumnIdsByBoardId: Record<string, string>;
+	thirdPartyCostColumnIdsByBoardId: Record<string, string>;
 }
 
 /**
@@ -1232,6 +1303,12 @@ export interface BudgetBoardLinkedItem {
  * @property cost         - `costText` parsed to a number via {@link parseNumericColumnText}, or `null`.
  * @property linkedItemIds - IDs of every job item linked via the relation column (`linked_item_ids`).
  * @property linkedItems  - Same items with name + board, for drill-down display.
+ * @property thirdPartyBudgetText - Raw `.text` of the "Fremdkosten-Budget" column, or `null` if empty/missing/unconfigured.
+ * @property thirdPartyBudget     - `thirdPartyBudgetText` parsed via {@link parseNumericColumnText}, or `null`.
+ * @property thirdPartyCostText   - Raw `.text` of the "Fremdkosten-IST" column, or `null` if empty/missing/unconfigured.
+ * @property thirdPartyCost       - `thirdPartyCostText` parsed via {@link parseNumericColumnText}, or `null`.
+ * @property thirdPartyLinkedIds   - IDs of every Fremdleistungs-item linked via the third-party relation column.
+ * @property thirdPartyLinkedItems - Same items with name, board, own cost, and status — see {@link BudgetBoardThirdPartyItem}.
  */
 export interface BudgetBoardItem {
 	id: string;
@@ -1241,8 +1318,14 @@ export interface BudgetBoardItem {
 	budget: number | null;
 	costText: string | null;
 	cost: number | null;
+	thirdPartyBudgetText: string | null;
+	thirdPartyBudget: number | null;
+	thirdPartyCostText: string | null;
+	thirdPartyCost: number | null;
 	linkedItemIds: string[];
 	linkedItems: BudgetBoardLinkedItem[];
+	thirdPartyLinkedIds: string[];
+	thirdPartyLinkedItems: BudgetBoardThirdPartyItem[];
 	status: { text: string | null; color: string | null };
 }
 
@@ -1277,7 +1360,14 @@ type RawBudgetBoardItem = {
 		id: string;
 		text: string | null;
 		linked_item_ids?: string[];
-		linked_items?: Array<{ id: string; name: string; url: string; board: { id: string; name: string } | null }>;
+		linked_items?: Array<{
+			id: string;
+			name: string;
+			url: string;
+			board: { id: string; name: string } | null;
+			/** Present only when the query requested `includeLinkedColumns` — see {@link buildBudgetBoardColumnValuesFragment}. */
+			column_values?: Array<{ id: string; text: string | null; label_style?: { color: string | null } }>;
+		}>;
 		label_style?: {
 			color: string | null;
 		};
@@ -1285,12 +1375,31 @@ type RawBudgetBoardItem = {
 };
 
 /**
- * Shared `column_values` selection for both {@link getBudgetBoardItems} and
- * {@link getBudgetBoardItem} — kept as one string (rather than duplicated per query) so the
+ * Builds the shared `column_values` selection for both {@link getBudgetBoardItems} and
+ * {@link getBudgetBoardItem} — kept as one function (rather than duplicated per query) so the
  * two can never drift out of sync on what a "budget board item" looks like.
+ *
+ * The outer `ids:` list is passed as a single `$topLevelColumnIds: [String!]!` variable built by
+ * the caller from every **non-null** configured column id (relation, third-party relation,
+ * agency budget/cost, third-party budget/cost, status) — a nullable third-party column id is
+ * simply omitted from that array rather than sent as a literal `null`, which monday would
+ * reject inside a non-null-item list.
+ *
+ * @param includeLinkedColumns - When `false` (no job boards or Fremdkosten-Boards have a
+ *   status/cost mapping configured at all), emits the fragment with no nested `column_values`
+ *   under `linked_items` — the original shape, verbatim. Sending `column_values(ids: [])` to
+ *   monday is deliberately avoided since that's an unspecified query shape. When `true`, nests a
+ *   `column_values(ids: $linkedColumnIds)` selection under `linked_items` so each linked item's
+ *   status/cost (on whichever board it currently lives on) comes back in the same request. The
+ *   same nested selection applies uniformly to **both** the Agentur-Projekte relation column's
+ *   `linked_items` and the Fremdleistungen relation column's `linked_items` — `$linkedColumnIds`
+ *   is the deduped union of job-status + third-party-status + third-party-cost column ids, and an
+ *   id absent from a given linked item's board just comes back empty, not an error — see
+ *   `lib/abrechnung.ts`'s `getLinkedBoardColumnMaps` for how the id list is built.
  */
-const BUDGET_BOARD_COLUMN_VALUES_FRAGMENT = `
-	column_values(ids: [$relationColumnId, $budgetColumnId, $costColumnId, $statusColumnId]) {
+function buildBudgetBoardColumnValuesFragment(includeLinkedColumns: boolean): string {
+	return `
+	column_values(ids: $topLevelColumnIds) {
 		id
 		text
 		... on BoardRelationValue {
@@ -1303,6 +1412,19 @@ const BUDGET_BOARD_COLUMN_VALUES_FRAGMENT = `
 					name
 					}
 				url
+				${
+					includeLinkedColumns
+						? `column_values(ids: $linkedColumnIds) {
+					id
+					text
+					... on StatusValue {
+						label_style {
+							color
+						}
+					}
+				}`
+						: ""
+				}
 			}
 		}
 		... on StatusValue {
@@ -1313,19 +1435,60 @@ const BUDGET_BOARD_COLUMN_VALUES_FRAGMENT = `
 		}
 	}
 `;
+}
 
 /** Maps one {@link RawBudgetBoardItem} (from either {@link getBudgetBoardItems} or {@link getBudgetBoardItem}) to a {@link BudgetBoardItem}. */
-function mapRawBudgetBoardItem(item: RawBudgetBoardItem, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string): BudgetBoardItem {
+function mapRawBudgetBoardItem(item: RawBudgetBoardItem, config: BudgetBoardColumnConfig): BudgetBoardItem {
+	const { relationColumnId, thirdPartyRelationColumnId, agencyBudgetColumnId, agencyCostColumnId, thirdPartyBudgetColumnId, thirdPartyCostColumnId, statusColumnId, jobStatusColumnIdsByBoardId, thirdPartyStatusColumnIdsByBoardId, thirdPartyCostColumnIdsByBoardId } = config;
+
 	const relationValue = item.column_values.find((cv) => cv.id === relationColumnId);
-	const budgetValue = item.column_values.find((cv) => cv.id === budgetColumnId);
-	const costValue = item.column_values.find((cv) => cv.id === costColumnId);
+	const thirdPartyRelationValue = thirdPartyRelationColumnId ? item.column_values.find((cv) => cv.id === thirdPartyRelationColumnId) : undefined;
+	const budgetValue = item.column_values.find((cv) => cv.id === agencyBudgetColumnId);
+	const costValue = item.column_values.find((cv) => cv.id === agencyCostColumnId);
+	const thirdPartyBudgetValue = thirdPartyBudgetColumnId ? item.column_values.find((cv) => cv.id === thirdPartyBudgetColumnId) : undefined;
+	const thirdPartyCostValue = thirdPartyCostColumnId ? item.column_values.find((cv) => cv.id === thirdPartyCostColumnId) : undefined;
 	const statusValue = item.column_values.find((cv) => cv.id === statusColumnId);
 
 	// totalCost is a placeholder — lib/abrechnung.ts overwrites it (along with
 	// totalSeconds/byRole, which AbrechnungLinkedItem adds on top of this monday-only
 	// shape) with the real per-item rollup from get_items_time_by_role.
-	const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => ({ id: li.id, name: li.name, itemUrl: li.url, board: li.board, totalCost: 0 }));
+	const linkedItems: BudgetBoardLinkedItem[] = (relationValue?.linked_items ?? []).map((li) => {
+		// A column id that doesn't exist on the linked item's board comes back as an empty
+		// column_values array (not an error), so an unmapped/stale job board degrades to
+		// "no status" on its own — see Step 0 finding 2 in the feature plan.
+		const jobStatusColumnId = li.board?.id ? jobStatusColumnIdsByBoardId[li.board.id] : undefined;
+		const linkedStatusValue = jobStatusColumnId ? li.column_values?.find((cv) => cv.id === jobStatusColumnId) : undefined;
+
+		return {
+			id: li.id,
+			name: li.name,
+			itemUrl: li.url,
+			board: li.board,
+			totalCost: 0,
+			status: { text: linkedStatusValue?.text ?? null, color: linkedStatusValue?.label_style?.color ?? null },
+		};
+	});
 	const linkedItemIds = relationValue?.linked_item_ids ?? linkedItems.map((li) => li.id);
+
+	// Sourced from the SEPARATE third-party relation column, not `relationValue` — a budget
+	// board with no `thirdPartyRelationColumnId` configured degrades to an empty list rather
+	// than duplicating the Agentur-Projekte links.
+	const thirdPartyLinkedItems: BudgetBoardThirdPartyItem[] = (thirdPartyRelationValue?.linked_items ?? []).map((li) => {
+		const thirdPartyStatusColumnId = li.board?.id ? thirdPartyStatusColumnIdsByBoardId[li.board.id] : undefined;
+		const linkedThirdPartyStatusValue = thirdPartyStatusColumnId ? li.column_values?.find((cv) => cv.id === thirdPartyStatusColumnId) : undefined;
+		const thirdPartyItemCostColumnId = li.board?.id ? thirdPartyCostColumnIdsByBoardId[li.board.id] : undefined;
+		const linkedThirdPartyCostValue = thirdPartyItemCostColumnId ? li.column_values?.find((cv) => cv.id === thirdPartyItemCostColumnId) : undefined;
+
+		return {
+			id: li.id,
+			name: li.name,
+			itemUrl: li.url,
+			board: li.board,
+			cost: parseNumericColumnText(linkedThirdPartyCostValue?.text),
+			status: { text: linkedThirdPartyStatusValue?.text ?? null, color: linkedThirdPartyStatusValue?.label_style?.color ?? null },
+		};
+	});
+	const thirdPartyLinkedIds = thirdPartyRelationValue?.linked_item_ids ?? thirdPartyLinkedItems.map((li) => li.id);
 
 	return {
 		id: item.id,
@@ -1335,18 +1498,45 @@ function mapRawBudgetBoardItem(item: RawBudgetBoardItem, relationColumnId: strin
 		budget: parseNumericColumnText(budgetValue?.text),
 		costText: costValue?.text ?? null,
 		cost: parseNumericColumnText(costValue?.text),
+		thirdPartyBudgetText: thirdPartyBudgetValue?.text ?? null,
+		thirdPartyBudget: parseNumericColumnText(thirdPartyBudgetValue?.text),
+		thirdPartyCostText: thirdPartyCostValue?.text ?? null,
+		thirdPartyCost: parseNumericColumnText(thirdPartyCostValue?.text),
 		linkedItemIds,
 		linkedItems,
+		thirdPartyLinkedIds,
+		thirdPartyLinkedItems,
 		status: {
 			text: statusValue?.text ?? null,
-			color: statusValue?.label_style?.color ?? "var(--color--background-secondary)", // fallback to a neutral color if missing
+			color: statusValue?.label_style?.color ?? null,
 		},
 	};
 }
 
-/** Builds the Redis cache key for one budget board's {@link getBudgetBoardItems} result — column ids are part of the key so an admin config change misses naturally instead of serving stale-shaped data. */
-function budgetBoardItemsCacheKey(boardId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string): string {
-	return `monday:budget-items:${boardId}:${relationColumnId}:${budgetColumnId}:${costColumnId}:${statusColumnId}`;
+/**
+ * Builds the Redis cache key for one budget board's {@link getBudgetBoardItems} result —
+ * column ids are part of the key so an admin config change misses naturally instead of
+ * serving stale-shaped data. Includes a short hash combining the sorted `boardId:columnId`
+ * job-status, third-party-status, and third-party-cost mappings for the same reason: changing
+ * any of the three maps changes the key, so the old entry simply expires on its own TTL rather
+ * than needing explicit invalidation.
+ */
+function budgetBoardItemsCacheKey(boardId: string, config: BudgetBoardColumnConfig): string {
+	const { relationColumnId, thirdPartyRelationColumnId, agencyBudgetColumnId, agencyCostColumnId, thirdPartyBudgetColumnId, thirdPartyCostColumnId, statusColumnId, jobStatusColumnIdsByBoardId, thirdPartyStatusColumnIdsByBoardId, thirdPartyCostColumnIdsByBoardId } = config;
+
+	const hashMap = (map: Record<string, string>): string => {
+		const pairs = Object.entries(map)
+			.map(([board, column]) => `${board}:${column}`)
+			.sort();
+		return pairs.length === 0 ? "none" : pairs.join(",");
+	};
+
+	const columnMapsHash = createHash("sha1")
+		.update([hashMap(jobStatusColumnIdsByBoardId), hashMap(thirdPartyStatusColumnIdsByBoardId), hashMap(thirdPartyCostColumnIdsByBoardId)].join("|"))
+		.digest("hex")
+		.slice(0, 8);
+
+	return `monday:budget-items:${boardId}:${relationColumnId}:${thirdPartyRelationColumnId ?? "-"}:${agencyBudgetColumnId}:${agencyCostColumnId}:${thirdPartyBudgetColumnId ?? "-"}:${thirdPartyCostColumnId ?? "-"}:${statusColumnId}:${columnMapsHash}`;
 }
 
 /**
@@ -1371,29 +1561,42 @@ function budgetBoardItemsCacheKey(boardId: string, relationColumnId: string, bud
  * stay stale for the whole TTL; {@link getBudgetBoardItem}'s per-item refresh is the escape
  * hatch). Pass `forceRefresh: true` to bypass the cache and rewrite the entry.
  *
- * @param boardId          - The budget board's monday.com ID.
- * @param relationColumnId - The `board_relation`/`connect_boards` column listing linked job items.
- * @param budgetColumnId   - The `numbers`/`formula`/`mirror` column holding the total budget figure.
- * @param costColumnId     - The `numbers`/`formula`/`mirror` column holding the cost ("Agenturleistung") figure.
- * @param statusColumnId   - The `status`/`dropdown` column holding the budget item's status.
- * @param forceRefresh     - Bypasses the cache and rewrites it with a fresh fetch. Default `false`.
+ * @param boardId      - The budget board's monday.com ID.
+ * @param config       - Column-id configuration; see {@link BudgetBoardColumnConfig}.
+ * @param forceRefresh - Bypasses the cache and rewrites it with a fresh fetch. Default `false`.
  * @returns One {@link BudgetBoardItem} per item on the board, in API order.
  * @throws If `boardId` is not a valid positive integer, or on unrecoverable API errors.
  */
-export async function getBudgetBoardItems(boardId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string, forceRefresh = false): Promise<BudgetBoardItem[]> {
+export async function getBudgetBoardItems(boardId: string, config: BudgetBoardColumnConfig, forceRefresh = false): Promise<BudgetBoardItem[]> {
 	if (!boardId || isNaN(Number(boardId)) || Number(boardId) <= 0) {
 		throw new Error("boardId must be a valid positive integer");
 	}
 
-	const cacheKey = budgetBoardItemsCacheKey(boardId, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+	const { relationColumnId, thirdPartyRelationColumnId, agencyBudgetColumnId, agencyCostColumnId, thirdPartyBudgetColumnId, thirdPartyCostColumnId, statusColumnId, jobStatusColumnIdsByBoardId, thirdPartyStatusColumnIdsByBoardId, thirdPartyCostColumnIdsByBoardId } = config;
+
+	const cacheKey = budgetBoardItemsCacheKey(boardId, config);
 
 	if (!forceRefresh) {
 		const cached = await cacheHelper.get<BudgetBoardItem[]>(cacheKey);
 		if (cached) return cached;
 	}
 
+	// Every configured top-level column id, with unconfigured (null) third-party ids filtered
+	// out rather than sent as a literal `null`, which monday rejects inside a non-null-item list.
+	const topLevelColumnIds = [relationColumnId, thirdPartyRelationColumnId, agencyBudgetColumnId, agencyCostColumnId, thirdPartyBudgetColumnId, thirdPartyCostColumnId, statusColumnId].filter((id): id is string => !!id);
+
+	// Deduplicated, sorted union of every job board's mapped status column and every
+	// Fremdkosten-Board's mapped status/cost columns — over-fetched per linked item (a column id
+	// absent from a given linked item's board just comes back empty, not an error; see
+	// buildBudgetBoardColumnValuesFragment/mapRawBudgetBoardItem).
+	const linkedColumnIds = Array.from(new Set([...Object.values(jobStatusColumnIdsByBoardId), ...Object.values(thirdPartyStatusColumnIdsByBoardId), ...Object.values(thirdPartyCostColumnIdsByBoardId)])).sort();
+	const includeLinkedColumns = linkedColumnIds.length > 0;
+	const columnValuesFragment = buildBudgetBoardColumnValuesFragment(includeLinkedColumns);
+	const linkedColumnsVarDecl = includeLinkedColumns ? ", $linkedColumnIds: [String!]" : "";
+	const queryVars = { topLevelColumnIds, ...(includeLinkedColumns ? { linkedColumnIds } : {}) };
+
 	const initialQuery = `
-		query ($boardId: ID!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!, $statusColumnId: String!) {
+		query ($boardId: ID!, $topLevelColumnIds: [String!]!${linkedColumnsVarDecl}) {
 			boards(ids: [$boardId]) {
 				items_page(limit: 100) {
 					cursor
@@ -1401,7 +1604,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 						id
 						name
 						url
-						${BUDGET_BOARD_COLUMN_VALUES_FRAGMENT}
+						${columnValuesFragment}
 					}
 				}
 			}
@@ -1412,14 +1615,14 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	`;
 
 	const nextPageQuery = `
-		query ($cursor: String!, $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!, $statusColumnId: String!) {
+		query ($cursor: String!, $topLevelColumnIds: [String!]!${linkedColumnsVarDecl}) {
 			next_items_page(limit: 100, cursor: $cursor) {
 				cursor
 				items {
 					id
 					name
 					url
-					${BUDGET_BOARD_COLUMN_VALUES_FRAGMENT}
+					${columnValuesFragment}
 				}
 			}
 			complexity {
@@ -1431,7 +1634,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 	const rawItems: RawBudgetBoardItem[] = [];
 
 	try {
-		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, relationColumnId, budgetColumnId, costColumnId, statusColumnId });
+		const response: BudgetBoardItemsPageResponse = await client.request(initialQuery, { boardId, ...queryVars });
 
 		if (response.error) {
 			throw new Error(response.error?.message || "Failed to fetch budget board items");
@@ -1446,7 +1649,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 		let cursor = itemsPage.cursor;
 
 		while (cursor) {
-			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, relationColumnId, budgetColumnId, costColumnId, statusColumnId });
+			const pageResponse: BudgetBoardNextItemsPageResponse = await client.request(nextPageQuery, { cursor, ...queryVars });
 
 			if (pageResponse.error) {
 				console.warn(`[getBudgetBoardItems] Pagination error for board ${boardId}: ${pageResponse.error.message}`);
@@ -1467,7 +1670,7 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
 		throw error;
 	}
 
-	const result = rawItems.map((item) => mapRawBudgetBoardItem(item, relationColumnId, budgetColumnId, costColumnId, statusColumnId));
+	const result = rawItems.map((item) => mapRawBudgetBoardItem(item, config));
 
 	await cacheHelper.set(cacheKey, result, CACHE_TTL.BUDGET_ITEMS);
 	return result;
@@ -1482,22 +1685,28 @@ export async function getBudgetBoardItems(boardId: string, relationColumnId: str
  * board array (if present) so the refreshed values survive until the next full board load
  * instead of being silently overwritten by stale cached data on its next hit.
  *
- * @param boardId          - The budget board's monday.com ID (used only to key the cache patch).
- * @param itemId           - The budget item's monday.com ID.
- * @param relationColumnId - Same as {@link getBudgetBoardItems}.
- * @param budgetColumnId   - Same as {@link getBudgetBoardItems}.
- * @param costColumnId     - Same as {@link getBudgetBoardItems}.
- * @param statusColumnId   - Same as {@link getBudgetBoardItems}.
+ * @param boardId - The budget board's monday.com ID (used only to key the cache patch).
+ * @param itemId  - The budget item's monday.com ID.
+ * @param config  - Same as {@link getBudgetBoardItems}.
  * @returns The refreshed {@link BudgetBoardItem}, or `null` if the item no longer exists.
  */
-export async function getBudgetBoardItem(boardId: string, itemId: string, relationColumnId: string, budgetColumnId: string, costColumnId: string, statusColumnId: string): Promise<BudgetBoardItem | null> {
+export async function getBudgetBoardItem(boardId: string, itemId: string, config: BudgetBoardColumnConfig): Promise<BudgetBoardItem | null> {
+	const { relationColumnId, thirdPartyRelationColumnId, agencyBudgetColumnId, agencyCostColumnId, thirdPartyBudgetColumnId, thirdPartyCostColumnId, statusColumnId, jobStatusColumnIdsByBoardId, thirdPartyStatusColumnIdsByBoardId, thirdPartyCostColumnIdsByBoardId } = config;
+
+	const topLevelColumnIds = [relationColumnId, thirdPartyRelationColumnId, agencyBudgetColumnId, agencyCostColumnId, thirdPartyBudgetColumnId, thirdPartyCostColumnId, statusColumnId].filter((id): id is string => !!id);
+
+	const linkedColumnIds = Array.from(new Set([...Object.values(jobStatusColumnIdsByBoardId), ...Object.values(thirdPartyStatusColumnIdsByBoardId), ...Object.values(thirdPartyCostColumnIdsByBoardId)])).sort();
+	const includeLinkedColumns = linkedColumnIds.length > 0;
+	const linkedColumnsVarDecl = includeLinkedColumns ? ", $linkedColumnIds: [String!]" : "";
+	const queryVars = { topLevelColumnIds, ...(includeLinkedColumns ? { linkedColumnIds } : {}) };
+
 	const query = `
-		query ($itemId: [ID!], $relationColumnId: String!, $budgetColumnId: String!, $costColumnId: String!, $statusColumnId: String!) {
+		query ($itemId: [ID!], $topLevelColumnIds: [String!]!${linkedColumnsVarDecl}) {
 			items(ids: $itemId) {
 				id
 				name
 				url
-				${BUDGET_BOARD_COLUMN_VALUES_FRAGMENT}
+				${buildBudgetBoardColumnValuesFragment(includeLinkedColumns)}
 			}
 		}
 	`;
@@ -1505,7 +1714,7 @@ export async function getBudgetBoardItem(boardId: string, itemId: string, relati
 	type BudgetBoardItemResponse = { items: RawBudgetBoardItem[]; error?: APIError };
 
 	try {
-		const response: BudgetBoardItemResponse = await client.request(query, { itemId: [itemId], relationColumnId, budgetColumnId, costColumnId, statusColumnId });
+		const response: BudgetBoardItemResponse = await client.request(query, { itemId: [itemId], ...queryVars });
 
 		if (response.error) {
 			throw new Error(response.error?.message || "Failed to fetch budget board item");
@@ -1514,9 +1723,9 @@ export async function getBudgetBoardItem(boardId: string, itemId: string, relati
 		const raw = response.items?.[0];
 		if (!raw) return null;
 
-		const result = mapRawBudgetBoardItem(raw, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+		const result = mapRawBudgetBoardItem(raw, config);
 
-		const cacheKey = budgetBoardItemsCacheKey(boardId, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+		const cacheKey = budgetBoardItemsCacheKey(boardId, config);
 		const cachedBoard = await cacheHelper.get<BudgetBoardItem[]>(cacheKey);
 		if (cachedBoard) {
 			const patched = cachedBoard.map((existing) => (existing.id === result.id ? result : existing));

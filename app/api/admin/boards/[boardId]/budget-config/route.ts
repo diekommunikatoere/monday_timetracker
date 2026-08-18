@@ -59,7 +59,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  * write-back sync) when it doesn't exist yet, matching the "existing add-board
  * flow must run first" note in the Abrechnung plan.
  *
- * Body: `{ board_name, workspace_id?, budget_board_status, label?, job_relation_column_id, budget_column_id, cost_column_id }`.
+ * The three Fremdleistungen keys (`third_party_relation_column_id`, `third_party_budget_column_id`,
+ * `third_party_cost_column_id`) are optional — a budget board with none of them set keeps working,
+ * it just has no Fremdleistungen section in the drill-down (see `lib/abrechnung.ts`).
+ *
+ * Body: `{ board_name, workspace_id?, budget_board_status, label?, job_relation_column_id, agency_budget_column_id, agency_cost_column_id, status_column_id, third_party_relation_column_id?, third_party_budget_column_id?, third_party_cost_column_id? }`.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
 	try {
@@ -68,14 +72,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 		const { boardId } = await params;
 		const body = await request.json();
-		const { board_name, workspace_id, budget_board_status, label, job_relation_column_id, budget_column_id, cost_column_id, status_column_id } = body as {
+		const { board_name, workspace_id, budget_board_status, label, job_relation_column_id, third_party_relation_column_id, agency_budget_column_id, third_party_budget_column_id, agency_cost_column_id, third_party_cost_column_id, status_column_id } = body as {
 			board_name?: string;
 			workspace_id?: string;
 			budget_board_status?: BudgetBoardStatus;
 			label?: string | null;
 			job_relation_column_id?: string;
-			budget_column_id?: string;
-			cost_column_id?: string;
+			third_party_relation_column_id?: string;
+			agency_budget_column_id?: string;
+			third_party_budget_column_id?: string;
+			agency_cost_column_id?: string;
+			third_party_cost_column_id?: string;
 			status_column_id?: string;
 		};
 
@@ -87,8 +94,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 			return NextResponse.json({ error: "budget_board_status must be 'active' or 'archived'" }, { status: 400 });
 		}
 
-		if (!job_relation_column_id || !budget_column_id || !cost_column_id || !status_column_id) {
-			return NextResponse.json({ error: "job_relation_column_id, budget_column_id, cost_column_id and status_column_id are required" }, { status: 400 });
+		if (!job_relation_column_id || !agency_budget_column_id || !agency_cost_column_id || !status_column_id) {
+			return NextResponse.json({ error: "job_relation_column_id, agency_budget_column_id, agency_cost_column_id and status_column_id are required" }, { status: 400 });
 		}
 
 		// Ensure the monday_board dimension row exists so the board_config FK holds.
@@ -98,8 +105,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 			budget_board_status,
 			label: budget_board_status === "archived" ? (label ?? null) : null,
 			job_relation_column_id,
-			budget_column_id,
-			cost_column_id,
+			third_party_relation_column_id,
+			agency_budget_column_id,
+			third_party_budget_column_id,
+			agency_cost_column_id,
+			third_party_cost_column_id,
 			status_column_id,
 		};
 

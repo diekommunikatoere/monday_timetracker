@@ -58,13 +58,32 @@ interface BudgetBoardRow {
 	status: "active" | "archived";
 	label: string | null;
 	job_relation_column_id: string | null;
-	cost_column_id: string | null;
-	budget_column_id: string | null;
+	third_party_relation_column_id: string | null;
+	agency_cost_column_id: string | null;
+	third_party_cost_column_id: string | null;
+	agency_budget_column_id: string | null;
+	third_party_budget_column_id: string | null;
 	status_column_id: string | null;
 }
 
+/** A `board_config` row with a `settings.job_status_column_id` mapping, for the "Job-Boards" list. */
+interface JobBoardRow {
+	board_id: string;
+	board_name: string;
+	workspace_name: string;
+	job_status_column_id: string;
+}
+
+/** A `board_config` row with a `settings.third_party_status_column_id` mapping, for the "Fremdkosten-Boards" list. */
+interface ThirdPartyBoardRow {
+	board_id: string;
+	board_name: string;
+	workspace_name: string;
+	third_party_status_column_id: string;
+	third_party_item_cost_column_id: string;
+}
+
 const BUDGET_RELATION_COLUMN_TYPES = ["board_relation", "connect_boards"];
-const COST_COLUMN_TYPES = ["numbers", "formula", "mirror"];
 const BUDGET_COLUMN_TYPES = ["numbers", "formula", "mirror"];
 const STATUS_COLUMN_TYPES = ["status", "dropdown"];
 
@@ -153,13 +172,41 @@ export default function AdminPage() {
 		budget_board_status: "active" as "active" | "archived",
 		label: "",
 		job_relation_column_id: "",
-		cost_column_id: "",
-		budget_column_id: "",
+		third_party_relation_column_id: "",
+		agency_cost_column_id: "",
+		third_party_cost_column_id: "",
+		agency_budget_column_id: "",
+		third_party_budget_column_id: "",
 		status_column_id: "",
 	});
 	const [budgetBoardColumns, setBudgetBoardColumns] = useState<BudgetColumnOption[]>([]);
 	const [budgetBoardColumnsLoading, setBudgetBoardColumnsLoading] = useState(false);
 	const [savingBudgetBoard, setSavingBudgetBoard] = useState(false);
+
+	// Job-board modal state — reuses budgetBoardColumns/fetchBudgetBoardColumns (same
+	// GET /api/boards/:boardId/columns endpoint) since only one of the two modals is ever open.
+	const [jobBoardModalOpen, setJobBoardModalOpen] = useState(false);
+	const [editingJobBoardId, setEditingJobBoardId] = useState<string | null>(null);
+	const [jobBoardForm, setJobBoardForm] = useState({
+		board_id: "",
+		board_name: "",
+		workspace_id: undefined as string | undefined,
+		status_column_id: "",
+	});
+	const [savingJobBoard, setSavingJobBoard] = useState(false);
+
+	// Third-party-board modal state — reuses budgetBoardColumns/fetchBudgetBoardColumns (same
+	// GET /api/boards/:boardId/columns endpoint) since only one of the two modals is ever open.
+	const [thirdPartyBoardModalOpen, setThirdPartyBoardModalOpen] = useState(false);
+	const [editingThirdPartyBoardId, setEditingThirdPartyBoardId] = useState<string | null>(null);
+	const [thirdPartyBoardForm, setThirdPartyBoardForm] = useState({
+		board_id: "",
+		board_name: "",
+		workspace_id: undefined as string | undefined,
+		third_party_status_column_id: "",
+		third_party_item_cost_column_id: "",
+	});
+	const [savingThirdPartyBoard, setSavingThirdPartyBoard] = useState(false);
 
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -465,8 +512,11 @@ export default function AdminPage() {
 					status: b.settings.budget_board_status as "active" | "archived",
 					label: b.settings.label ?? null,
 					job_relation_column_id: b.settings.job_relation_column_id ?? null,
-					cost_column_id: b.settings.cost_column_id ?? null,
-					budget_column_id: b.settings.budget_column_id ?? null,
+					third_party_relation_column_id: b.settings.third_party_relation_column_id ?? null,
+					agency_cost_column_id: b.settings.agency_cost_column_id ?? null,
+					third_party_cost_column_id: b.settings.third_party_cost_column_id ?? null,
+					agency_budget_column_id: b.settings.agency_budget_column_id ?? null,
+					third_party_budget_column_id: b.settings.third_party_budget_column_id ?? null,
 					status_column_id: b.settings.status_column_id ?? null,
 				};
 			})
@@ -475,6 +525,42 @@ export default function AdminPage() {
 
 	const activeBudgetBoards = useMemo(() => budgetBoardRows.filter((b) => b.status === "active"), [budgetBoardRows]);
 	const archivedBudgetBoards = useMemo(() => budgetBoardRows.filter((b) => b.status === "archived"), [budgetBoardRows]);
+
+	// Job-board handlers — the status column mapping for the boards linked Agentur-Projekte
+	// live on (see lib/abrechnung.ts's getJobStatusColumnMap).
+	const jobBoardRows: JobBoardRow[] = useMemo(() => {
+		return allBoardConfigs
+			.filter((b: any) => !!b.settings?.job_status_column_id)
+			.map((b: any) => {
+				const workspaceId: string | null = b.monday_board?.workspace_id ?? null;
+				return {
+					board_id: b.board_id,
+					board_name: b.monday_board?.name || b.board_id,
+					workspace_name: (workspaceId && workspaceNameById[workspaceId]) || "Hauptbereich",
+					job_status_column_id: b.settings.job_status_column_id as string,
+				};
+			})
+			.sort((a: JobBoardRow, b: JobBoardRow) => a.board_name.localeCompare(b.board_name));
+	}, [allBoardConfigs, workspaceNameById]);
+
+	// Third-party-board handlers — discriminated on third_party_status_column_id (mirroring
+	// jobBoardRows' job_status_column_id filter), not the cost key, since third_party_cost_column_id
+	// used to also live on budget boards and would list every budget board here too.
+	const thirdPartyBoardRows: ThirdPartyBoardRow[] = useMemo(() => {
+		return allBoardConfigs
+			.filter((b: any) => !!b.settings?.third_party_status_column_id)
+			.map((b: any) => {
+				const workspaceId: string | null = b.monday_board?.workspace_id ?? null;
+				return {
+					board_id: b.board_id,
+					board_name: b.monday_board?.name || b.board_id,
+					workspace_name: (workspaceId && workspaceNameById[workspaceId]) || "Hauptbereich",
+					third_party_status_column_id: b.settings.third_party_status_column_id as string,
+					third_party_item_cost_column_id: b.settings.third_party_item_cost_column_id as string,
+				};
+			})
+			.sort((a: ThirdPartyBoardRow, b: ThirdPartyBoardRow) => a.board_name.localeCompare(b.board_name));
+	}, [allBoardConfigs, workspaceNameById]);
 
 	// Budget-board board picker: every monday board, flattened with its workspace name for the label.
 	const budgetBoardSelectOptions = useMemo(
@@ -527,8 +613,11 @@ export default function AdminPage() {
 				budget_board_status: existing.status,
 				label: existing.label || "",
 				job_relation_column_id: existing.job_relation_column_id || "",
-				cost_column_id: existing.cost_column_id || "",
-				budget_column_id: existing.budget_column_id || "",
+				third_party_relation_column_id: existing.third_party_relation_column_id || "",
+				agency_cost_column_id: existing.agency_cost_column_id || "",
+				third_party_cost_column_id: existing.third_party_cost_column_id || "",
+				agency_budget_column_id: existing.agency_budget_column_id || "",
+				third_party_budget_column_id: existing.third_party_budget_column_id || "",
 				status_column_id: existing.status_column_id || "",
 			});
 			fetchBudgetBoardColumns(existing.board_id);
@@ -541,8 +630,11 @@ export default function AdminPage() {
 				budget_board_status: "active",
 				label: "",
 				job_relation_column_id: "",
-				cost_column_id: "",
-				budget_column_id: "",
+				third_party_relation_column_id: "",
+				agency_cost_column_id: "",
+				third_party_cost_column_id: "",
+				agency_budget_column_id: "",
+				third_party_budget_column_id: "",
 				status_column_id: "",
 			});
 			setBudgetBoardColumns([]);
@@ -560,8 +652,11 @@ export default function AdminPage() {
 			board_name: pickerBoard?.label || selected?.label || boardId,
 			workspace_id: pickerBoard?.workspaceId === DEFAULT_WORKSPACE_ID ? undefined : pickerBoard?.workspaceId,
 			job_relation_column_id: "",
-			cost_column_id: "",
-			budget_column_id: "",
+			third_party_relation_column_id: "",
+			agency_cost_column_id: "",
+			third_party_cost_column_id: "",
+			agency_budget_column_id: "",
+			third_party_budget_column_id: "",
 			status_column_id: "",
 		}));
 		fetchBudgetBoardColumns(boardId);
@@ -572,7 +667,10 @@ export default function AdminPage() {
 			notifications.show({ title: "Validierungsfehler", message: "Bitte ein Board auswählen", color: "red" });
 			return;
 		}
-		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.cost_column_id || !budgetBoardForm.budget_column_id || !budgetBoardForm.status_column_id) {
+		// The third-party pickers (relation/budget/cost) are optional, matching the relaxed
+		// server-side guard in budget-config/route.ts — a budget board without Fremdleistungen
+		// configured is a valid, supported state.
+		if (!budgetBoardForm.job_relation_column_id || !budgetBoardForm.agency_cost_column_id || !budgetBoardForm.agency_budget_column_id || !budgetBoardForm.status_column_id) {
 			notifications.show({ title: "Validierungsfehler", message: "Bitte Verknüpfungs-, Agenturleistungs-, Budget- und Status-Spalte auswählen", color: "red" });
 			return;
 		}
@@ -591,8 +689,11 @@ export default function AdminPage() {
 					budget_board_status: budgetBoardForm.budget_board_status,
 					label: budgetBoardForm.budget_board_status === "archived" ? budgetBoardForm.label : null,
 					job_relation_column_id: budgetBoardForm.job_relation_column_id,
-					cost_column_id: budgetBoardForm.cost_column_id,
-					budget_column_id: budgetBoardForm.budget_column_id,
+					third_party_relation_column_id: budgetBoardForm.third_party_relation_column_id || undefined,
+					agency_cost_column_id: budgetBoardForm.agency_cost_column_id,
+					third_party_cost_column_id: budgetBoardForm.third_party_cost_column_id || undefined,
+					agency_budget_column_id: budgetBoardForm.agency_budget_column_id,
+					third_party_budget_column_id: budgetBoardForm.third_party_budget_column_id || undefined,
 					status_column_id: budgetBoardForm.status_column_id,
 				}),
 			});
@@ -645,6 +746,224 @@ export default function AdminPage() {
 			notifications.show({
 				title: "Fehler",
 				message: err instanceof Error ? err.message : "Budget-Board konnte nicht entfernt werden",
+				color: "red",
+			});
+		}
+	};
+
+	// Job-board handlers — the status column mapping for the boards linked Agentur-Projekte
+	const handleOpenJobBoardModal = (existing?: JobBoardRow) => {
+		if (existing) {
+			setEditingJobBoardId(existing.board_id);
+			setJobBoardForm({
+				board_id: existing.board_id,
+				board_name: existing.board_name,
+				workspace_id: undefined,
+				status_column_id: existing.job_status_column_id,
+			});
+			fetchBudgetBoardColumns(existing.board_id);
+		} else {
+			setEditingJobBoardId(null);
+			setJobBoardForm({ board_id: "", board_name: "", workspace_id: undefined, status_column_id: "" });
+			setBudgetBoardColumns([]);
+		}
+		setJobBoardModalOpen(true);
+	};
+
+	const handleSelectJobBoardBoard = (boardId: string | null) => {
+		if (!boardId) return;
+		const selected = budgetBoardSelectOptions.find((b) => b.value === boardId);
+		const pickerBoard = allPickerBoardsById.get(boardId);
+		setJobBoardForm((prev) => ({
+			...prev,
+			board_id: boardId,
+			board_name: pickerBoard?.label || selected?.label || boardId,
+			workspace_id: pickerBoard?.workspaceId === DEFAULT_WORKSPACE_ID ? undefined : pickerBoard?.workspaceId,
+			status_column_id: "",
+		}));
+		fetchBudgetBoardColumns(boardId);
+	};
+
+	const handleSaveJobBoard = async () => {
+		if (!jobBoardForm.board_id || !jobBoardForm.status_column_id) {
+			notifications.show({ title: "Validierungsfehler", message: "Bitte Board und Status-Spalte auswählen", color: "red" });
+			return;
+		}
+
+		setSavingJobBoard(true);
+		try {
+			const response = await fetch(`/api/admin/boards/${jobBoardForm.board_id}/job-status-config`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify({
+					board_name: jobBoardForm.board_name,
+					workspace_id: jobBoardForm.workspace_id,
+					status_column_id: jobBoardForm.status_column_id,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Job-Board konnte nicht gespeichert werden");
+			}
+
+			notifications.show({
+				title: "Erfolg",
+				message: editingJobBoardId ? "Job-Board aktualisiert" : "Job-Board hinzugefügt",
+				color: "green",
+			});
+
+			setJobBoardModalOpen(false);
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Job-Board konnte nicht gespeichert werden",
+				color: "red",
+			});
+		} finally {
+			setSavingJobBoard(false);
+		}
+	};
+
+	const handleRemoveJobBoard = async (board: JobBoardRow) => {
+		if (!confirm(`Möchtest du die Status-Zuordnung für "${board.board_name}" wirklich entfernen?`)) {
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/admin/boards/${board.board_id}/job-status-config`, {
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${sessionToken}` },
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Status-Zuordnung konnte nicht entfernt werden");
+			}
+
+			notifications.show({ title: "Erfolg", message: "Status-Zuordnung entfernt", color: "green" });
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Status-Zuordnung konnte nicht entfernt werden",
+				color: "red",
+			});
+		}
+	};
+
+	// Third-party-board handlers — the status + per-item cost column mapping for the
+	// Fremdkosten-Boards linked Fremdleistungen live on.
+	const handleOpenThirdPartyBoardModal = (existing?: ThirdPartyBoardRow) => {
+		if (existing) {
+			setEditingThirdPartyBoardId(existing.board_id);
+			setThirdPartyBoardForm({
+				board_id: existing.board_id,
+				board_name: existing.board_name,
+				workspace_id: undefined,
+				third_party_item_cost_column_id: existing.third_party_item_cost_column_id,
+				third_party_status_column_id: existing.third_party_status_column_id,
+			});
+			fetchBudgetBoardColumns(existing.board_id);
+		} else {
+			setEditingThirdPartyBoardId(null);
+			setThirdPartyBoardForm({ board_id: "", board_name: "", workspace_id: undefined, third_party_item_cost_column_id: "", third_party_status_column_id: "" });
+			setBudgetBoardColumns([]);
+		}
+		setThirdPartyBoardModalOpen(true);
+	};
+
+	const handleSelectThirdPartyBoardBoard = (boardId: string | null) => {
+		if (!boardId) return;
+		const selected = budgetBoardSelectOptions.find((b) => b.value === boardId);
+		const pickerBoard = allPickerBoardsById.get(boardId);
+		setThirdPartyBoardForm((prev) => ({
+			...prev,
+			board_id: boardId,
+			board_name: pickerBoard?.label || selected?.label || boardId,
+			workspace_id: pickerBoard?.workspaceId === DEFAULT_WORKSPACE_ID ? undefined : pickerBoard?.workspaceId,
+			third_party_status_column_id: "",
+			third_party_item_cost_column_id: "",
+		}));
+		fetchBudgetBoardColumns(boardId);
+	};
+
+	const handleSaveThirdPartyBoard = async () => {
+		if (!thirdPartyBoardForm.board_id || !thirdPartyBoardForm.third_party_status_column_id) {
+			notifications.show({ title: "Validierungsfehler", message: "Bitte Board und Status-Spalte auswählen", color: "red" });
+			return;
+		}
+
+		setSavingThirdPartyBoard(true);
+		try {
+			const response = await fetch(`/api/admin/boards/${thirdPartyBoardForm.board_id}/third-party-board-config`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${sessionToken}`,
+				},
+				body: JSON.stringify({
+					board_name: thirdPartyBoardForm.board_name,
+					workspace_id: thirdPartyBoardForm.workspace_id,
+					third_party_status_column_id: thirdPartyBoardForm.third_party_status_column_id,
+					third_party_item_cost_column_id: thirdPartyBoardForm.third_party_item_cost_column_id,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Fremdkosten-Board konnte nicht gespeichert werden");
+			}
+
+			notifications.show({
+				title: "Erfolg",
+				message: editingThirdPartyBoardId ? "Fremdkosten-Board aktualisiert" : "Fremdkosten-Board hinzugefügt",
+				color: "green",
+			});
+
+			setThirdPartyBoardModalOpen(false);
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Fremdkosten-Board konnte nicht gespeichert werden",
+				color: "red",
+			});
+		} finally {
+			setSavingThirdPartyBoard(false);
+		}
+	};
+
+	const handleRemoveThirdPartyBoard = async (board: ThirdPartyBoardRow) => {
+		if (!confirm(`Möchtest du die Status-Zuordnung für "${board.board_name}" wirklich entfernen?`)) {
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/admin/boards/${board.board_id}/third-party-board-config`, {
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${sessionToken}` },
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Status-Zuordnung konnte nicht entfernt werden");
+			}
+
+			notifications.show({ title: "Erfolg", message: "Status-Zuordnung entfernt", color: "green" });
+			fetchBoards();
+		} catch (err) {
+			notifications.show({
+				title: "Fehler",
+				message: err instanceof Error ? err.message : "Status-Zuordnung konnte nicht entfernt werden",
 				color: "red",
 			});
 		}
@@ -1025,6 +1344,122 @@ export default function AdminPage() {
 				)}
 			</div>
 
+			{/* Job-Boards */}
+			<div className="admin-section">
+				<div className="admin-section-header">
+					<div>
+						<h2>Job-Boards</h2>
+						<p className="admin-section-description">Status-Spalte der Boards, auf denen die verknüpften Agentur-Projekte liegen.</p>
+					</div>
+					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenJobBoardModal()}>
+						Board hinzufügen
+					</Button>
+				</div>
+				{loading ? (
+					<div className="admin-loading">
+						<Loader />
+					</div>
+				) : jobBoardRows.length === 0 ? (
+					<div className="empty-state">
+						<div className="empty-state-title">Keine Job-Boards konfiguriert</div>
+						<p className="empty-state-description">Ordne einem Job-Board seine Status-Spalte zu, damit verknüpfte Agentur-Projekte in der Abrechnungs-Ansicht ihren Status zeigen.</p>
+						<Button onClick={() => handleOpenJobBoardModal()}>Board hinzufügen</Button>
+					</div>
+				) : (
+					<Table withTableBorder>
+						<Table.Thead>
+							<Table.Tr>
+								<Table.Th>Board</Table.Th>
+								<Table.Th>Workspace</Table.Th>
+								<Table.Th>Status-Spalte</Table.Th>
+								<Table.Th>Aktionen</Table.Th>
+							</Table.Tr>
+						</Table.Thead>
+						<Table.Tbody>
+							{jobBoardRows.map((board) => (
+								<Table.Tr key={board.board_id}>
+									<Table.Td>
+										<Text fw={500}>{board.board_name}</Text>
+									</Table.Td>
+									<Table.Td>{board.workspace_name}</Table.Td>
+									<Table.Td>
+										<Badge variant="light">{board.job_status_column_id}</Badge>
+									</Table.Td>
+									<Table.Td>
+										<Group gap="xs">
+											<IconButton variant="light" onClick={() => handleOpenJobBoardModal(board)}>
+												<Icon name="edit" size={21} />
+											</IconButton>
+											<IconButton variant="light" color="red" onClick={() => handleRemoveJobBoard(board)}>
+												<Icon name="delete" size={21} />
+											</IconButton>
+										</Group>
+									</Table.Td>
+								</Table.Tr>
+							))}
+						</Table.Tbody>
+					</Table>
+				)}
+			</div>
+
+			{/* Third-Party-Boards */}
+			<div className="admin-section">
+				<div className="admin-section-header">
+					<div>
+						<h2>Fremdkosten-Boards</h2>
+						<p className="admin-section-description">Status- und Kostenspalte der Boards, auf denen die verknüpften Fremdleistungen liegen.</p>
+					</div>
+					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenThirdPartyBoardModal()}>
+						Board hinzufügen
+					</Button>
+				</div>
+				{loading ? (
+					<div className="admin-loading">
+						<Loader />
+					</div>
+				) : thirdPartyBoardRows.length === 0 ? (
+					<div className="empty-state">
+						<div className="empty-state-title">Keine Fremdkosten-Boards konfiguriert</div>
+						<p className="empty-state-description">Ordne einem Fremdkosten-Board seine Status-Spalte zu, damit verknüpfte Fremdleistungen in der Abrechnungs-Ansicht ihren Status zeigen.</p>
+						<Button onClick={() => handleOpenThirdPartyBoardModal()}>Board hinzufügen</Button>
+					</div>
+				) : (
+					<Table withTableBorder>
+						<Table.Thead>
+							<Table.Tr>
+								<Table.Th>Board</Table.Th>
+								<Table.Th>Workspace</Table.Th>
+								<Table.Th>Status-Spalte</Table.Th>
+								<Table.Th>Aktionen</Table.Th>
+							</Table.Tr>
+						</Table.Thead>
+						<Table.Tbody>
+							{thirdPartyBoardRows.map((board) => (
+								<Table.Tr key={board.board_id}>
+									<Table.Td>
+										<Text fw={500}>{board.board_name}</Text>
+									</Table.Td>
+									<Table.Td>{board.workspace_name}</Table.Td>
+									<Table.Td>
+										<Badge variant="light">{board.third_party_status_column_id}</Badge>
+									</Table.Td>
+									<Table.Td>
+										<Group gap="xs">
+											<IconButton variant="light" onClick={() => handleOpenThirdPartyBoardModal(board)}>
+												<Icon name="edit" size={21} />
+											</IconButton>
+											<IconButton variant="light" color="red" onClick={() => handleRemoveThirdPartyBoard(board)}>
+												<Icon name="delete" size={21} />
+											</IconButton>
+										</Group>
+									</Table.Td>
+								</Table.Tr>
+							))}
+						</Table.Tbody>
+					</Table>
+				)}
+			</div>
+
 			{/* Board Picker Modal */}
 			<Modal opened={pickerOpen} onClose={() => setPickerOpen(false)} title="Boards hinzufügen" size="lg">
 				<Stack gap="md">
@@ -1138,23 +1573,56 @@ export default function AdminPage() {
 							/>
 
 							<Select
+								label="Fremdleistungs-Verknüpfungsspalte"
+								description="Verknüpfungsspalte mit den zugehörigen Fremdleistungen"
+								placeholder="Spalte auswählen (optional)"
+								data={budgetBoardColumns.filter((c) => BUDGET_RELATION_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.third_party_relation_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, third_party_relation_column_id: val || "" })}
+								searchable
+								clearable
+							/>
+
+							<Select
 								label="Budget-Spalte"
 								description="Numbers-, Formula- oder Mirror-Spalte mit dem Budget-Betrag"
 								placeholder="Spalte auswählen"
 								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
-								value={budgetBoardForm.budget_column_id || null}
-								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, budget_column_id: val || "" })}
+								value={budgetBoardForm.agency_budget_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, agency_budget_column_id: val || "" })}
 								searchable
+							/>
+
+							<Select
+								label="Fremdkosten-Budget-Spalte"
+								description="Numbers-, Formula- oder Mirror-Spalte mit dem Budget-Betrag (optional)"
+								placeholder="Spalte auswählen (optional)"
+								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.third_party_budget_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, third_party_budget_column_id: val || "" })}
+								searchable
+								clearable
 							/>
 
 							<Select
 								label="Agenturleistungs-Spalte"
 								description="Numbers-, Formula- oder Mirror-Spalte mit dem Agenturleistungs-Betrag"
 								placeholder="Spalte auswählen"
-								data={budgetBoardColumns.filter((c) => COST_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
-								value={budgetBoardForm.cost_column_id || null}
-								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, cost_column_id: val || "" })}
+								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.agency_cost_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, agency_cost_column_id: val || "" })}
 								searchable
+							/>
+
+							<Select
+								label="Fremdkosten-IST-Spalte"
+								description="Numbers-, Formula- oder Mirror-Spalte mit dem Fremdkosten-IST-Betrag (optional)"
+								placeholder="Spalte auswählen (optional)"
+								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={budgetBoardForm.third_party_cost_column_id || null}
+								onChange={(val) => setBudgetBoardForm({ ...budgetBoardForm, third_party_cost_column_id: val || "" })}
+								searchable
+								clearable
 							/>
 
 							<Select
@@ -1179,6 +1647,93 @@ export default function AdminPage() {
 						</Button>
 						<Button onClick={handleSaveBudgetBoard} loading={savingBudgetBoard}>
 							{editingBudgetBoardId ? "Board aktualisieren" : "Board hinzufügen"}
+						</Button>
+					</Group>
+				</Stack>
+			</Modal>
+
+			{/* Job-Board Modal */}
+			<Modal opened={jobBoardModalOpen} onClose={() => setJobBoardModalOpen(false)} title={editingJobBoardId ? "Job-Board bearbeiten" : "Job-Board hinzufügen"} size="lg">
+				<Stack gap="md">
+					{!editingJobBoardId && <Select label="Board auswählen" placeholder="Wähle ein monday.com-Board" data={budgetBoardSelectOptions} value={jobBoardForm.board_id || null} onChange={handleSelectJobBoardBoard} searchable />}
+
+					{editingJobBoardId && <Input label="Board" value={jobBoardForm.board_name} disabled />}
+
+					{budgetBoardColumnsLoading ? (
+						<div className="admin-loading">
+							<Loader size="sm" />
+						</div>
+					) : jobBoardForm.board_id ? (
+						<Select
+							label="Status-Spalte"
+							description="Status-Spalte, deren Wert als Status des verknüpften Agentur-Projekts angezeigt wird"
+							placeholder="Spalte auswählen"
+							data={budgetBoardColumns.filter((c) => STATUS_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+							value={jobBoardForm.status_column_id || null}
+							onChange={(val) => setJobBoardForm({ ...jobBoardForm, status_column_id: val || "" })}
+							searchable
+						/>
+					) : (
+						<Text size="sm" c="dimmed">
+							Wähle zuerst ein Board aus, um seine Spalten zu laden.
+						</Text>
+					)}
+
+					<Group justify="flex-end" mt="md">
+						<Button variant="default" onClick={() => setJobBoardModalOpen(false)}>
+							Abbrechen
+						</Button>
+						<Button onClick={handleSaveJobBoard} loading={savingJobBoard}>
+							{editingJobBoardId ? "Job-Board aktualisieren" : "Job-Board hinzufügen"}
+						</Button>
+					</Group>
+				</Stack>
+			</Modal>
+
+			{/* Third-Party-Board Modal */}
+			<Modal opened={thirdPartyBoardModalOpen} onClose={() => setThirdPartyBoardModalOpen(false)} title={editingThirdPartyBoardId ? "Fremdkosten-Board bearbeiten" : "Fremdkosten-Board hinzufügen"} size="lg">
+				<Stack gap="md">
+					{!editingThirdPartyBoardId && <Select label="Board auswählen" placeholder="Wähle ein monday.com-Board" data={budgetBoardSelectOptions} value={thirdPartyBoardForm.board_id || null} onChange={handleSelectThirdPartyBoardBoard} searchable />}
+
+					{editingThirdPartyBoardId && <Input label="Board" value={thirdPartyBoardForm.board_name} disabled />}
+
+					{budgetBoardColumnsLoading ? (
+						<div className="admin-loading">
+							<Loader size="sm" />
+						</div>
+					) : thirdPartyBoardForm.board_id ? (
+						<>
+							<Select
+								label="Status-Spalte"
+								description="Status-Spalte, deren Wert als Status des verknüpften Fremdleistungs-Items angezeigt wird"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => STATUS_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={thirdPartyBoardForm.third_party_status_column_id || null}
+								onChange={(val) => setThirdPartyBoardForm({ ...thirdPartyBoardForm, third_party_status_column_id: val || "" })}
+								searchable
+							/>
+							<Select
+								label="Fremdkosten-Spalte"
+								description="Spalte, die die Kosten des verknüpften Fremdleistungs-Items enthält"
+								placeholder="Spalte auswählen"
+								data={budgetBoardColumns.filter((c) => BUDGET_COLUMN_TYPES.includes(c.type)).map((c) => ({ value: c.id, label: `${c.title} (${c.type})` }))}
+								value={thirdPartyBoardForm.third_party_item_cost_column_id || null}
+								onChange={(val) => setThirdPartyBoardForm({ ...thirdPartyBoardForm, third_party_item_cost_column_id: val || "" })}
+								searchable
+							/>
+						</>
+					) : (
+						<Text size="sm" c="dimmed">
+							Wähle zuerst ein Board aus, um seine Spalten zu laden.
+						</Text>
+					)}
+
+					<Group justify="flex-end" mt="md">
+						<Button variant="default" onClick={() => setThirdPartyBoardModalOpen(false)}>
+							Abbrechen
+						</Button>
+						<Button onClick={handleSaveThirdPartyBoard} loading={savingThirdPartyBoard}>
+							{editingThirdPartyBoardId ? "Fremdkosten-Board aktualisieren" : "Fremdkosten-Board hinzufügen"}
 						</Button>
 					</Group>
 				</Stack>

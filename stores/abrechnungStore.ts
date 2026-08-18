@@ -23,8 +23,10 @@ export interface AbrechnungFilters {
 	search: string;
 	/** Restrict to a single budget board by `boardId`. Client-side; never triggers a refetch. */
 	boardId: string | null;
-	/** Restrict to a single status by its text. Client-side; never triggers a refetch. */
+	/** Restrict to a single budget-item status by its text. Client-side; never triggers a refetch. */
 	status: string | null;
+	/** Restrict to budget items with ≥1 linked project matching this status by its text — a separate vocabulary from `status` (job-board labels, not budget-board labels). Client-side; never triggers a refetch. */
+	linkedStatus: string | null;
 	/** Inclusive rollup range start (local day, converted to an ISO instant on fetch). Triggers a refetch. */
 	startDate: Date | null;
 	/** Inclusive rollup range end (local day, through end-of-day). Triggers a refetch. */
@@ -39,6 +41,7 @@ const EMPTY_ABRECHNUNG_FILTERS: AbrechnungFilters = {
 	search: "",
 	boardId: null,
 	status: null,
+	linkedStatus: null,
 	startDate: null,
 	endDate: null,
 	utilizationMin: null,

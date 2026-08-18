@@ -1,7 +1,7 @@
 // components/dashboard/analytics/AbrechnungTable.tsx
 "use client";
 
-import { Table, Center, Loader, Text, Badge, Group, ActionIcon, Stack, Box, SimpleGrid, Card, Tooltip, Flex } from "@mantine/core";
+import { Table, Center, Loader, Text, Badge, Group, Stack, Box, SimpleGrid, Card, Tooltip, Flex } from "@mantine/core";
 import { Fragment, useMemo, useState } from "react";
 
 import { Icon, IconButton } from "@/components";
@@ -9,9 +9,11 @@ import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
 import { useAbrechnungStore } from "@/stores/abrechnungStore";
 
+import { StatusCell } from "./StatusCell";
+
 import styles from "@/components/styles/ui/tables/Table.module.css";
 
-import type { AbrechnungBudgetItem, AbrechnungLinkedItem, AbrechnungRoleBreakdown, AbrechnungTableRow } from "@/types/abrechnung";
+import type { AbrechnungBudgetItem, AbrechnungLinkedItem, AbrechnungThirdPartyItem, AbrechnungRoleBreakdown, AbrechnungTableRow } from "@/types/abrechnung";
 
 /**
  * Formats a euro amount for display, matching the `€{value.toFixed(2)}`
@@ -97,11 +99,13 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 							</Text>
 						</Group>
 						<Group gap={4} wrap="nowrap">
-							<Tooltip label="Budget-Item aktualisieren" position="top" withArrow>
-								<IconButton variant="subtle" size="md" loading={refreshingItemIds.has(`${row.boardId}:${row.id}`)} onClick={() => refreshBudgetItem(row.boardId, row.id)} aria-label="Budget-Item aktualisieren">
-									<Icon name="refresh" size={16} />
-								</IconButton>
-							</Tooltip>
+							{enableItemRefresh && (
+								<Tooltip label="Budget-Item aktualisieren" position="top" withArrow>
+									<IconButton variant="subtle" size="md" loading={refreshingItemIds.has(`${row.boardId}:${row.id}`)} onClick={() => refreshBudgetItem(row.boardId, row.id)} aria-label="Budget-Item aktualisieren">
+										<Icon name="refresh" size={16} />
+									</IconButton>
+								</Tooltip>
+							)}
 							<Tooltip label="Monday-Item öffnen" position="top" withArrow>
 								<IconButton colorVariant="tertiary" size="md" loading={refreshingItemIds.has(`${row.boardId}:${row.id}`)} onClick={() => window.open(row.itemUrl, "_blank")} aria-label="Monday-Item öffnen">
 									<Icon name="open_in_new" size={16} />
@@ -115,11 +119,7 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 				id: "status",
 				header: "Status",
 				minWidth: 200,
-				cell: ({ row }) => (
-					<Text fw={500} size="sm" title={row.status?.text ?? ""} c={"white"} ta="center">
-						{row.status?.text ?? ""}
-					</Text>
-				),
+				cell: ({ row }) => <StatusCell status={row.status} size="sm" />,
 			},
 			{
 				id: "board",
@@ -193,8 +193,34 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 					);
 				},
 			},
+			{
+				id: "third-party-budget",
+				header: "Fremdkosten-Budget",
+				align: "right",
+				minWidth: 110,
+				// Boards without any Fremdkosten configured have this null on every row —
+				// don't carry a permanently empty column for them (same mechanism as `board`).
+				hidden: items.every((i) => i.thirdPartyBudget === null && i.thirdPartyTotalCost === null),
+				cell: ({ row }) => (
+					<Text c={row.thirdPartyBudget !== null && row.thirdPartyBudget < 0 ? "red" : undefined} fw={row.thirdPartyBudget !== null && row.thirdPartyBudget < 0 ? 600 : undefined} size="sm" style={{ letterSpacing: "-2%" }}>
+						{formatEuro(row.thirdPartyBudget)}
+					</Text>
+				),
+			},
+			{
+				id: "third-party-total-cost",
+				header: "Fremdkosten-IST",
+				align: "right",
+				minWidth: 110,
+				hidden: items.every((i) => i.thirdPartyBudget === null && i.thirdPartyTotalCost === null),
+				cell: ({ row }) => (
+					<Text c={row.thirdPartyTotalCost !== null && row.thirdPartyTotalCost < 0 ? "red" : undefined} fw={row.thirdPartyTotalCost !== null && row.thirdPartyTotalCost < 0 ? 600 : undefined} size="sm" style={{ letterSpacing: "-2%" }}>
+						{formatEuro(row.thirdPartyTotalCost)}
+					</Text>
+				),
+			},
 		],
-		[expandedIds, showBoardColumn, enableItemRefresh, refreshingItemIds, refreshBudgetItem],
+		[items, expandedIds, showBoardColumn, enableItemRefresh, refreshingItemIds, refreshBudgetItem],
 	);
 
 	const visibleColumns = useMemo(() => columns.filter((col) => !col.hidden), [columns]);
@@ -249,7 +275,7 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 						<Fragment key={item.id}>
 							<Table.Tr className={expandedIds.has(item.id) ? styles.expandedRow : styles.bodyRow}>
 								{visibleColumns.map((col) => (
-									<Table.Td key={col.id} ta={col.align || "left"} style={{ backgroundColor: col.id === "status" ? item.status?.color : undefined, minWidth: col.minWidth }}>
+									<Table.Td key={col.id} ta={col.align || "left"} style={{ minWidth: col.minWidth }}>
 										{col.cell({ row: item, index: rowIndex })}
 									</Table.Td>
 								))}
@@ -316,7 +342,7 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 
 			<Box>
 				<Text size="sm" fw={600} mb={8} style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
-					Verknüpfte Agentur-Projekte{" "}
+					Agentur-Projekte
 					<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
 						{item.linkedItems.length}
 					</Badge>
@@ -329,6 +355,20 @@ function AbrechnungItemDetails({ item }: { item: AbrechnungBudgetItem }) {
 					<LinkedItemsTable linkedItems={item.linkedItems} />
 				)}
 			</Box>
+
+			{/* Omitted entirely (not just an empty state) for budget boards with no Fremdleistungen
+			    configured — see the feature plan's "no Fremdkosten config" regression requirement. */}
+			{item.thirdPartyItems.length > 0 && (
+				<Box>
+					<Text size="sm" fw={600} mb={8} style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
+						Fremdleistungen
+						<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Fremdleistungen">
+							{item.thirdPartyItems.length}
+						</Badge>
+					</Text>
+					<ThirdPartyItemsTable thirdPartyItems={item.thirdPartyItems} />
+				</Box>
+			)}
 		</Stack>
 	);
 }
@@ -356,6 +396,11 @@ function LinkedItemsTable({ linkedItems }: { linkedItems: AbrechnungLinkedItem[]
 					<Table.Th className={styles.headerCell}>
 						<Text fw={600} size="xs">
 							Projekt{linkedItems.length > 1 ? "e" : ""}
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Status
 						</Text>
 					</Table.Th>
 					<Table.Th className={styles.headerCell}>
@@ -400,6 +445,9 @@ function LinkedItemsTable({ linkedItems }: { linkedItems: AbrechnungLinkedItem[]
 										</Tooltip>
 									</Flex>
 								</Table.Td>
+								<Table.Td width={200}>
+									<StatusCell status={linked.status} size="xs" />
+								</Table.Td>
 								<Table.Td>
 									<Text fw={500} size="xs">
 										{linked.board ? linked.board.name : ""}
@@ -418,7 +466,7 @@ function LinkedItemsTable({ linkedItems }: { linkedItems: AbrechnungLinkedItem[]
 							</Table.Tr>
 							{isExpanded && hasBreakdown && (
 								<Table.Tr>
-									<Table.Td colSpan={4} style={{ background: "var(--color--background-secondary)" }}>
+									<Table.Td colSpan={5} style={{ background: "var(--color--background-secondary)" }}>
 										<Box p="xs">
 											<RoleBreakdownCards roles={linked.byRole} />
 										</Box>
@@ -428,6 +476,75 @@ function LinkedItemsTable({ linkedItems }: { linkedItems: AbrechnungLinkedItem[]
 						</Fragment>
 					);
 				})}
+			</Table.Tbody>
+		</Table>
+	);
+}
+
+/**
+ * The "Fremdleistungen" table. Unlike {@link LinkedItemsTable}, there's no role breakdown to
+ * expand into — Fremdleistungen carry no time entries, so each row is a flat
+ * Projekt/Status/Board/Fremdkosten line, cost read straight off `AbrechnungThirdPartyItem.cost`
+ * (see `lib/abrechnung.ts`).
+ */
+function ThirdPartyItemsTable({ thirdPartyItems }: { thirdPartyItems: AbrechnungThirdPartyItem[] }) {
+	return (
+		<Table striped withTableBorder withColumnBorders withRowBorders verticalSpacing="sm" layout="auto" style={{ width: "100%" }} className={styles.table}>
+			<Table.Thead className={styles.headerRow}>
+				<Table.Tr>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Projekt{thirdPartyItems.length > 1 ? "e" : ""}
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Status
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Board
+						</Text>
+					</Table.Th>
+					<Table.Th className={styles.headerCell}>
+						<Text fw={600} size="xs">
+							Fremdkosten
+						</Text>
+					</Table.Th>
+				</Table.Tr>
+			</Table.Thead>
+			<Table.Tbody>
+				{thirdPartyItems.map((thirdParty) => (
+					<Table.Tr key={thirdParty.id} className={styles.bodyRow}>
+						<Table.Td>
+							<Flex gap="xs" align="center" justify="space-between" style={{ width: "100%" }}>
+								<Text fw={500} size="xs">
+									{thirdParty.name}
+								</Text>
+
+								<Tooltip label="Monday-Item öffnen" position="top" withArrow>
+									<IconButton colorVariant="tertiary" size="md" onClick={() => window.open(thirdParty.itemUrl, "_blank")} aria-label="Monday-Item öffnen">
+										<Icon name="open_in_new" size={16} />
+									</IconButton>
+								</Tooltip>
+							</Flex>
+						</Table.Td>
+						<Table.Td width={200}>
+							<StatusCell status={thirdParty.status} size="xs" />
+						</Table.Td>
+						<Table.Td>
+							<Text fw={500} size="xs">
+								{thirdParty.board ? thirdParty.board.name : ""}
+							</Text>
+						</Table.Td>
+						<Table.Td>
+							<Text size="xs" style={{ letterSpacing: "-2%" }}>
+								{formatEuro(thirdParty.cost)}
+							</Text>
+						</Table.Td>
+					</Table.Tr>
+				))}
 			</Table.Tbody>
 		</Table>
 	);

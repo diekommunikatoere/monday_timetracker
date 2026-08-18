@@ -19,7 +19,7 @@
 import { getBudgetBoardItems, getBudgetBoardItem, type BudgetBoardItem } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-import type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange } from "@/types/abrechnung";
+import type { BudgetBoardStatus, BudgetBoardSettings, JobBoardSettings, ThirdPartyBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungThirdPartyItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange } from "@/types/abrechnung";
 import type { GetItemsTimeByRoleResult } from "@/types/database";
 
 // Domain types live in `@/types/abrechnung` (not here) so client code — the Zustand
@@ -27,7 +27,7 @@ import type { GetItemsTimeByRoleResult } from "@/types/database";
 // imports `lib/supabase/server`'s service-role client). Re-exported for convenience so
 // existing server-side importers (e.g. the admin budget-config API route) can keep
 // importing them from here.
-export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange };
+export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungThirdPartyItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange };
 
 /**
  * Loads every budget board matching `status` (optionally narrowed to a single `boardId`),
@@ -58,10 +58,10 @@ export async function getAbrechnungData(status: BudgetBoardStatus = "active", bo
 		query = query.eq("board_id", boardId);
 	}
 
-	// The role table is tiny and global — fetching it once here (in parallel with the
-	// board_config query) and threading it down replaces what used to be one `role`
-	// query per budget item (see getRoleColorMap below).
-	const [{ data: boardConfigs, error }, roleColorMap] = await Promise.all([query, getRoleColorMap()]);
+	// The role table and the linked-board column maps are both tiny and global — fetching
+	// them once here (in parallel with the board_config query) and threading them down
+	// replaces what used to be one `role` query per budget item (see getRoleColorMap below).
+	const [{ data: boardConfigs, error }, roleColorMap, linkedBoardColumnMaps] = await Promise.all([query, getRoleColorMap(), getLinkedBoardColumnMaps()]);
 
 	if (error) {
 		console.error("[getAbrechnungData] Error loading budget board configs:", error);
@@ -72,24 +72,48 @@ export async function getAbrechnungData(status: BudgetBoardStatus = "active", bo
 		return [];
 	}
 
-	return Promise.all(boardConfigs.map((config: any) => loadBudgetBoard(config, status, roleColorMap, range, forceRefresh)));
+	return Promise.all(boardConfigs.map((config: any) => loadBudgetBoard(config, status, roleColorMap, linkedBoardColumnMaps, range, forceRefresh)));
 }
 
 /** Loads and rolls up a single budget board's items. Never throws — degrades to an empty `items` array. */
-async function loadBudgetBoard(config: { board_id: string; settings: unknown; monday_board?: { name: string } | null }, status: BudgetBoardStatus, roleColorMap: Map<string, string | undefined>, range?: AbrechnungDateRange, forceRefresh = false): Promise<AbrechnungBoard> {
+async function loadBudgetBoard(config: { board_id: string; settings: unknown; monday_board?: { name: string } | null }, status: BudgetBoardStatus, roleColorMap: Map<string, string | undefined>, linkedBoardColumnMaps: LinkedBoardColumnMaps, range?: AbrechnungDateRange, forceRefresh = false): Promise<AbrechnungBoard> {
 	const settings = (config.settings ?? {}) as BudgetBoardSettings;
 	const boardName = config.monday_board?.name || config.board_id;
 	const label = settings.label ?? null;
-	const { job_relation_column_id: relationColumnId, budget_column_id: budgetColumnId, cost_column_id: costColumnId, status_column_id: statusColumnId } = settings;
+	const {
+		job_relation_column_id: relationColumnId,
+		third_party_relation_column_id: thirdPartyRelationColumnId,
+		agency_budget_column_id: agencyBudgetColumnId,
+		agency_cost_column_id: agencyCostColumnId,
+		third_party_budget_column_id: thirdPartyBudgetColumnId,
+		third_party_cost_column_id: thirdPartyCostColumnId,
+		status_column_id: statusColumnId,
+	} = settings;
 
-	if (!relationColumnId || !budgetColumnId || !costColumnId || !statusColumnId) {
-		console.warn(`[getAbrechnungData] Budget board ${config.board_id} is missing job_relation_column_id/budget_column_id/cost_column_id/status_column_id configuration; skipping.`);
+	// Third-party settings are optional — a budget board with no Fremdleistungen configured
+	// keeps working, just with thirdPartyRelationColumnId/thirdPartyBudgetColumnId/
+	// thirdPartyCostColumnId passed through as null (see getBudgetBoardItems).
+	if (!relationColumnId || !agencyBudgetColumnId || !agencyCostColumnId || !statusColumnId) {
+		console.warn(`[getAbrechnungData] Budget board ${config.board_id} is missing job_relation_column_id/agency_budget_column_id/agency_cost_column_id/status_column_id configuration; skipping.`);
 		return { boardId: config.board_id, boardName, label, status, items: [] };
 	}
 
 	let rawItems: BudgetBoardItem[];
 	try {
-		rawItems = await getBudgetBoardItems(config.board_id, relationColumnId, budgetColumnId, costColumnId, statusColumnId, forceRefresh);
+		rawItems = await getBudgetBoardItems(
+			config.board_id,
+			{
+				relationColumnId,
+				thirdPartyRelationColumnId: thirdPartyRelationColumnId ?? null,
+				agencyBudgetColumnId,
+				agencyCostColumnId,
+				thirdPartyBudgetColumnId: thirdPartyBudgetColumnId ?? null,
+				thirdPartyCostColumnId: thirdPartyCostColumnId ?? null,
+				statusColumnId,
+				...linkedBoardColumnMaps,
+			},
+			forceRefresh,
+		);
 	} catch (err) {
 		console.error(`[getAbrechnungData] Failed to fetch items for budget board ${config.board_id}:`, err);
 		return { boardId: config.board_id, boardName, label, status, items: [] };
@@ -259,8 +283,13 @@ function computeBudgetItemRollup(item: BudgetBoardItem, itemsByRoleData: GetItem
 		totalCost,
 		remainingBudget: item.budget !== null ? item.budget - totalCost : null,
 		utilizationPercent,
+		// Read as-is off the budget item's own mapped columns — not derived from
+		// thirdPartyItems, which may legitimately disagree (see the feature plan).
+		thirdPartyBudget: item.thirdPartyBudget,
+		thirdPartyTotalCost: item.thirdPartyCost,
 		byRole,
 		linkedItems,
+		thirdPartyItems: item.thirdPartyLinkedItems,
 	};
 }
 
@@ -272,6 +301,46 @@ async function getRoleColorMap(): Promise<Map<string, string | undefined>> {
 		return new Map();
 	}
 	return new Map((roles ?? []).map((r) => [r.id, r.color_hex ?? undefined]));
+}
+
+/** The three monday-board-id-keyed column maps threaded into {@link getBudgetBoardItems}/{@link getBudgetBoardItem} as `BudgetBoardColumnConfig`'s `*ColumnIdsByBoardId` fields — see {@link getLinkedBoardColumnMaps}. */
+interface LinkedBoardColumnMaps {
+	jobStatusColumnIdsByBoardId: Record<string, string>;
+	thirdPartyStatusColumnIdsByBoardId: Record<string, string>;
+	thirdPartyCostColumnIdsByBoardId: Record<string, string>;
+}
+
+/**
+ * monday board id → configured status/cost column id, covering both job boards
+ * ({@link JobBoardSettings.job_status_column_id}) and Fremdkosten-Boards
+ * ({@link ThirdPartyBoardSettings.third_party_status_column_id} /
+ * {@link ThirdPartyBoardSettings.third_party_item_cost_column_id}) from a **single**
+ * `board_config` read — collapsed from the two separate per-role queries this used to be,
+ * since `board_config` is small and this drops a round trip from both {@link getAbrechnungData}
+ * and {@link refreshBudgetItem}. Threaded down into {@link getBudgetBoardItems}/
+ * {@link getBudgetBoardItem} so a linked item's status/cost can be resolved against whichever
+ * board it currently lives on. Same "one tiny global query, threaded down" pattern as
+ * {@link getRoleColorMap}.
+ */
+async function getLinkedBoardColumnMaps(): Promise<LinkedBoardColumnMaps> {
+	const { data: rows, error } = await supabaseAdmin.from("board_config").select("board_id, settings");
+	if (error) {
+		console.error("[getAbrechnungData] Failed to load linked-board column maps:", error);
+		return { jobStatusColumnIdsByBoardId: {}, thirdPartyStatusColumnIdsByBoardId: {}, thirdPartyCostColumnIdsByBoardId: {} };
+	}
+
+	const jobStatusColumnIdsByBoardId: Record<string, string> = {};
+	const thirdPartyStatusColumnIdsByBoardId: Record<string, string> = {};
+	const thirdPartyCostColumnIdsByBoardId: Record<string, string> = {};
+
+	for (const row of rows ?? []) {
+		const settings = (row.settings ?? {}) as JobBoardSettings & ThirdPartyBoardSettings;
+		if (settings.job_status_column_id) jobStatusColumnIdsByBoardId[row.board_id] = settings.job_status_column_id;
+		if (settings.third_party_status_column_id) thirdPartyStatusColumnIdsByBoardId[row.board_id] = settings.third_party_status_column_id;
+		if (settings.third_party_item_cost_column_id) thirdPartyCostColumnIdsByBoardId[row.board_id] = settings.third_party_item_cost_column_id;
+	}
+
+	return { jobStatusColumnIdsByBoardId, thirdPartyStatusColumnIdsByBoardId, thirdPartyCostColumnIdsByBoardId };
 }
 
 /**
@@ -292,7 +361,7 @@ async function getRoleColorMap(): Promise<Map<string, string | undefined>> {
  *          or the item could not be found on it.
  */
 export async function refreshBudgetItem(boardId: string, itemId: string, range?: AbrechnungDateRange): Promise<AbrechnungBudgetItem | null> {
-	const { data: config, error } = await supabaseAdmin.from("board_config").select("board_id, settings").eq("board_id", boardId).maybeSingle();
+	const [{ data: config, error }, linkedBoardColumnMaps] = await Promise.all([supabaseAdmin.from("board_config").select("board_id, settings").eq("board_id", boardId).maybeSingle(), getLinkedBoardColumnMaps()]);
 
 	if (error || !config) {
 		console.error(`[refreshBudgetItem] Failed to load board_config for board ${boardId}:`, error);
@@ -300,16 +369,33 @@ export async function refreshBudgetItem(boardId: string, itemId: string, range?:
 	}
 
 	const settings = (config.settings ?? {}) as BudgetBoardSettings;
-	const { job_relation_column_id: relationColumnId, budget_column_id: budgetColumnId, cost_column_id: costColumnId, status_column_id: statusColumnId } = settings;
+	const {
+		job_relation_column_id: relationColumnId,
+		third_party_relation_column_id: thirdPartyRelationColumnId,
+		agency_budget_column_id: agencyBudgetColumnId,
+		agency_cost_column_id: agencyCostColumnId,
+		third_party_budget_column_id: thirdPartyBudgetColumnId,
+		third_party_cost_column_id: thirdPartyCostColumnId,
+		status_column_id: statusColumnId,
+	} = settings;
 
-	if (!relationColumnId || !budgetColumnId || !costColumnId || !statusColumnId) {
+	if (!relationColumnId || !agencyBudgetColumnId || !agencyCostColumnId || !statusColumnId) {
 		console.warn(`[refreshBudgetItem] Budget board ${boardId} is missing column configuration.`);
 		return null;
 	}
 
 	let item: BudgetBoardItem | null;
 	try {
-		item = await getBudgetBoardItem(boardId, itemId, relationColumnId, budgetColumnId, costColumnId, statusColumnId);
+		item = await getBudgetBoardItem(boardId, itemId, {
+			relationColumnId,
+			thirdPartyRelationColumnId: thirdPartyRelationColumnId ?? null,
+			agencyBudgetColumnId,
+			agencyCostColumnId,
+			thirdPartyBudgetColumnId: thirdPartyBudgetColumnId ?? null,
+			thirdPartyCostColumnId: thirdPartyCostColumnId ?? null,
+			statusColumnId,
+			...linkedBoardColumnMaps,
+		});
 	} catch (err) {
 		console.error(`[refreshBudgetItem] Failed to fetch item ${itemId} on board ${boardId}:`, err);
 		return null;

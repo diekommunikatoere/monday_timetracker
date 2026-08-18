@@ -41,10 +41,6 @@ export async function GET(request: NextRequest) {
 
 		const boards = await getAbrechnungData("active", undefined, { startDate, endDate }, forceRefresh);
 
-		console.log(`GET /api/analytics/abrechnung: returning ${boards.length} boards (refresh=${forceRefresh})`);
-		console.log(`GET /api/analytics/abrechnung: returning boards: ${boards.map((b) => b.boardName).join(", ")}`);
-		console.log(`GET /api/analytics/abrechnung: returning boards with items: ${boards.map((b) => `${b.items.map((i) => JSON.stringify(i)).join(", ")}`).join(", ")}`);
-
 		return NextResponse.json({ boards });
 	} catch (error) {
 		console.error("Error in GET /api/analytics/abrechnung:", error);

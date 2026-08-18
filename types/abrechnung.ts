@@ -14,20 +14,60 @@ export type BudgetBoardStatus = "active" | "archived";
  * shared with other per-board flags, e.g. `jobs_selectable`; see 037_board_settings_merge.sql's
  * merge-based PATCH).
  *
- * @property budget_board_status     - Presence of this key marks the board as a budget board at all.
- * @property label                   - Display label for archived periods (e.g. `"2025"`); unused for `"active"`.
- * @property job_relation_column_id - The board_relation/connect_boards column listing linked job items.
- * @property budget_column_id       - The numbers/formula/mirror column holding the total budget figure.
- * @property cost_column_id         - The numbers/formula/mirror column holding the cost figure, labeled "Agenturleistungs-Spalte" in the UI.
- * @property status_column_id         - The status column holding the budget item's current status, labeled "Status-Spalte" in the UI.
+ * @property budget_board_status          - Presence of this key marks the board as a budget board at all.
+ * @property label                        - Display label for archived periods (e.g. `"2025"`); unused for `"active"`.
+ * @property job_relation_column_id       - The board_relation/connect_boards column listing linked Agentur-Projekte (job items). Required.
+ * @property third_party_relation_column_id - A **separate** board_relation/connect_boards column listing linked
+ *   Fremdleistungen (third-party items) — distinct from {@link job_relation_column_id} so the two roles never
+ *   collapse onto the same linked-items list. Optional: absent means this budget board has no Fremdleistungen.
+ * @property agency_budget_column_id      - The numbers/formula/mirror column holding the total (agency) budget figure. Required.
+ * @property agency_cost_column_id        - The numbers/formula/mirror column holding the tracked-cost ("Agenturleistung") figure. Required.
+ * @property third_party_budget_column_id - The numbers/formula/mirror column holding the "Fremdkosten-Budget" figure, read
+ *   as-is (not derived from the linked Fremdleistungen). Optional, paired with {@link third_party_relation_column_id}.
+ * @property third_party_cost_column_id   - The numbers/formula/mirror column holding the "Fremdkosten-IST" figure, read
+ *   as-is. Optional, paired with {@link third_party_relation_column_id}.
+ * @property status_column_id             - The status column holding the budget item's current status, labeled "Status-Spalte" in the UI. Required.
  */
 export interface BudgetBoardSettings {
 	budget_board_status?: BudgetBoardStatus;
 	label?: string | null;
 	job_relation_column_id?: string;
-	budget_column_id?: string;
-	cost_column_id?: string;
+	third_party_relation_column_id?: string;
+	agency_budget_column_id?: string;
+	third_party_budget_column_id?: string;
+	agency_cost_column_id?: string;
+	third_party_cost_column_id?: string;
 	status_column_id?: string;
+}
+
+/**
+ * Job-board-specific keys in `board_config.settings`. Set on the boards that linked
+ * Agentur-Projekte live on, not on budget boards — see {@link BudgetBoardSettings}.
+ *
+ * @property job_status_column_id - The status/dropdown column whose value is shown as a
+ *   linked item's status in the Abrechnung drill-down. Absent = no status shown.
+ */
+export interface JobBoardSettings {
+	job_status_column_id?: string;
+}
+
+/**
+ * Third-party-board-specific keys in `board_config.settings` — set on "Fremdkosten-Boards",
+ * the boards linked Fremdleistungen live on. Distinct from and independent of
+ * {@link BudgetBoardSettings} (whose `third_party_*_column_id` keys live on the *budget* board
+ * instead) — a board can be a budget board, a Fremdkosten-Board, or both, and neither role
+ * shares a settings key with the other.
+ *
+ * @property third_party_status_column_id   - The status/dropdown column whose value is shown as a
+ *   linked Fremdleistungs-item's status in the Abrechnung drill-down. Absent = no status shown.
+ *   Also the discriminator used to list this board under admin's "Fremdkosten-Boards" section.
+ * @property third_party_item_cost_column_id - The numbers/formula/mirror column on *this* board
+ *   holding an individual Fremdleistungs-item's own cost — resolved per linked item via whichever
+ *   board it currently lives on, the same pattern as {@link JobBoardSettings.job_status_column_id}.
+ */
+export interface ThirdPartyBoardSettings {
+	third_party_status_column_id?: string;
+	third_party_item_cost_column_id?: string;
 }
 
 /** Per-role time breakdown for one budget item, enriched with the role's display color. */
@@ -55,6 +95,24 @@ export interface AbrechnungLinkedItem {
 	totalSeconds: number;
 	totalCost: number;
 	byRole: AbrechnungRoleBreakdown[];
+	/** The linked item's status on its own job board, resolved via that board's configured `job_status_column_id` (see {@link JobBoardSettings}). `{ text: null, color: null }` when unmapped or unset. */
+	status: { text: string | null; color: string | null };
+}
+
+/**
+ * A Fremdleistungs-item (third-party/subcontracted item) linked to a budget item via its
+ * {@link BudgetBoardSettings.third_party_relation_column_id}. Unlike {@link AbrechnungLinkedItem},
+ * it carries no time entries and no role breakdown — its cost is read straight off its own
+ * Fremdkosten-Board column (see {@link ThirdPartyBoardSettings.third_party_item_cost_column_id}).
+ */
+export interface AbrechnungThirdPartyItem {
+	id: string;
+	name: string;
+	itemUrl: string;
+	board: { id: string; name: string } | null;
+	cost: number | null;
+	/** The item's status on its own Fremdkosten-Board, resolved via that board's configured `third_party_status_column_id` (see {@link ThirdPartyBoardSettings}). `{ text: null, color: null }` when unmapped or unset. */
+	status: { text: string | null; color: string | null };
 }
 
 /**
@@ -71,8 +129,13 @@ export interface AbrechnungBudgetItem {
 	totalCost: number;
 	remainingBudget: number | null;
 	utilizationPercent: number | null;
+	/** Read as-is from the budget board's own mapped column — not derived from `thirdPartyItems`, which may legitimately disagree. */
+	thirdPartyBudget: number | null;
+	/** Read as-is from the budget board's own mapped column — not derived from `thirdPartyItems`, which may legitimately disagree. */
+	thirdPartyTotalCost: number | null;
 	byRole: AbrechnungRoleBreakdown[];
 	linkedItems: AbrechnungLinkedItem[];
+	thirdPartyItems: AbrechnungThirdPartyItem[];
 }
 
 /** One budget board (e.g. "Retainer", or an archived "Angebote-Archiv 2025") with its rolled-up items. */

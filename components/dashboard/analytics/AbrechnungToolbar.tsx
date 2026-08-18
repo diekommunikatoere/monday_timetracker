@@ -20,14 +20,17 @@ import type { AbrechnungBoardOption } from "./hooks/useFilteredAbrechnung";
  *   `useFilteredAbrechnung`), so the Budget-Board dropdown lists no dead values. Passed in
  *   rather than recomputed here so the filter pass only runs once per render, in the parent —
  *   same reasoning as `TimeEntriesToolbar`'s `filterOptions` prop.
- * @property statusOptions - Statuses present in `activeBoards` (from `useFilteredAbrechnung`),
- *   so the Status dropdown lists no dead values. Passed in rather than recomputed here so the
- *   filter pass only runs once per render, in the parent — same reasoning as
- *   `TimeEntriesToolbar`'s `filterOptions` prop.
+ * @property statusOptions - Budget-item statuses present in `activeBoards` (from
+ *   `useFilteredAbrechnung`), so the "Budget-Status" dropdown lists no dead values. Passed in
+ *   rather than recomputed here so the filter pass only runs once per render, in the parent —
+ *   same reasoning as `TimeEntriesToolbar`'s `filterOptions` prop.
+ * @property linkedStatusOptions - Linked-item (job-board) statuses present in `activeBoards`,
+ *   for the separate "Projekt-Status" dropdown — a different vocabulary from `statusOptions`.
  */
 interface AbrechnungToolbarProps {
 	boardOptions: AbrechnungBoardOption[];
 	statusOptions: { id: string; name: string }[];
+	linkedStatusOptions: { id: string; name: string }[];
 }
 
 /**
@@ -40,7 +43,7 @@ interface AbrechnungToolbarProps {
  * Only affects the active (current-year) table — the Archiv section below it is
  * intentionally never filtered, so this toolbar renders above the active section only.
  */
-export default function AbrechnungToolbar({ boardOptions, statusOptions }: AbrechnungToolbarProps) {
+export default function AbrechnungToolbar({ boardOptions, statusOptions, linkedStatusOptions }: AbrechnungToolbarProps) {
 	const { filters, setFilter, resetFilters, fetchActiveBudgetData } = useAbrechnungStore();
 	const [showFilters, setShowFilters] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
@@ -67,7 +70,10 @@ export default function AbrechnungToolbar({ boardOptions, statusOptions }: Abrec
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [debouncedDateRange]);
 
-	const hasActiveFilters = !!(filters.search || filters.boardId || filters.startDate || filters.endDate || filters.utilizationMin !== null || filters.utilizationMax !== null);
+	// Includes filters.status/linkedStatus — previously omitted here (a pre-existing bug),
+	// so "Filter zurücksetzen" never appeared when only a status filter was set even though
+	// the table filtered correctly.
+	const hasActiveFilters = !!(filters.search || filters.boardId || filters.status || filters.linkedStatus || filters.startDate || filters.endDate || filters.utilizationMin !== null || filters.utilizationMax !== null);
 
 	const handleReset = () => {
 		setSearchInput("");
@@ -126,7 +132,8 @@ export default function AbrechnungToolbar({ boardOptions, statusOptions }: Abrec
 				<Collapse expanded={showFilters} className={classes.filtersCollapse} transitionDuration={200} keepMounted>
 					<div className={classes.filtersRow}>
 						<Select placeholder="Budget-Board" data={boardOptions.map((b) => ({ value: b.id, label: b.name }))} value={filters.boardId} onChange={(value) => setFilter({ boardId: value })} clearable />
-						<Select placeholder="Status" data={statusOptions.map((s) => ({ value: s.id, label: s.name }))} value={filters.status} onChange={(value) => setFilter({ status: value })} clearable />
+						<Select placeholder="Budget-Status" data={statusOptions.map((s) => ({ value: s.id, label: s.name }))} value={filters.status} onChange={(value) => setFilter({ status: value })} clearable />
+						<Select placeholder="Projekt-Status" data={linkedStatusOptions.map((s) => ({ value: s.id, label: s.name }))} value={filters.linkedStatus} onChange={(value) => setFilter({ linkedStatus: value })} clearable />
 						<DatePicker
 							type="range"
 							allowSingleDateInRange
