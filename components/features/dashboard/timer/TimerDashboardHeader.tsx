@@ -96,33 +96,31 @@ export function TimerDashboardHeader() {
 					<TimerContainer />
 				</div>
 
-				<div className="header-view-switch">
-					<SegmentedControl
-						data={[
-							{
-								value: "table",
-								label: (
-									<Center style={{ gap: 4 }}>
-										<Icon name="table" size={16} />
-										<span>Tabelle</span>
-									</Center>
-								),
-							},
-							{
-								value: "calendar",
-								label: (
-									<Center style={{ gap: 4 }}>
-										<Icon name="event_note" size={16} />
-										<span>Kalender</span>
-									</Center>
-								),
-							},
-						]}
-						value={dashboardViewMode === "table" ? "table" : "calendar"}
-						onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
-						radius="md"
-					/>
-				</div>
+				<SegmentedControl
+					data={[
+						{
+							value: "table",
+							label: (
+								<Center style={{ gap: 4 }}>
+									<Icon name="table" size={16} />
+									<span>Tabelle</span>
+								</Center>
+							),
+						},
+						{
+							value: "calendar",
+							label: (
+								<Center style={{ gap: 4 }}>
+									<Icon name="event_note" size={16} />
+									<span>Kalender</span>
+								</Center>
+							),
+						},
+					]}
+					value={dashboardViewMode === "table" ? "table" : "calendar"}
+					onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
+					radius="md"
+				/>
 			</header>
 			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
 			<SaveTimerModal show={showTimerSave} onClose={closeTimerSave} />

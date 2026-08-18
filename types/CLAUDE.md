@@ -11,7 +11,6 @@ Hand-written and generated TypeScript types shared across the app. Import via th
 | [database/index.ts](database/index.ts) | `@/types/database` | Barrel that re-exports a curated subset of the two files above. The canonical entry point (~22 importers). |
 | [time-entry.ts](time-entry.ts) | `@/types/time-entry` | `TimeEntry` — the **flattened, display-ready** entry shape used by stores/UI. Not the raw DB row. |
 | [timer.types.ts](timer.types.ts) | `@/types/timer.types` | Client-side timer domain for the 2-table model: `TimerStatus`/`TimerState`/`TimerStore*`/`ActiveTimer` (the `get_active_timers` row shape) and component-prop/API-response types. No `sessionId` — a live timer is just a non-finalized `time_entry`, tracked by `entryId`. |
-| [IconProps.ts](IconProps.ts) | `@/types/IconProps` | `IconProps` / `IconComponentProps` for `components/icons/`. **Orphaned** — zero real importers; superseded by the local `types.ts` files under `components/ui/icons/` and `components/ui/buttons/`. |
 | [monday.ts](monday.ts) | `@/types/monday` | monday SDK `context` shape (`MondayContext` etc.). **Currently imported nowhere** — reference spec, not load-bearing. |
 
 ## How the DB types are layered

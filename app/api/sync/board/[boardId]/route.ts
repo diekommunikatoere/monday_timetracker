@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncItemColumns, getBoardConfig } from "@/lib/columnSync";
 import { getMondayContext } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
-import { supabaseAdmin } from "@/lib/supabase/server";
 import { fetchAllWithKeyset } from "@/lib/supabase/pagination";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 interface Props {
 	params: Promise<{
