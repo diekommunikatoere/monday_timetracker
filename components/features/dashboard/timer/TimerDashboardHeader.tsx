@@ -1,6 +1,7 @@
 "use client";
 
 import { Center, Flex, Tooltip, Text } from "@mantine/core";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { DashboardMenuButton, Icon, Logo, SegmentedControl } from "@/components";
@@ -64,6 +65,8 @@ export function TimerDashboardHeader() {
 		setShowManualSaveModal(false);
 	}, []);
 
+	const timeEntriesPath = "/dashboards";
+
 	return (
 		<>
 			<header id="app-header">
@@ -120,6 +123,7 @@ export function TimerDashboardHeader() {
 					value={dashboardViewMode === "table" ? "table" : "calendar"}
 					onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
 					radius="md"
+					disabled={usePathname() !== timeEntriesPath}
 				/>
 			</header>
 			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
