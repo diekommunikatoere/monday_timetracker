@@ -1297,15 +1297,15 @@ export interface BudgetBoardColumnConfig {
  *
  * @property id           - monday.com item ID of the budget item.
  * @property name         - Display name of the budget item.
- * @property budgetText   - Raw `.text` of the budget column, or `null` if empty/missing.
+ * @property budgetText   - The budget column's display text via {@link columnDisplayText} (prefers `display_value` for formula columns, else `.text`), or `null` if empty/missing.
  * @property budget       - `budgetText` parsed to a number via {@link parseNumericColumnText}, or `null`.
- * @property costText     - Raw `.text` of the cost ("Agenturleistung") column, or `null` if empty/missing.
+ * @property costText     - The cost ("Agenturleistung") column's display text via {@link columnDisplayText}, or `null` if empty/missing.
  * @property cost         - `costText` parsed to a number via {@link parseNumericColumnText}, or `null`.
  * @property linkedItemIds - IDs of every job item linked via the relation column (`linked_item_ids`).
  * @property linkedItems  - Same items with name + board, for drill-down display.
- * @property thirdPartyBudgetText - Raw `.text` of the "Fremdkosten-Budget" column, or `null` if empty/missing/unconfigured.
+ * @property thirdPartyBudgetText - The "Fremdkosten-Budget" column's display text via {@link columnDisplayText}, or `null` if empty/missing/unconfigured.
  * @property thirdPartyBudget     - `thirdPartyBudgetText` parsed via {@link parseNumericColumnText}, or `null`.
- * @property thirdPartyCostText   - Raw `.text` of the "Fremdkosten-IST" column, or `null` if empty/missing/unconfigured.
+ * @property thirdPartyCostText   - The "Fremdkosten-IST" column's display text via {@link columnDisplayText}, or `null` if empty/missing/unconfigured.
  * @property thirdPartyCost       - `thirdPartyCostText` parsed via {@link parseNumericColumnText}, or `null`.
  * @property thirdPartyLinkedIds   - IDs of every Fremdleistungs-item linked via the third-party relation column.
  * @property thirdPartyLinkedItems - Same items with name, board, own cost, and status — see {@link BudgetBoardThirdPartyItem}.
@@ -1359,6 +1359,8 @@ type RawBudgetBoardItem = {
 	column_values: Array<{
 		id: string;
 		text: string | null;
+		/** Only populated for `formula`- and `mirror`-type columns (see {@link buildBudgetBoardColumnValuesFragment}'s `... on FormulaValue`/`... on MirrorValue` fragments) — `.text` is unreliable for both, so {@link columnDisplayText} prefers this when present. */
+		display_value?: string | null;
 		linked_item_ids?: string[];
 		linked_items?: Array<{
 			id: string;
@@ -1366,13 +1368,25 @@ type RawBudgetBoardItem = {
 			url: string;
 			board: { id: string; name: string } | null;
 			/** Present only when the query requested `includeLinkedColumns` — see {@link buildBudgetBoardColumnValuesFragment}. */
-			column_values?: Array<{ id: string; text: string | null; label_style?: { color: string | null } }>;
+			column_values?: Array<{ id: string; text: string | null; display_value?: string | null; label_style?: { color: string | null } }>;
 		}>;
 		label_style?: {
 			color: string | null;
 		};
 	}>;
 };
+
+/**
+ * Prefers a column's `display_value` (only present on `formula`- and `mirror`-type columns, via
+ * the `... on FormulaValue`/`... on MirrorValue` query fragments) over its `.text` — monday
+ * leaves `.text` blank or unformatted for both (a `mirror` column reflecting a `formula` source
+ * inherits the same issue), while `display_value` matches what's rendered on the board. Every
+ * other column type has no `display_value` in the response, so this falls back to `.text` for
+ * them unchanged.
+ */
+function columnDisplayText(cv: { text: string | null; display_value?: string | null } | undefined): string | null {
+	return cv?.display_value ?? cv?.text ?? null;
+}
 
 /**
  * Builds the shared `column_values` selection for both {@link getBudgetBoardItems} and
@@ -1422,6 +1436,12 @@ function buildBudgetBoardColumnValuesFragment(includeLinkedColumns: boolean): st
 							color
 						}
 					}
+					... on FormulaValue {
+						display_value
+					}
+					... on MirrorValue {
+						display_value
+					}
 				}`
 						: ""
 				}
@@ -1432,6 +1452,12 @@ function buildBudgetBoardColumnValuesFragment(includeLinkedColumns: boolean): st
 			label_style {
 		 		color
 		 	}
+		}
+		... on FormulaValue {
+			display_value
+		}
+		... on MirrorValue {
+			display_value
 		}
 	}
 `;
@@ -1484,7 +1510,7 @@ function mapRawBudgetBoardItem(item: RawBudgetBoardItem, config: BudgetBoardColu
 			name: li.name,
 			itemUrl: li.url,
 			board: li.board,
-			cost: parseNumericColumnText(linkedThirdPartyCostValue?.text),
+			cost: parseNumericColumnText(columnDisplayText(linkedThirdPartyCostValue)),
 			status: { text: linkedThirdPartyStatusValue?.text ?? null, color: linkedThirdPartyStatusValue?.label_style?.color ?? null },
 		};
 	});
@@ -1494,14 +1520,14 @@ function mapRawBudgetBoardItem(item: RawBudgetBoardItem, config: BudgetBoardColu
 		id: item.id,
 		name: item.name,
 		itemUrl: item.url,
-		budgetText: budgetValue?.text ?? null,
-		budget: parseNumericColumnText(budgetValue?.text),
-		costText: costValue?.text ?? null,
-		cost: parseNumericColumnText(costValue?.text),
-		thirdPartyBudgetText: thirdPartyBudgetValue?.text ?? null,
-		thirdPartyBudget: parseNumericColumnText(thirdPartyBudgetValue?.text),
-		thirdPartyCostText: thirdPartyCostValue?.text ?? null,
-		thirdPartyCost: parseNumericColumnText(thirdPartyCostValue?.text),
+		budgetText: columnDisplayText(budgetValue),
+		budget: parseNumericColumnText(columnDisplayText(budgetValue)),
+		costText: columnDisplayText(costValue),
+		cost: parseNumericColumnText(columnDisplayText(costValue)),
+		thirdPartyBudgetText: columnDisplayText(thirdPartyBudgetValue),
+		thirdPartyBudget: parseNumericColumnText(columnDisplayText(thirdPartyBudgetValue)),
+		thirdPartyCostText: columnDisplayText(thirdPartyCostValue),
+		thirdPartyCost: parseNumericColumnText(columnDisplayText(thirdPartyCostValue)),
 		linkedItemIds,
 		linkedItems,
 		thirdPartyLinkedIds,

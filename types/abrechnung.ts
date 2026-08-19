@@ -129,9 +129,9 @@ export interface AbrechnungBudgetItem {
 	totalCost: number;
 	remainingBudget: number | null;
 	utilizationPercent: number | null;
-	/** Read as-is from the budget board's own mapped column — not derived from `thirdPartyItems`, which may legitimately disagree. */
+	/** Read as-is from the budget board's own mapped column — a planned figure, not derived from `thirdPartyItems`. */
 	thirdPartyBudget: number | null;
-	/** Read as-is from the budget board's own mapped column — not derived from `thirdPartyItems`, which may legitimately disagree. */
+	/** Summed from `thirdPartyItems[].cost` (each linked Fremdleistung's own cost column) rather than read off the budget item's own column — monday can't reliably compute a formula/mirror rollup over the same connect-board relation. `null` when `thirdPartyItems` is empty. */
 	thirdPartyTotalCost: number | null;
 	byRole: AbrechnungRoleBreakdown[];
 	linkedItems: AbrechnungLinkedItem[];

@@ -88,13 +88,13 @@ export function AbrechnungTable({ items, loading, error, showBoardColumn = false
 				cell: ({ row }) => (
 					<Flex gap="xs" align="center" justify="space-between" style={{ width: "100%" }}>
 						<Group gap="xs" wrap="nowrap">
-							<IconButton variant="subtle" size="sm" onClick={() => toggleExpand(row.id)} aria-label={expandedIds.has(row.id) ? "Details ausblenden" : "Details anzeigen"}>
+							<IconButton variant="subtle" size="sm" onClick={() => toggleExpand(row.id)} aria-label={expandedIds.has(row.id) ? "Details ausblenden" : "Details anzeigen"} disabled={row.linkedItems.length === 0}>
 								<Icon name={expandedIds.has(row.id) ? "expand_more" : "chevron_right"} size={18} />
 							</IconButton>
 							<Text fw={500} size="sm" style={{ display: "inline-flex", gap: "8px", alignItems: "center" }} title={row.name}>
 								{row.name}{" "}
 								<Badge component="span" variant="light" color="var(--color--text-secondary)" fw={600} size="sm" style={{ lineHeight: "1em", verticalAlign: "middle" }} title="Verknüpfte Agentur-Projekte">
-									{row.linkedItems.length}
+									{row.linkedItems.length + row.thirdPartyItems.length}
 								</Badge>
 							</Text>
 						</Group>

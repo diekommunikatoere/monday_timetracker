@@ -283,10 +283,18 @@ function computeBudgetItemRollup(item: BudgetBoardItem, itemsByRoleData: GetItem
 		totalCost,
 		remainingBudget: item.budget !== null ? item.budget - totalCost : null,
 		utilizationPercent,
-		// Read as-is off the budget item's own mapped columns — not derived from
-		// thirdPartyItems, which may legitimately disagree (see the feature plan).
+		// thirdPartyBudget is read as-is off the budget item's own mapped column (a planned
+		// figure, not naturally a sum of the linked items). thirdPartyTotalCost, by contrast, is
+		// now summed from thirdPartyLinkedItems' own cost columns rather than read off the budget
+		// item's thirdPartyCostColumnId: that root column is typically a formula/mirror rolling up
+		// the same connect-board relation, and monday's API can't reliably compute a formula built
+		// on a mirror/connect-board source (display_value comes back empty) — see the FormulaValue/
+		// MirrorValue investigation. Summing the already-fetched linked items sidesteps that
+		// entirely. `null` (not 0) when there are no linked items at all, so budget boards with no
+		// Fremdleistungen configured still resolve to null like thirdPartyBudget does, keeping
+		// AbrechnungTable's "hide the Fremdkosten columns" check working.
 		thirdPartyBudget: item.thirdPartyBudget,
-		thirdPartyTotalCost: item.thirdPartyCost,
+		thirdPartyTotalCost: item.thirdPartyLinkedItems.length > 0 ? item.thirdPartyLinkedItems.reduce((sum, li) => sum + (li.cost ?? 0), 0) : null,
 		byRole,
 		linkedItems,
 		thirdPartyItems: item.thirdPartyLinkedItems,
