@@ -35,4 +35,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
  *   .subscribe();
  * ```
  */
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		autoRefreshToken: false,
+		persistSession: false,
+		detectSessionInUrl: false,
+	},
+});
