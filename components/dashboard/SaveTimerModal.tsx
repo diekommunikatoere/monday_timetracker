@@ -18,7 +18,6 @@ import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields"
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 
 import "@mantine/dates/styles.css";
-import "@/public/css/components/SaveTimerModal.css";
 
 /**
  * Optional seed data for {@link SaveTimerModal} when reopening a saved draft.

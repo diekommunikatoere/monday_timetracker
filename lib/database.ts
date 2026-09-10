@@ -93,6 +93,15 @@ export async function upsertMondayBoard(id: string, name: string, workspaceId?: 
 /**
  * Fetch the task list for a board from the local DB mirror.
  *
+ * Gated on `board_config.settings.board_selectable`: boards default to **not**
+ * selectable (opt-in — absent key or `false` both count as off) and this throws
+ * a `BOARD_NOT_SELECTABLE` sentinel error when the board isn't opted in. Callers
+ * must handle that sentinel explicitly rather than letting it fall through to a
+ * generic error path — see `app/api/tasks/route.ts`, which turns it into an
+ * empty task list instead of falling back to the monday API (that fallback is
+ * exactly what this gate is meant to prevent). This is independent of
+ * `board_config.sync_enabled`, which still solely controls column write-back.
+ *
  * Returns items and subitems from the `view_monday_tasks` view, filtered to:
  * - Groups with `sync_enabled = true` (disabled groups are excluded).
  * - `is_active = true` items (soft-deleted / archived items are excluded).
@@ -107,8 +116,25 @@ export async function upsertMondayBoard(id: string, name: string, workspaceId?: 
  *
  * @param boardId - The monday board ID to query.
  * @returns Array of task objects with `id`, `name`, `group`, and `parent_item`.
+ * @throws Error("BOARD_NOT_SELECTABLE") if the board isn't opted into the task picker.
  */
 export async function getTasksFromDB(boardId: string) {
+	const { data: config, error: configError } = await supabaseAdmin
+		.from("board_config")
+		.select("board_id, settings")
+		.eq("board_id", boardId) // was .eq("id", boardId) — id is a uuid PK
+		.maybeSingle(); // was .single() — PGRST116 on 0 rows
+
+	if (configError) {
+		console.error(`Error fetching board config for board ${boardId}:`, configError);
+		throw configError; // genuine DB fault → API fallback is still correct
+	}
+
+	if ((config?.settings as any)?.board_selectable !== true) {
+		console.warn(`[getTasksFromDB] Board ${boardId} is not selectable`);
+		throw new Error("BOARD_NOT_SELECTABLE");
+	}
+
 	console.log(`[getTasksFromDB] Fetching tasks for board ${boardId}`);
 	// Step 1: Get all synced groups for this board, ordered by their board position
 	const { data: allGroups, error: groupsError } = await supabaseAdmin.from("monday_group").select("id, title, position, color, sync_enabled").eq("board_id", boardId).order("position", { ascending: true });
@@ -777,7 +803,7 @@ export async function restoreTimeEntry(id: string, userId: string, undoToken: st
 			throw new Error("Invalid or expired undo token");
 		}
 	} catch (err) {
-		throw new Error("Invalid undo token");
+		throw new Error("Invalid undo token", { cause: err });
 	}
 
 	// Restore entry

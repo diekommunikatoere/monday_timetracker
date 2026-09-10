@@ -5,8 +5,8 @@
  * (see `supabase/migrations/037_board_settings_merge.sql`'s `update_board_config` RPC; there is
  * no separate schema for this, it's a jsonb tag on the existing `board_config` row) — and for
  * each budget item on those boards, rolls up its linked job items' tracked time / cost /
- * remaining budget via the generic `get_item_total_time` / `get_item_time_by_role` /
- * `calculate_remaining_budget` Postgres RPC family (`supabase/migrations/029_timer_constraints_and_drops.sql`).
+ * remaining budget via the `get_items_time_by_role` Postgres RPC
+ * (`supabase/migrations/040_items_time_by_role.sql`).
  *
  * A budget item's linked job items are discovered dynamically per query via monday's own
  * `linked_items[].board` data ({@link getBudgetBoardItems} in `lib/monday.ts`) — there is no
@@ -16,46 +16,52 @@
  * deliberately kept separate from — see `lib/CLAUDE.md`), nothing here writes back to monday.
  */
 
-import { getBudgetBoardItems, type BudgetBoardItem } from "@/lib/monday";
+import { getBudgetBoardItems, getBudgetBoardItem, type BudgetBoardItem } from "@/lib/monday";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-import type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange } from "@/types/abrechnung";
-import type { GetItemsTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
+import type { BudgetBoardStatus, BudgetBoardSettings, JobBoardSettings, ThirdPartyBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungThirdPartyItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange } from "@/types/abrechnung";
+import type { GetItemsTimeByRoleResult } from "@/types/database";
 
 // Domain types live in `@/types/abrechnung` (not here) so client code — the Zustand
 // store, the page — can import them without pulling in this server-only module (which
 // imports `lib/supabase/server`'s service-role client). Re-exported for convenience so
 // existing server-side importers (e.g. the admin budget-config API route) can keep
 // importing them from here.
-export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange };
+export type { BudgetBoardStatus, BudgetBoardSettings, AbrechnungRoleBreakdown, AbrechnungLinkedItem, AbrechnungThirdPartyItem, AbrechnungBudgetItem, AbrechnungBoard, ArchivedBudgetPeriod, AbrechnungDateRange };
 
 /**
  * Loads every budget board matching `status` (optionally narrowed to a single `boardId`),
  * fetches each board's items from monday, and rolls up tracked time / cost / remaining
- * budget per item via the RPC family. Boards missing their column configuration are
- * returned with an empty `items` array (and logged) rather than failing the whole call —
- * one misconfigured board shouldn't take down the rest of the report.
+ * budget per item via {@link getItemsTimeByRoleForBudgetItems}. Boards missing their column
+ * configuration are returned with an empty `items` array (and logged) rather than failing
+ * the whole call — one misconfigured board shouldn't take down the rest of the report.
  *
  * Same function serves both the active view (`status: "active"`) and a single archived
  * period (`status: "archived", boardId: "<id>"`) — only the filter differs.
  *
- * @param status  - `"active"` (default) or `"archived"`.
- * @param boardId - Optional: narrow to one budget board (used for a single archived period).
- * @param range   - Optional: narrows the rollup (`totalSeconds`/`totalCost`/`remainingBudget`/
- *                  `utilizationPercent`) to time entries within this date range; `budget`
- *                  itself is unaffected. Unset (or both bounds `null`) means all-time,
- *                  matching pre-existing behavior. Only the active view's toolbar sets this —
- *                  the archive is intentionally never date-filtered.
+ * @param status       - `"active"` (default) or `"archived"`.
+ * @param boardId      - Optional: narrow to one budget board (used for a single archived period).
+ * @param range        - Optional: narrows the rollup (`totalSeconds`/`totalCost`/`remainingBudget`/
+ *                       `utilizationPercent`) to time entries within this date range; `budget`
+ *                       itself is unaffected. Unset (or both bounds `null`) means all-time,
+ *                       matching pre-existing behavior. Only the active view's toolbar sets this —
+ *                       the archive is intentionally never date-filtered.
+ * @param forceRefresh - Bypasses and rewrites the monday-layer Redis cache in
+ *                       {@link getBudgetBoardItems} (the toolbar's "Aktualisieren" button, via
+ *                       `?refresh=1` on the route). Default `false`.
  * @returns One {@link AbrechnungBoard} per matching `board_config` row.
  */
-export async function getAbrechnungData(status: BudgetBoardStatus = "active", boardId?: string, range?: AbrechnungDateRange): Promise<AbrechnungBoard[]> {
+export async function getAbrechnungData(status: BudgetBoardStatus = "active", boardId?: string, range?: AbrechnungDateRange, forceRefresh = false): Promise<AbrechnungBoard[]> {
 	let query = supabaseAdmin.from("board_config").select("board_id, settings, monday_board(name)").eq("settings->>budget_board_status", status);
 
 	if (boardId) {
 		query = query.eq("board_id", boardId);
 	}
 
-	const { data: boardConfigs, error } = await query;
+	// The role table and the linked-board column maps are both tiny and global — fetching
+	// them once here (in parallel with the board_config query) and threading them down
+	// replaces what used to be one `role` query per budget item (see getRoleColorMap below).
+	const [{ data: boardConfigs, error }, roleColorMap, linkedBoardColumnMaps] = await Promise.all([query, getRoleColorMap(), getLinkedBoardColumnMaps()]);
 
 	if (error) {
 		console.error("[getAbrechnungData] Error loading budget board configs:", error);
@@ -66,95 +72,164 @@ export async function getAbrechnungData(status: BudgetBoardStatus = "active", bo
 		return [];
 	}
 
-	return Promise.all(boardConfigs.map((config: any) => loadBudgetBoard(config, status, range)));
+	return Promise.all(boardConfigs.map((config: any) => loadBudgetBoard(config, status, roleColorMap, linkedBoardColumnMaps, range, forceRefresh)));
 }
 
 /** Loads and rolls up a single budget board's items. Never throws — degrades to an empty `items` array. */
-async function loadBudgetBoard(config: { board_id: string; settings: unknown; monday_board?: { name: string } | null }, status: BudgetBoardStatus, range?: AbrechnungDateRange): Promise<AbrechnungBoard> {
+async function loadBudgetBoard(config: { board_id: string; settings: unknown; monday_board?: { name: string } | null }, status: BudgetBoardStatus, roleColorMap: Map<string, string | undefined>, linkedBoardColumnMaps: LinkedBoardColumnMaps, range?: AbrechnungDateRange, forceRefresh = false): Promise<AbrechnungBoard> {
 	const settings = (config.settings ?? {}) as BudgetBoardSettings;
 	const boardName = config.monday_board?.name || config.board_id;
 	const label = settings.label ?? null;
-	const { job_relation_column_id: relationColumnId, budget_column_id: budgetColumnId, cost_column_id: costColumnId } = settings;
+	const {
+		job_relation_column_id: relationColumnId,
+		third_party_relation_column_id: thirdPartyRelationColumnId,
+		agency_budget_column_id: agencyBudgetColumnId,
+		agency_cost_column_id: agencyCostColumnId,
+		third_party_budget_column_id: thirdPartyBudgetColumnId,
+		third_party_cost_column_id: thirdPartyCostColumnId,
+		status_column_id: statusColumnId,
+	} = settings;
 
-	if (!relationColumnId || !budgetColumnId || !costColumnId) {
-		console.warn(`[getAbrechnungData] Budget board ${config.board_id} is missing job_relation_column_id/budget_column_id/cost_column_id configuration; skipping.`);
+	// Third-party settings are optional — a budget board with no Fremdleistungen configured
+	// keeps working, just with thirdPartyRelationColumnId/thirdPartyBudgetColumnId/
+	// thirdPartyCostColumnId passed through as null (see getBudgetBoardItems).
+	if (!relationColumnId || !agencyBudgetColumnId || !agencyCostColumnId || !statusColumnId) {
+		console.warn(`[getAbrechnungData] Budget board ${config.board_id} is missing job_relation_column_id/agency_budget_column_id/agency_cost_column_id/status_column_id configuration; skipping.`);
 		return { boardId: config.board_id, boardName, label, status, items: [] };
 	}
 
 	let rawItems: BudgetBoardItem[];
 	try {
-		rawItems = await getBudgetBoardItems(config.board_id, relationColumnId, budgetColumnId, costColumnId);
+		rawItems = await getBudgetBoardItems(
+			config.board_id,
+			{
+				relationColumnId,
+				thirdPartyRelationColumnId: thirdPartyRelationColumnId ?? null,
+				agencyBudgetColumnId,
+				agencyCostColumnId,
+				thirdPartyBudgetColumnId: thirdPartyBudgetColumnId ?? null,
+				thirdPartyCostColumnId: thirdPartyCostColumnId ?? null,
+				statusColumnId,
+				...linkedBoardColumnMaps,
+			},
+			forceRefresh,
+		);
 	} catch (err) {
 		console.error(`[getAbrechnungData] Failed to fetch items for budget board ${config.board_id}:`, err);
 		return { boardId: config.board_id, boardName, label, status, items: [] };
 	}
 
-	const items = await Promise.all(rawItems.map((item) => rollupBudgetItem(config.board_id, item, range)));
+	const itemsByRoleByBudgetItem = await getItemsTimeByRoleForBudgetItems(rawItems, range);
+	const items = rawItems.map((item) => computeBudgetItemRollup(item, itemsByRoleByBudgetItem.get(item.id) ?? [], roleColorMap));
 
 	return { boardId: config.board_id, boardName, label, status, items };
 }
 
 /**
- * Rolls up one budget item's linked job items via the RPC family.
- *
- * `p_board_id` is still passed to `calculate_remaining_budget` for signature compatibility,
- * but as of `supabase/migrations/038_calculate_remaining_budget_per_item_board.sql` the
- * `board_role_override` join uses each time entry's own `board_id`, so a budget item whose
- * linked job items span multiple boards gets each entry's correct board-specific rate override.
- *
- * `range` (added in `039_rollup_functions_date_range.sql`) narrows every RPC call to time
- * entries within the bounds; `item.budget` itself is never touched by it.
- *
- * Per-role time+cost is fetched once via `get_items_time_by_role` (`040_items_time_by_role.sql`)
- * and then regrouped in-memory two ways: collapsed across all linked items for the budget
- * item's own `byRole`, and kept per linked item for `linkedItems[].byRole`/`totalSeconds`/
- * `totalCost`. This replaced an older N+1 (one `calculate_remaining_budget` call per linked
- * item, cost-only, no per-role split) with a single grouped call.
+ * Chunk size for {@link getItemsTimeByRoleForBudgetItems}'s `get_items_time_by_role` calls.
+ * PostgREST caps a single RPC response at 1 000 rows (see `lib/supabase/pagination.ts`), and
+ * a chunk can return more rows than input ids (one row per item **and role**) — 200 keeps
+ * real-world chunks comfortably under the cap while still batching a ~200-item board's linked
+ * items into a small handful of calls instead of one per budget item.
  */
-async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, range?: AbrechnungDateRange): Promise<AbrechnungBudgetItem> {
-	const linkedItemIds = item.linkedItemIds;
+const ITEMS_TIME_BY_ROLE_CHUNK_SIZE = 200;
+
+/**
+ * Batches the per-item, per-role time+cost rollup for every budget item on a board into a
+ * few `get_items_time_by_role` calls (chunked over the **union** of every budget item's
+ * `linkedItemIds`) instead of one `get_item_total_time` + `get_items_time_by_role` +
+ * `calculate_remaining_budget` call per budget item — the fan-out this module used to do.
+ *
+ * Returns rows grouped **per budget item** (not per linked item): a linked job item
+ * referenced by more than one budget item (possible via the relation column — see the
+ * `linkedToBudget` inverse index below) contributes its full rows to each budget item it's
+ * linked to, matching the old per-item-call behavior of never splitting attribution.
+ *
+ * `get_items_time_by_role` deliberately includes role-less rows (`role_id IS NULL`) — see
+ * `040_items_time_by_role.sql` — so summing every row's `total_seconds`/`total_cost` per
+ * budget item (done by {@link computeBudgetItemRollup}) reproduces what `get_item_total_time`
+ * / `calculate_remaining_budget` used to compute directly, just via JS summation instead of
+ * a Postgres `NUMERIC` aggregate (sub-cent rounding differences are expected, not a bug).
+ */
+async function getItemsTimeByRoleForBudgetItems(rawItems: BudgetBoardItem[], range?: AbrechnungDateRange): Promise<Map<string, GetItemsTimeByRoleResult[]>> {
 	const startDate = range?.startDate ?? null;
 	const endDate = range?.endDate ?? null;
 
-	if (linkedItemIds.length === 0) {
-		return {
-			id: item.id,
-			name: item.name,
-			budget: item.budget,
-			totalSeconds: 0,
-			totalCost: 0,
-			remainingBudget: item.budget,
-			utilizationPercent: 0,
-			byRole: [],
-			linkedItems: item.linkedItems.map((linkedItem) => ({ ...linkedItem, totalSeconds: 0, totalCost: 0, byRole: [] })),
-		};
+	// Inverse index: linked job item id -> every budget item id that links to it. An array
+	// value (not a single owner) because a job item can be linked from more than one budget
+	// item — that must not collapse to a single attribution.
+	const linkedToBudget = new Map<string, string[]>();
+	for (const item of rawItems) {
+		for (const linkedId of item.linkedItemIds) {
+			const owners = linkedToBudget.get(linkedId);
+			if (owners) owners.push(item.id);
+			else linkedToBudget.set(linkedId, [item.id]);
+		}
 	}
 
-	const [totalTimeResult, itemsByRoleResult, budgetResultRows] = await Promise.all([
-		supabaseAdmin.rpc("get_item_total_time", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: number | null; error: any }>,
-		supabaseAdmin.rpc("get_items_time_by_role", { p_item_ids: linkedItemIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{ data: GetItemsTimeByRoleResult[] | null; error: any }>,
-		supabaseAdmin.rpc("calculate_remaining_budget", {
-			p_board_id: budgetBoardId,
-			p_item_ids: linkedItemIds,
-			p_budget_amount: item.budget ?? 0,
-			p_user_id: null,
-			p_start_date: startDate,
-			p_end_date: endDate,
-		} as any) as unknown as Promise<{ data: CalculateRemainingBudgetResult[] | null; error: any }>,
-	]);
+	const result = new Map<string, GetItemsTimeByRoleResult[]>();
+	const unionIds = Array.from(linkedToBudget.keys());
+	if (unionIds.length === 0) return result;
 
-	if (totalTimeResult.error) console.error(`[getAbrechnungData] get_item_total_time failed for budget item ${item.id}:`, totalTimeResult.error);
-	if (itemsByRoleResult.error) console.error(`[getAbrechnungData] get_items_time_by_role failed for budget item ${item.id}:`, itemsByRoleResult.error);
-	if (budgetResultRows.error) console.error(`[getAbrechnungData] calculate_remaining_budget failed for budget item ${item.id}:`, budgetResultRows.error);
+	const chunks: string[][] = [];
+	for (let i = 0; i < unionIds.length; i += ITEMS_TIME_BY_ROLE_CHUNK_SIZE) {
+		chunks.push(unionIds.slice(i, i + ITEMS_TIME_BY_ROLE_CHUNK_SIZE));
+	}
 
-	const itemsByRoleData = itemsByRoleResult.data ?? [];
-	const colorMap = await getRoleColorMap(itemsByRoleData.filter((r) => r.role_id !== null).map((r) => r.role_id as string));
-	const budgetResult = budgetResultRows.data?.[0];
+	const chunkResults = await Promise.all(
+		chunks.map(
+			(chunkIds) =>
+				supabaseAdmin.rpc("get_items_time_by_role", { p_item_ids: chunkIds, p_user_id: null, p_start_date: startDate, p_end_date: endDate } as any) as unknown as Promise<{
+					data: GetItemsTimeByRoleResult[] | null;
+					error: any;
+				}>,
+		),
+	);
+
+	for (const { data, error } of chunkResults) {
+		if (error) {
+			console.error("[getAbrechnungData] get_items_time_by_role batch call failed:", error);
+			continue;
+		}
+
+		const rows = data ?? [];
+		if (rows.length === 1000) {
+			console.warn("[getAbrechnungData] get_items_time_by_role returned exactly 1000 rows for one chunk — results may be truncated by the PostgREST row cap; consider lowering ITEMS_TIME_BY_ROLE_CHUNK_SIZE.");
+		}
+
+		for (const row of rows) {
+			const owners = linkedToBudget.get(row.item_id) ?? [];
+			for (const budgetItemId of owners) {
+				const existing = result.get(budgetItemId);
+				if (existing) existing.push(row);
+				else result.set(budgetItemId, [row]);
+			}
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Pure computation — rolls up one budget item's linked job items from already-fetched
+ * `get_items_time_by_role` rows. No RPC/DB calls of its own, so it's reused both by the
+ * batched board load ({@link loadBudgetBoard}) and by {@link refreshBudgetItem}'s
+ * single-item path.
+ *
+ * Per-role time+cost is regrouped in-memory two ways: collapsed across all linked items
+ * for the budget item's own `byRole`, and kept per linked item for `linkedItems[].byRole`/
+ * `totalSeconds`/`totalCost`.
+ */
+function computeBudgetItemRollup(item: BudgetBoardItem, itemsByRoleData: GetItemsTimeByRoleResult[], roleColorMap: Map<string, string | undefined>): AbrechnungBudgetItem {
+	const totalSeconds = itemsByRoleData.reduce((sum, r) => sum + r.total_seconds, 0);
+	const totalCost = itemsByRoleData.reduce((sum, r) => sum + r.total_cost, 0);
+	const budgetAmount = item.budget ?? 0;
+
 	const utilizationPercent = (() => {
-		if (budgetResult?.budget_amount === 0 && budgetResult?.total_cost > 0) {
+		if (budgetAmount === 0 && totalCost > 0) {
 			return null;
-		} else if (budgetResult?.budget_amount && budgetResult?.total_cost !== undefined) {
-			return (budgetResult.total_cost / budgetResult.budget_amount) * 100;
+		} else if (budgetAmount && totalCost !== undefined) {
+			return (totalCost / budgetAmount) * 100;
 		} else {
 			return 0;
 		}
@@ -162,7 +237,7 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 
 	// Collapse across all linked items → the budget item's own "Zeit nach Rolle". Role-less
 	// rows (role_id === null) are excluded from the breakdown but still count toward
-	// totalSeconds/totalCost via the get_item_total_time/calculate_remaining_budget calls above.
+	// totalSeconds/totalCost via the reduce() calls above.
 	const byRoleTotals = new Map<string, { roleName: string; totalSeconds: number; totalCost: number; entryCount: number }>();
 	for (const row of itemsByRoleData) {
 		if (row.role_id === null) continue;
@@ -176,7 +251,7 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 		}
 	}
 	const byRole: AbrechnungRoleBreakdown[] = Array.from(byRoleTotals.entries())
-		.map(([roleId, r]) => ({ roleId, roleName: r.roleName, totalSeconds: r.totalSeconds, totalCost: r.totalCost, entryCount: r.entryCount, colorHex: colorMap.get(roleId) }))
+		.map(([roleId, r]) => ({ roleId, roleName: r.roleName, totalSeconds: r.totalSeconds, totalCost: r.totalCost, entryCount: r.entryCount, colorHex: roleColorMap.get(roleId) }))
 		.sort((a, b) => b.totalSeconds - a.totalSeconds);
 
 	// Kept per linked item → each linked item's own time/cost and role breakdown.
@@ -188,35 +263,157 @@ async function rollupBudgetItem(budgetBoardId: string, item: BudgetBoardItem, ra
 	}
 	const linkedItems: AbrechnungLinkedItem[] = item.linkedItems.map((linkedItem) => {
 		const rows = rowsByItemId.get(linkedItem.id) ?? [];
-		const totalSeconds = rows.reduce((sum, r) => sum + r.total_seconds, 0);
-		const totalCost = rows.reduce((sum, r) => sum + r.total_cost, 0);
+		const linkedTotalSeconds = rows.reduce((sum, r) => sum + r.total_seconds, 0);
+		const linkedTotalCost = rows.reduce((sum, r) => sum + r.total_cost, 0);
 		const linkedByRole: AbrechnungRoleBreakdown[] = rows
 			.filter((r) => r.role_id !== null)
-			.map((r) => ({ roleId: r.role_id as string, roleName: r.role_name ?? "", totalSeconds: r.total_seconds, totalCost: r.total_cost, entryCount: r.entry_count, colorHex: colorMap.get(r.role_id as string) }))
+			.map((r) => ({ roleId: r.role_id as string, roleName: r.role_name ?? "", totalSeconds: r.total_seconds, totalCost: r.total_cost, entryCount: r.entry_count, colorHex: roleColorMap.get(r.role_id as string) }))
 			.sort((a, b) => b.totalSeconds - a.totalSeconds);
 
-		return { ...linkedItem, totalSeconds, totalCost, byRole: linkedByRole };
+		return { ...linkedItem, totalSeconds: linkedTotalSeconds, totalCost: linkedTotalCost, byRole: linkedByRole };
 	});
 
 	return {
 		id: item.id,
 		name: item.name,
+		itemUrl: item.itemUrl,
+		status: item.status,
 		budget: item.budget,
-		totalSeconds: totalTimeResult.data ?? 0,
-		totalCost: budgetResult?.total_cost ?? 0,
-		remainingBudget: item.budget !== null ? (budgetResult?.remaining_budget ?? item.budget) : null,
-		utilizationPercent: utilizationPercent,
+		totalSeconds,
+		totalCost,
+		remainingBudget: item.budget !== null ? item.budget - totalCost : null,
+		utilizationPercent,
+		// thirdPartyBudget is read as-is off the budget item's own mapped column (a planned
+		// figure, not naturally a sum of the linked items). thirdPartyTotalCost, by contrast, is
+		// now summed from thirdPartyLinkedItems' own cost columns rather than read off the budget
+		// item's thirdPartyCostColumnId: that root column is typically a formula/mirror rolling up
+		// the same connect-board relation, and monday's API can't reliably compute a formula built
+		// on a mirror/connect-board source (display_value comes back empty) — see the FormulaValue/
+		// MirrorValue investigation. Summing the already-fetched linked items sidesteps that
+		// entirely. `null` (not 0) when there are no linked items at all, so budget boards with no
+		// Fremdleistungen configured still resolve to null like thirdPartyBudget does, keeping
+		// AbrechnungTable's "hide the Fremdkosten columns" check working.
+		thirdPartyBudget: item.thirdPartyBudget,
+		thirdPartyTotalCost: item.thirdPartyLinkedItems.length > 0 ? item.thirdPartyLinkedItems.reduce((sum, li) => sum + (li.cost ?? 0), 0) : null,
 		byRole,
 		linkedItems,
+		thirdPartyItems: item.thirdPartyLinkedItems,
 	};
 }
 
-/** Batch-resolves `role.color_hex` for a set of role IDs, for {@link AbrechnungRoleBreakdown.colorHex}. */
-async function getRoleColorMap(roleIds: string[]): Promise<Map<string, string | undefined>> {
-	if (roleIds.length === 0) return new Map();
-
-	const { data: roles } = await supabaseAdmin.from("role").select("id, color_hex").in("id", roleIds);
+/** Batch-resolves every `role.color_hex`, keyed by `role.id`. `role` is a tiny global table, so fetching it in full once per {@link getAbrechnungData} call (rather than once per budget item, as before) is cheap. */
+async function getRoleColorMap(): Promise<Map<string, string | undefined>> {
+	const { data: roles, error } = await supabaseAdmin.from("role").select("id, color_hex");
+	if (error) {
+		console.error("[getAbrechnungData] Failed to load role colors:", error);
+		return new Map();
+	}
 	return new Map((roles ?? []).map((r) => [r.id, r.color_hex ?? undefined]));
+}
+
+/** The three monday-board-id-keyed column maps threaded into {@link getBudgetBoardItems}/{@link getBudgetBoardItem} as `BudgetBoardColumnConfig`'s `*ColumnIdsByBoardId` fields — see {@link getLinkedBoardColumnMaps}. */
+interface LinkedBoardColumnMaps {
+	jobStatusColumnIdsByBoardId: Record<string, string>;
+	thirdPartyStatusColumnIdsByBoardId: Record<string, string>;
+	thirdPartyCostColumnIdsByBoardId: Record<string, string>;
+}
+
+/**
+ * monday board id → configured status/cost column id, covering both job boards
+ * ({@link JobBoardSettings.job_status_column_id}) and Fremdkosten-Boards
+ * ({@link ThirdPartyBoardSettings.third_party_status_column_id} /
+ * {@link ThirdPartyBoardSettings.third_party_item_cost_column_id}) from a **single**
+ * `board_config` read — collapsed from the two separate per-role queries this used to be,
+ * since `board_config` is small and this drops a round trip from both {@link getAbrechnungData}
+ * and {@link refreshBudgetItem}. Threaded down into {@link getBudgetBoardItems}/
+ * {@link getBudgetBoardItem} so a linked item's status/cost can be resolved against whichever
+ * board it currently lives on. Same "one tiny global query, threaded down" pattern as
+ * {@link getRoleColorMap}.
+ */
+async function getLinkedBoardColumnMaps(): Promise<LinkedBoardColumnMaps> {
+	const { data: rows, error } = await supabaseAdmin.from("board_config").select("board_id, settings");
+	if (error) {
+		console.error("[getAbrechnungData] Failed to load linked-board column maps:", error);
+		return { jobStatusColumnIdsByBoardId: {}, thirdPartyStatusColumnIdsByBoardId: {}, thirdPartyCostColumnIdsByBoardId: {} };
+	}
+
+	const jobStatusColumnIdsByBoardId: Record<string, string> = {};
+	const thirdPartyStatusColumnIdsByBoardId: Record<string, string> = {};
+	const thirdPartyCostColumnIdsByBoardId: Record<string, string> = {};
+
+	for (const row of rows ?? []) {
+		const settings = (row.settings ?? {}) as JobBoardSettings & ThirdPartyBoardSettings;
+		if (settings.job_status_column_id) jobStatusColumnIdsByBoardId[row.board_id] = settings.job_status_column_id;
+		if (settings.third_party_status_column_id) thirdPartyStatusColumnIdsByBoardId[row.board_id] = settings.third_party_status_column_id;
+		if (settings.third_party_item_cost_column_id) thirdPartyCostColumnIdsByBoardId[row.board_id] = settings.third_party_item_cost_column_id;
+	}
+
+	return { jobStatusColumnIdsByBoardId, thirdPartyStatusColumnIdsByBoardId, thirdPartyCostColumnIdsByBoardId };
+}
+
+/**
+ * Refreshes a single budget item without re-fetching or re-rolling-up the rest of its
+ * board — the Abrechnung table's per-row "Aktualisieren" action, and the escape hatch for
+ * {@link getBudgetBoardItems}'s monday-layer cache TTL (a budget/status value edited
+ * directly in monday would otherwise stay stale for up to that TTL).
+ *
+ * Reads the board's column config from `board_config`, re-fetches just this item from
+ * monday via `getBudgetBoardItem` (which also patches the cached board array so a
+ * subsequent full board load doesn't clobber the refreshed values), then runs the same
+ * rollup computation as the batched path — just scoped to this one item's own linked-item ids.
+ *
+ * @param boardId - The budget board's monday.com ID.
+ * @param itemId  - The budget item's monday.com ID.
+ * @param range   - Optional date range narrowing the rollup, same as {@link getAbrechnungData}.
+ * @returns The refreshed {@link AbrechnungBudgetItem}, or `null` if the board is unconfigured
+ *          or the item could not be found on it.
+ */
+export async function refreshBudgetItem(boardId: string, itemId: string, range?: AbrechnungDateRange): Promise<AbrechnungBudgetItem | null> {
+	const [{ data: config, error }, linkedBoardColumnMaps] = await Promise.all([supabaseAdmin.from("board_config").select("board_id, settings").eq("board_id", boardId).maybeSingle(), getLinkedBoardColumnMaps()]);
+
+	if (error || !config) {
+		console.error(`[refreshBudgetItem] Failed to load board_config for board ${boardId}:`, error);
+		return null;
+	}
+
+	const settings = (config.settings ?? {}) as BudgetBoardSettings;
+	const {
+		job_relation_column_id: relationColumnId,
+		third_party_relation_column_id: thirdPartyRelationColumnId,
+		agency_budget_column_id: agencyBudgetColumnId,
+		agency_cost_column_id: agencyCostColumnId,
+		third_party_budget_column_id: thirdPartyBudgetColumnId,
+		third_party_cost_column_id: thirdPartyCostColumnId,
+		status_column_id: statusColumnId,
+	} = settings;
+
+	if (!relationColumnId || !agencyBudgetColumnId || !agencyCostColumnId || !statusColumnId) {
+		console.warn(`[refreshBudgetItem] Budget board ${boardId} is missing column configuration.`);
+		return null;
+	}
+
+	let item: BudgetBoardItem | null;
+	try {
+		item = await getBudgetBoardItem(boardId, itemId, {
+			relationColumnId,
+			thirdPartyRelationColumnId: thirdPartyRelationColumnId ?? null,
+			agencyBudgetColumnId,
+			agencyCostColumnId,
+			thirdPartyBudgetColumnId: thirdPartyBudgetColumnId ?? null,
+			thirdPartyCostColumnId: thirdPartyCostColumnId ?? null,
+			statusColumnId,
+			...linkedBoardColumnMaps,
+		});
+	} catch (err) {
+		console.error(`[refreshBudgetItem] Failed to fetch item ${itemId} on board ${boardId}:`, err);
+		return null;
+	}
+
+	if (!item) return null;
+
+	const [itemsByRoleByBudgetItem, roleColorMap] = await Promise.all([getItemsTimeByRoleForBudgetItems([item], range), getRoleColorMap()]);
+
+	return computeBudgetItemRollup(item, itemsByRoleByBudgetItem.get(item.id) ?? [], roleColorMap);
 }
 
 /**

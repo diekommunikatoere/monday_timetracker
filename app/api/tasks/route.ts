@@ -88,6 +88,9 @@ export async function GET(request: NextRequest) {
 				tasksData.source = "api";
 			}
 		} catch (dbError) {
+			if (dbError instanceof Error && dbError.message === "BOARD_NOT_SELECTABLE") {
+				return NextResponse.json({ groups: [], source: "db" });
+			}
 			console.error("Failed to fetch tasks from DB, falling back to Monday API:", dbError);
 			tasksData = await getBoardTasks(boardId, searchTerm);
 			tasksData.source = "api";

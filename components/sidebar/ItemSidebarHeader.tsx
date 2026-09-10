@@ -38,7 +38,7 @@ export function ItemSidebarHeader({ onManualEntryClick }: ItemSidebarHeaderProps
 		<header>
 			<Flex justify="space-between" align="center" p="sm">
 				<Tooltip label={`v${APP_VERSION}`} position="bottom">
-					<Logo size={{ height: 24 }} style={logoStyle} loading="eager" />
+					<Logo size={{ height: 21 }} style={logoStyle} loading="eager" />
 				</Tooltip>
 				<Button leftSection={<Icon name="add" size={21} color="var(--color--icon-on-primary)" weight="bold" />} onClick={onManualEntryClick}>
 					Zeit eintragen
