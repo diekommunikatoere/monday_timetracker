@@ -7,14 +7,18 @@ import { useState, useEffect } from "react";
 import { Button, Modal } from "@/components";
 import { useToast } from "@/components/ToastProvider";
 import { getMondaySdk } from "@/lib/monday-browser-sdk";
+import { PERMISSIONS } from "@/lib/permissions/keys";
 import { combineDateAndTime, durationToSeconds, getCurrentTimeString } from "@/lib/utils";
 import { useItemTimeEntriesStore } from "@/stores/itemTimeEntriesStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useUserStore } from "@/stores/userStore";
 
+import { useAssignableUsers } from "../shared/hooks/useAssignableUsers";
+import { useHasPermission } from "../shared/hooks/useHasPermission";
 import { useRoles } from "../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
+import { UserSelect } from "../shared/UserSelect";
 
 /**
  * Props for {@link ItemManualEntryModal}.
@@ -64,6 +68,10 @@ export interface ItemManualEntryModalProps {
  * `monday.get("context")`) and the `sessionToken` as a bearer token. On success
  * it calls `refetch` on `useItemTimeEntriesStore`, shows a toast, and closes.
  *
+ * Users holding `time_entries.manage_others` (monday admins implicitly) additionally get a
+ * {@link UserSelect} (defaulting to themselves) to book the entry in someone else's name; the
+ * chosen id is sent as `userId` and a hint names the target when it isn't the caller.
+ *
  * Reads from: `useUserStore` (Supabase user id), `useMondayStore` (context +
  * session token), `useItemTimeEntriesStore` (refetch), `useToast`.
  *
@@ -75,9 +83,19 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedRoleId, setSelectedRoleId] = useState<string>(roleId);
+	const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+	// Booking for other users (privileged only): the picker lists same-account profiles.
+	const canManageOthers = useHasPermission(PERMISSIONS.MANAGE_OTHERS_ENTRIES);
+	const { users, isLoading: loadingUsers } = useAssignableUsers();
 
 	// Roles (alphabetical, active-only) — shared fetch, see useRoles.
 	const { roles, isLoading: loadingRoles } = useRoles();
+
+	const { refetch } = useItemTimeEntriesStore();
+	const { showToast } = useToast();
+	const { rawContext, sessionToken } = useMondayStore();
+	const userProfile = useUserStore((state) => state.supabaseUser);
 
 	// Synchronize selectedRoleId with prop if it changes
 	useEffect(() => {
@@ -92,16 +110,15 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 			const now = getCurrentTimeString();
 			handlers.reset({ date: new Date(), duration: "00:00", startTime: now, endTime: now, comment: "" }, "end", false);
 			setError(null);
+			setSelectedUserId(userProfile?.id ?? null);
 		}
 	}, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const { refetch } = useItemTimeEntriesStore();
-	const { showToast } = useToast();
-	const { rawContext, sessionToken } = useMondayStore();
-	const userProfile = useUserStore((state) => state.supabaseUser);
+	const targetUserId = selectedUserId ?? userProfile?.id ?? null;
+	const targetUserName = users.find((user) => user.id === targetUserId)?.name ?? "Unbekannter Benutzer";
 
 	const handleSave = async () => {
-		if (!userProfile?.id) return;
+		if (!userProfile?.id || !targetUserId) return;
 
 		const durationSeconds = durationToSeconds(values.duration);
 		if (durationSeconds === 0) {
@@ -125,7 +142,7 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 					Authorization: `Bearer ${sessionToken}`,
 				},
 				body: JSON.stringify({
-					userId: userProfile.id,
+					userId: targetUserId,
 					taskName: itemName,
 					comment: values.comment,
 					boardId: boardId,
@@ -174,6 +191,19 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 					</Flex>
 
 					<TimeEntryFormFields
+						userSelector={{
+							show: canManageOthers,
+							node: (
+								<Flex direction="column" gap={4}>
+									<UserSelect users={users} value={targetUserId} onChange={setSelectedUserId} loading={loadingUsers} />
+									{targetUserId && targetUserId !== userProfile?.id && (
+										<Text size="xs" c="dimmed">
+											Eintrag wird für {targetUserName} erstellt
+										</Text>
+									)}
+								</Flex>
+							),
+						}}
 						date={values.date}
 						onDateChange={handlers.setDate}
 						duration={values.duration}

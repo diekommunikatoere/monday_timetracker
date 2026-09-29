@@ -5,6 +5,8 @@ import { getMondaySdk } from "@/lib/monday-browser-sdk";
 
 import { useMondayStore } from "./mondayStore";
 
+import type { PermissionKey } from "@/lib/permissions/keys";
+
 /** Raw theme value as reported by the monday context. */
 export type MondayTheme = "black" | "light" | "dark";
 
@@ -66,6 +68,12 @@ interface UserState {
 	/** Linked Supabase user, or null until authenticated. */
 	supabaseUser: SupabaseUser;
 
+	/**
+	 * Effective permission keys from `/api/auth/monday-user` (admins get all). Session-based, not
+	 * persisted; refreshed on every app boot. Prefer `useHasPermission` over reading this directly.
+	 */
+	permissions: PermissionKey[];
+
 	/** Persisted theme preference, stored as the raw monday theme value. */
 	theme: MondayTheme;
 
@@ -89,6 +97,7 @@ export const useUserStore = create<UserState>()(
 		(set, get) => ({
 			mondayUser: null,
 			supabaseUser: null,
+			permissions: [],
 			theme: "black",
 			appTheme: "dark",
 			dashboardViewMode: "table",
@@ -198,7 +207,8 @@ export const useUserStore = create<UserState>()(
 					throw new Error("Failed to authenticate user");
 				}
 
-				set({ authenticated: true });
+				const { permissions } = await response.json();
+				set({ authenticated: true, permissions: permissions ?? [] });
 			},
 		}),
 		{

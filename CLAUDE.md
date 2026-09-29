@@ -47,6 +47,15 @@ const userProfile = await getUserProfileByMondayId(session.userId);
 
 The older `getMondayContext(request)` (parses the `monday-context` header) still exists in [lib/monday.ts](lib/monday.ts) but is used by only one route (`/api/sync/board/[boardId]`). Prefer the JWT pattern. Webhook (`/api/webhooks/monday`) and cron routes are **not** user-authenticated — see below.
 
+### Permissions
+
+Beyond monday admins, access is granted through DB-backed **permissions**: rows in `permission_grant` (migration 043) that give a named permission to a `user_profiles.id` **or** a monday team id. v1 keys (in [lib/permissions/keys.ts](lib/permissions/keys.ts), which also holds the German UI copy): `time_entries.manage_others` (create/edit/reassign/delete other users' time entries) and `analytics.auswertung` (Auswertung dashboard; Abrechnung stays ungated). monday admins (`session.isAdmin`) implicitly hold every permission — no grant needed.
+
+- **Server**: `getEffectivePermissions(profile, isAdmin)` / `hasPermission(...)` in [lib/database/permissions.ts](lib/database/permissions.ts) (uncached, so revocation applies on the next request). Team grants match against `user_profiles.team_ids`, which are refreshed from monday on every app boot (`/api/auth/monday-user`) — a team change only takes effect after that user reloads the app.
+- **Client**: `/api/auth/monday-user` returns `permissions`; they live in `userStore.permissions`, read via `useHasPermission(key)`. UI gating only — routes always re-check.
+- Admins manage grants in the **Berechtigungen** tab of `/admin` (`/api/admin/permissions`, `/api/admin/monday/teams`). User pickers (`GET /api/users`, `useAssignableUsers`) list only `user_profiles` of the caller's monday account, never the monday API.
+- After deploying migration 043 to an environment, an admin must grant `analytics.auswertung` manually — the old `NEXT_PUBLIC_ANALYTICS_TEAM_IDS` env var was removed with no seed.
+
 ## Timer architecture (2-table model)
 
 Originally a 3-table design; migrations 023–032 ("timer 2-table redesign") dropped `timer_session` entirely (030) in favor of a `timer_state` enum on `time_entry` itself. A live timer **is** a non-finalized `time_entry` row — there's no separate session table anymore:
@@ -63,6 +72,7 @@ Timer API routes under `app/api/timer/`: `GET /` (active timers via `get_active_
 - **`supabaseAdmin`** ([lib/supabase/server.ts](lib/supabase/server.ts), service-role key `NEXT_SUPABASE_SECRET_KEY`) — all server-side DB work. RLS-bypassing; never import into client code.
 - **`supabase`** ([lib/supabase/client.ts](lib/supabase/client.ts), anon key `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) — client-side real-time subscriptions only.
 - **Redis** ([lib/redis.ts](lib/redis.ts)) via `cacheHelper.get/set/del/clearPattern`. Time-entry reads in `lib/database.ts` are cached under the `time_entry:` prefix with a 300s TTL. **After any write, invalidate**: `cacheHelper.clearPattern("time_entry:*")`. Redis also carries `hard_delete:*` keys as a deferred-work queue drained by the cleanup cron.
+- **Audit trail**: `time_entry.created_by` / `updated_by` record who performed a write (may differ from `user_id` when a privileged user edits someone else's entry). **Every write to `time_entry` must set `updated_by`** (`created_by` too on insert) — the timer RPCs do it with `p_user_id`. A trigger (`log_time_entry_change`) writes `time_entry_log` rows (action `create|update|soft_delete|restore|hard_delete`, `actor_id`, `owner_id`, field diffs in `changes`) for entries that are or were `finalized`/`parked`; running/paused churn and comment auto-saves are skipped, hard deletes by cron/`timer_reset` log a `NULL` (system) actor. Kept forever, no UI yet, service-role only.
 - DB types are generated into `types/database/` and re-exported as `@/types/database`. Use `Database["public"]["Tables"]["time_entry"]["Row" | "Insert" | "Update"]`.
 - `lib/supabase/pagination.ts` exists because Supabase caps rows per query at 1000 — use it for large result sets.
 
@@ -96,7 +106,7 @@ Persisted stores use `skipHydration: true` + the `useHydration()` helper in [lib
 
 ## App surfaces
 
-App-Router entry pages render into different monday widget contexts: `app/dashboards/` (main widget — a table/calendar view switcher over time entries, `userStore.dashboardViewMode`), `app/dashboards/analytics/abrechnung/` and `.../auswertung/` (budget reconciliation and per-user weekly-utilization dashboards, gated by `lib/permissions/routes.ts` — admin or `NEXT_PUBLIC_ANALYTICS_TEAM_IDS` allowlist), `app/dashboards/timerView/` (now just redirects client-side to `/dashboards`, kept for monday widget-context compatibility), `app/sidebar/itemView/` (per-item sidebar), and `app/admin/` (board/column-sync/role configuration). `app/page.tsx` is intentionally empty. Components are organized as `components/ui/` (the in-house design system, barrel-exported from `components/index.ts`), `components/features/`, `components/dashboard/` (including `calendar/` and `analytics/`), `components/shared/`, `components/sidebar/`. Path aliases: `@/*` → repo root, `@api/*` → `app/api/*`.
+App-Router entry pages render into different monday widget contexts: `app/dashboards/` (main widget — a table/calendar view switcher over time entries, `userStore.dashboardViewMode`), `app/dashboards/analytics/abrechnung/` and `.../auswertung/` (budget reconciliation and per-user weekly-utilization dashboards; Auswertung is gated by `lib/permissions/routes.ts` — admin or the `analytics.auswertung` permission), `app/dashboards/timerView/` (now just redirects client-side to `/dashboards`, kept for monday widget-context compatibility), `app/sidebar/itemView/` (per-item sidebar), and `app/admin/` (vertical tabs via `?tab=`: **Boards** — board/column-sync/budget/job/third-party config · **Rollen** · **Berechtigungen** — permission grants). `app/page.tsx` is intentionally empty. Components are organized as `components/ui/` (the in-house design system, barrel-exported from `components/index.ts`), `components/features/`, `components/dashboard/` (including `calendar/` and `analytics/`), `components/shared/`, `components/sidebar/`. Path aliases: `@/*` → repo root, `@api/*` → `app/api/*`.
 
 ## Styling
 
@@ -114,7 +124,6 @@ NEXT_SUPABASE_SECRET_KEY                          # service role (server)
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY      # anon (client)
 REDIS_URL                                         # ioredis connection string
 CRON_SECRET                                        # optional, gates /api/cron/*
-NEXT_PUBLIC_ANALYTICS_TEAM_IDS                    # comma-separated monday team IDs allowed into /dashboards/analytics/auswertung (see lib/permissions/routes.ts)
 APP_ID, PORT (8301), NODE_ENV
 ```
 

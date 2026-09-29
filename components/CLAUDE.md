@@ -45,7 +45,7 @@ Time-entry tables are data-driven. The presentational [shared/time-entries/TimeE
 
 - Components **don't fetch** — they read Zustand stores (`@/stores/*`) and the `shared/hooks`. Kick off fetches from `useEffect`. See root CLAUDE.md for the store map.
 - The timer subtree gets its state via React Context (`TimerProvider` exposes the `useTimer` result through `@/contexts/TimerContext`; consume with `useTimerContext`). This is the one place the app uses Context over Zustand for component state.
-- **Permissions are pure ownership**: [useTimeEntryPermissions](shared/hooks/useTimeEntryPermissions.ts) grants edit/delete/bulk-select only when `entry.user_id === currentUserId` (the internal Supabase id). Admin elevation is enforced at API routes, not here.
+- **Permissions**: [useTimeEntryPermissions](shared/hooks/useTimeEntryPermissions.ts) grants edit/delete to the entry owner (`entry.user_id === currentUserId`, the internal Supabase id) **or** to users with `time_entries.manage_others` (via [useHasPermission](shared/hooks/useHasPermission.ts); monday admins implicitly); bulk-select stays owner-only. This only drives the UI — API routes re-check. Privileged users also get a [UserSelect](shared/UserSelect.tsx) in `ItemManualEntryModal` / `EditTimeEntryModal` (fed by `useAssignableUsers`).
 - **Toasts**: `useToast().showToast(message, type?, duration?, action?)` from [ToastProvider](ToastProvider.tsx); types map to Mantine notification colors.
 
 ## Gotchas

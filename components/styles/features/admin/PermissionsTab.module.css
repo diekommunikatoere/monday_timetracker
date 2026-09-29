@@ -1,0 +1,31 @@
+/* "Berechtigungen" admin tab: one section per permission, separated by dividers. */
+.intro {
+	color: var(--color--text-secondary);
+	font-size: 14px;
+	margin-bottom: 16px;
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.sectionTitle {
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--color--text-primary);
+	margin: 0;
+}
+
+.sectionDescription {
+	color: var(--color--text-secondary);
+	font-size: 14px;
+	margin: 0;
+}
+
+.pickers {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 16px;
+}

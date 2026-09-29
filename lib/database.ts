@@ -15,7 +15,7 @@
 //     The cleanup cron drains that queue. Undo cancels the Redis key within
 //     the 5 s window.
 
-import { SELF_EDITABLE_TIME_ENTRY_FIELDS } from "@/lib/permissions";
+import { PRIVILEGED_EDITABLE_TIME_ENTRY_FIELDS, SELF_EDITABLE_TIME_ENTRY_FIELDS } from "@/lib/permissions";
 import { cacheHelper } from "@/lib/redis";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { TimeEntry as FrontendTimeEntry } from "@/types/time-entry";
@@ -442,6 +442,40 @@ export async function getItemTimeEntries(itemId: string, boardId: string, startD
 }
 
 /**
+ * Options shared by the time-entry write functions.
+ *
+ * @property canManageOthers - The actor holds `time_entries.manage_others` (or is a monday admin).
+ *   Resolved by the API route (`hasPermission`); this module never looks it up itself.
+ */
+export interface TimeEntryWriteOptions {
+	canManageOthers?: boolean;
+}
+
+/** Build an `Error` carrying an HTTP `statusCode` that API routes map to a response status. */
+function httpError(message: string, statusCode: number): Error & { statusCode: number } {
+	const error: any = new Error(message);
+	error.statusCode = statusCode;
+	return error;
+}
+
+/**
+ * Assert that `targetUserId` may be assigned an entry by `actorId`: the target profile must
+ * exist and belong to the same monday account as the actor.
+ *
+ * @throws Error with `statusCode` 400 ("Ungültiger Benutzer") otherwise.
+ */
+async function assertAssignableUser(actorId: string, targetUserId: string): Promise<void> {
+	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, monday_account_id").in("id", [actorId, targetUserId]);
+	if (error) throw error;
+
+	const actor = data?.find((p) => p.id === actorId);
+	const target = data?.find((p) => p.id === targetUserId);
+	if (!actor || !target || actor.monday_account_id !== target.monday_account_id) {
+		throw httpError("Ungültiger Benutzer", 400);
+	}
+}
+
+/**
  * Insert a new (non-draft) `time_entry` row and keep dimension tables in sync.
  *
  * Before inserting, this function:
@@ -453,14 +487,28 @@ export async function getItemTimeEntries(itemId: string, boardId: string, startD
  * 4. Rounds `duration` via `roundDuration` before writing.
  * 5. Invalidates all `time_entry:*` cache entries.
  *
- * @param entry  - Insert payload with optional {@link DimensionMetadata} fields merged in.
- * @param userId - Internal `user_profiles.id`; must match `entry.user_id`.
+ * Sets `created_by` / `updated_by` to `actorId`. `entry.user_id` (the owner) may differ from
+ * the actor only when `options.canManageOthers` is set, in which case the target must be a
+ * profile of the actor's monday account.
+ *
+ * @param entry   - Insert payload with optional {@link DimensionMetadata} fields merged in.
+ * @param actorId - Internal `user_profiles.id` of the user performing the write.
+ * @param options - {@link TimeEntryWriteOptions}.
  * @returns The inserted raw `time_entry` row.
+ * @throws Error with `statusCode` 403 when booking for another user without `canManageOthers`,
+ *   or 400 when the target user is not in the actor's account.
  */
-export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata, userId: string): Promise<TimeEntry> {
+export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata, actorId: string, options: TimeEntryWriteOptions = {}): Promise<TimeEntry> {
 	// Make sure user_id is provided
 	if (!entry.user_id) {
 		throw new Error("user_id is required to create a time entry");
+	}
+
+	if (entry.user_id !== actorId) {
+		if (!options.canManageOthers) {
+			throw httpError("Keine Berechtigung", 403);
+		}
+		await assertAssignableUser(actorId, entry.user_id);
 	}
 
 	// Extract dimension metadata and other non-database fields
@@ -496,7 +544,11 @@ export async function insertTimeEntry(entry: TimeEntryInsert & DimensionMetadata
 		cleanEntry.duration = roundDuration(cleanEntry.duration);
 	}
 
-	const { data, error } = await supabaseAdmin.from("time_entry").insert(cleanEntry).select().single();
+	const { data, error } = await supabaseAdmin
+		.from("time_entry")
+		.insert({ ...cleanEntry, created_by: actorId, updated_by: actorId })
+		.select()
+		.single();
 
 	if (error) {
 		console.error("Error inserting time entry:", error);
@@ -596,7 +648,8 @@ export async function getAllUserTimeEntries(userId: string): Promise<{ entries: 
  *
  * Before writing, this function:
  * 1. Fetches the existing row (cache-first via {@link getTimeEntryById}).
- * 2. Verifies `user_id` ownership (throws 403-equivalent if mismatch).
+ * 2. Verifies the actor owns the entry or holds `time_entries.manage_others`
+ *    (`options.canManageOthers`); otherwise throws an error with `statusCode` 403.
  * 3. If `expectedUpdatedAt` is provided, compares it to `updated_at` and throws
  *    a `CONFLICT` error (status 409) on mismatch — prevents silent overwrites
  *    when two tabs edit the same entry concurrently.
@@ -604,26 +657,31 @@ export async function getAllUserTimeEntries(userId: string): Promise<{ entries: 
  *    (same guard as {@link insertTimeEntry}: subitems board must never reach `monday_board`).
  * 5. Upserts `monday_board` (top-level items only) and `monday_item` dimension rows.
  * 6. Rounds `duration` via `roundDuration`.
- * 7. Invalidates all `time_entry:*` cache entries.
+ * 7. Whitelists the writable columns: {@link SELF_EDITABLE_TIME_ENTRY_FIELDS}, or with
+ *    `canManageOthers` {@link PRIVILEGED_EDITABLE_TIME_ENTRY_FIELDS} (adds `user_id`, i.e.
+ *    reassignment — the target must be a profile of the actor's monday account, else 400).
+ * 8. Stamps `updated_by = actorId` and invalidates all `time_entry:*` cache entries.
  *
- * Returns both the old and new rows so callers can compute delta syncs.
+ * Returns both the old and new rows so callers can compute delta syncs (`old` is the row
+ * fetched **before** the update, so the previous item/owner is never taken from the request).
  *
  * @param id               - The `time_entry.id` UUID to update.
  * @param updates          - Update payload with optional {@link DimensionMetadata} fields.
- * @param userId           - Internal `user_profiles.id`; must own the entry.
+ * @param actorId          - Internal `user_profiles.id` of the user performing the update.
  * @param expectedUpdatedAt - Optional ISO 8601 timestamp for optimistic-lock check.
+ * @param options          - {@link TimeEntryWriteOptions}.
  * @returns Object with `old` (pre-update row) and `new` (post-update row).
  */
-export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & DimensionMetadata, userId: string, expectedUpdatedAt?: string): Promise<{ old: TimeEntry; new: TimeEntry }> {
+export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & DimensionMetadata, actorId: string, expectedUpdatedAt?: string, options: TimeEntryWriteOptions = {}): Promise<{ old: TimeEntry; new: TimeEntry }> {
 	// Fetch old entry first
 	const oldEntry = await getTimeEntryById(id);
 	if (!oldEntry) {
 		throw new Error(`Time entry ${id} not found`);
 	}
 
-	// Verify ownership
-	if (oldEntry.user_id !== userId) {
-		throw new Error("Unauthorized to update this time entry");
+	// Verify ownership (or privilege)
+	if (oldEntry.user_id !== actorId && !options.canManageOthers) {
+		throw httpError("Keine Berechtigung", 403);
 	}
 
 	// Optimistic locking: check if entry was modified since user loaded it
@@ -677,11 +735,19 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 
 	// Whitelist the columns a user may change. cleanUpdates still holds whatever
 	// the client sent (minus dimension fields); copying only allowed keys keeps
-	// system columns (user_id, timer_state, deleted_*, synced_to_monday, created_at)
+	// system columns (timer_state, deleted_*, synced_to_monday, created_*, updated_*)
 	// unreachable from the request body. Runs last so the board/duration fixes above are included.
+	const editableFields: readonly string[] = options.canManageOthers ? PRIVILEGED_EDITABLE_TIME_ENTRY_FIELDS : SELF_EDITABLE_TIME_ENTRY_FIELDS;
 	const updatePayload: TimeEntryUpdate = {};
-	for (const field of SELF_EDITABLE_TIME_ENTRY_FIELDS) {
+	for (const field of editableFields) {
 		if (field in cleanUpdates) (updatePayload as any)[field] = (cleanUpdates as any)[field];
+	}
+
+	// Reassignment: the new owner must be a real profile of the actor's monday account.
+	if (updatePayload.user_id && updatePayload.user_id !== oldEntry.user_id) {
+		await assertAssignableUser(actorId, updatePayload.user_id);
+	} else {
+		delete updatePayload.user_id;
 	}
 
 	// Update entry
@@ -690,6 +756,7 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
 		.update({
 			...updatePayload,
 			updated_at: new Date().toISOString(),
+			updated_by: actorId,
 		})
 		.eq("id", id)
 		.select()
@@ -715,25 +782,30 @@ export async function updateTimeEntry(id: string, updates: TimeEntryUpdate & Dim
  * - Writes a `hard_delete:<id>` key to Redis with a **5-second TTL**.
  *   The cleanup cron (`/api/cron/cleanup-soft-deletes`) drains keys where the
  *   TTL has expired, performing the actual `DELETE`.
- * - Generates a base64-encoded undo token (containing `entryId`, `userId`, and
- *   a 5-second expiry timestamp). Pass this token to {@link restoreTimeEntry}
+ * - Generates a base64-encoded undo token (containing `entryId`, the **actor's** `userId`,
+ *   and a 5-second expiry timestamp). Pass this token to {@link restoreTimeEntry}
  *   within the window to cancel the delete.
  *
- * The undo token is **not** a signed JWT — it can be forged. Ownership and expiry
+ * The actor must own the entry or hold `time_entries.manage_others`
+ * (`options.canManageOthers`); otherwise an error with `statusCode` 403 is thrown.
+ * `deleted_by` and `updated_by` are stamped with the actor.
+ *
+ * The undo token is **not** a signed JWT — it can be forged. Actor and expiry
  * are enforced again inside {@link restoreTimeEntry}.
  *
- * @param id     - The `time_entry.id` UUID to soft-delete.
- * @param userId - Internal `user_profiles.id`; must own the entry.
+ * @param id      - The `time_entry.id` UUID to soft-delete.
+ * @param actorId - Internal `user_profiles.id` of the user performing the delete.
+ * @param options - {@link TimeEntryWriteOptions}.
  * @returns Object with the soft-deleted `entry` row and the base64 `undoToken`.
  */
-export async function softDeleteTimeEntry(id: string, userId: string): Promise<{ entry: TimeEntry; undoToken: string }> {
+export async function softDeleteTimeEntry(id: string, actorId: string, options: TimeEntryWriteOptions = {}): Promise<{ entry: TimeEntry; undoToken: string }> {
 	const entry = await getTimeEntryById(id);
 	if (!entry) {
 		throw new Error(`Time entry ${id} not found`);
 	}
 
-	if (entry.user_id !== userId) {
-		throw new Error("Unauthorized to delete this time entry");
+	if (entry.user_id !== actorId && !options.canManageOthers) {
+		throw httpError("Keine Berechtigung", 403);
 	}
 
 	// Mark as soft-deleted
@@ -741,7 +813,8 @@ export async function softDeleteTimeEntry(id: string, userId: string): Promise<{
 		.from("time_entry")
 		.update({
 			deleted_at: new Date().toISOString(),
-			deleted_by: userId,
+			deleted_by: actorId,
+			updated_by: actorId,
 		})
 		.eq("id", id)
 		.select()
@@ -757,7 +830,7 @@ export async function softDeleteTimeEntry(id: string, userId: string): Promise<{
 		hardDeleteKey,
 		JSON.stringify({
 			entryId: id,
-			userId,
+			userId: actorId,
 			itemId: data.item_id,
 			boardId: data.board_id,
 			deletedAt: data.deleted_at,
@@ -769,7 +842,7 @@ export async function softDeleteTimeEntry(id: string, userId: string): Promise<{
 	const undoToken = Buffer.from(
 		JSON.stringify({
 			entryId: id,
-			userId,
+			userId: actorId,
 			exp: Date.now() + 5000, // 5 seconds from now
 		}),
 	).toString("base64");
@@ -786,24 +859,37 @@ export async function softDeleteTimeEntry(id: string, userId: string): Promise<{
  *
  * Validates `undoToken` (a base64-encoded JSON payload with `entryId`, `userId`, and `exp`)
  * before restoring. The token is **not** a signed JWT — it only prevents accidental misuse,
- * not adversarial forgery; ownership is enforced by the `.eq("user_id", userId)` filter on
- * the update. After restore, the `hard_delete:${id}` Redis key is removed so the cleanup
+ * not adversarial forgery. The token's `userId` must equal `actorId` (the user who deleted
+ * the entry), and the actor must own the entry or hold `time_entries.manage_others`
+ * (`options.canManageOthers`), checked against the row itself. `updated_by` is stamped with
+ * the actor. After restore, the `hard_delete:${id}` Redis key is removed so the cleanup
  * cron does not hard-delete the entry later.
  *
  * @param id        - UUID of the time entry to restore.
- * @param userId    - Internal Supabase `user_profiles.id` — must match the entry's owner.
+ * @param actorId   - Internal Supabase `user_profiles.id` of the user restoring (the one who deleted it).
  * @param undoToken - Base64 token returned by {@link softDeleteTimeEntry}.
+ * @param options   - {@link TimeEntryWriteOptions}.
  * @returns The restored {@link TimeEntry} row.
+ * @throws Error with `statusCode` 403 when the actor may not touch this entry.
  */
-export async function restoreTimeEntry(id: string, userId: string, undoToken: string): Promise<TimeEntry> {
+export async function restoreTimeEntry(id: string, actorId: string, undoToken: string, options: TimeEntryWriteOptions = {}): Promise<TimeEntry> {
 	// Verify undo token
 	try {
 		const decoded = JSON.parse(Buffer.from(undoToken, "base64").toString());
-		if (decoded.entryId !== id || decoded.userId !== userId || decoded.exp < Date.now()) {
+		if (decoded.entryId !== id || decoded.userId !== actorId || decoded.exp < Date.now()) {
 			throw new Error("Invalid or expired undo token");
 		}
 	} catch (err) {
 		throw new Error("Invalid undo token", { cause: err });
+	}
+
+	// Ownership-or-privilege check against the row (soft-deleted rows are still readable by id).
+	const { data: existing, error: existingError } = await supabaseAdmin.from("time_entry").select("user_id").eq("id", id).single();
+	if (existingError) {
+		throw existingError;
+	}
+	if (existing.user_id !== actorId && !options.canManageOthers) {
+		throw httpError("Keine Berechtigung", 403);
 	}
 
 	// Restore entry
@@ -812,9 +898,9 @@ export async function restoreTimeEntry(id: string, userId: string, undoToken: st
 		.update({
 			deleted_at: null,
 			deleted_by: null,
+			updated_by: actorId,
 		})
 		.eq("id", id)
-		.eq("user_id", userId)
 		.select()
 		.single();
 

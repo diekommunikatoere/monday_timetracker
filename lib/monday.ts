@@ -15,6 +15,7 @@ const CACHE_TTL = {
 	BOARDS: 60 * 60, // 1 hour - board names rarely change
 	TASKS: 60 * 30, // 30 minutes - items may update more frequently
 	USER_TEAMS: 60 * 60 * 24, // 24 hours - team membership is stable
+	TEAMS: 60 * 10, // 10 minutes - account-wide team list, only read by the admin permissions UI
 	BUDGET_ITEMS: 60 * 10, // 10 minutes - deliberately moderate: no webhook covers change_column_value, so a budget/status edit made directly in monday stays stale for up to this long; the per-item refresh button is the escape hatch
 };
 
@@ -1084,6 +1085,49 @@ export async function getUserDetails(userId: string): Promise<{
 export async function getUserTeams(userId: string): Promise<Array<{ id: string; name: string }>> {
 	const details = await getUserDetails(userId);
 	return details.teams;
+}
+
+/**
+ * Fetches all teams of the monday.com account (`teams { id name picture_url }`).
+ *
+ * Used only by the admin "Berechtigungen" UI to resolve team names for permission
+ * grants (which store just the team id). Cached under `monday:teams` for
+ * {@link CACHE_TTL.TEAMS} seconds. Does **not** throw: on API failure it returns `[]`
+ * (uncached) so the UI can fall back to showing raw team ids.
+ *
+ * @returns Array of `{ id, name, picture_url }` (ids are strings), sorted by name.
+ */
+export async function getTeams(): Promise<Array<{ id: string; name: string; picture_url: string | null }>> {
+	const cacheKey = "monday:teams";
+	const cached = await cacheHelper.get<Array<{ id: string; name: string; picture_url: string | null }>>(cacheKey);
+	if (cached) return cached;
+
+	const query = `
+		query {
+			teams {
+				id
+				name
+				picture_url
+			}
+		}
+	`;
+
+	try {
+		const response: any = await client.request(query);
+
+		if (response.error) {
+			console.error("Monday API error in getTeams:", response.error?.message);
+			return [];
+		}
+
+		const teams = ((response.teams || []) as Array<{ id: string | number; name: string; picture_url?: string | null }>).map((team) => ({ id: String(team.id), name: team.name, picture_url: team.picture_url ?? null })).sort((a, b) => a.name.localeCompare(b.name));
+
+		await cacheHelper.set(cacheKey, teams, CACHE_TTL.TEAMS);
+		return teams;
+	} catch (error) {
+		console.error("Error in getTeams:", error);
+		return [];
+	}
 }
 
 /**

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { syncAfterUpdate, syncAfterDelete } from "@/lib/columnSync";
 import { updateTimeEntry, softDeleteTimeEntry, getTimeEntryById } from "@/lib/database";
+import { hasPermission } from "@/lib/database/permissions";
 import { getUserProfileByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 /**
  * `PATCH /api/time-entries/[id]` — update one time entry's editable fields.
@@ -12,7 +14,9 @@ import { verifyMondayJwt } from "@/lib/monday-auth";
  * is resolved to an internal `user_profiles.id` via {@link getUserProfileByMondayId},
  * and ownership + optimistic locking are enforced downstream in
  * {@link updateTimeEntry} (which whitelists the mutable columns — see
- * `SELF_EDITABLE_TIME_ENTRY_FIELDS`). The request body is `{ expectedUpdatedAt,
+ * `SELF_EDITABLE_TIME_ENTRY_FIELDS`). Callers holding `time_entries.manage_others`
+ * (monday admins implicitly) may edit any user's entry and reassign it via `user_id`
+ * (`PRIVILEGED_EDITABLE_TIME_ENTRY_FIELDS`). The request body is `{ expectedUpdatedAt,
  * ...updates }`: `expectedUpdatedAt` is the caller's last-seen `updated_at` for the
  * concurrency check; the rest are the field updates.
  *
@@ -24,14 +28,17 @@ import { verifyMondayJwt } from "@/lib/monday-auth";
  * flag or the mere shape of the payload could otherwise be used to skip the
  * requirement on an actually-finalized entry.
  *
- * On success, a column-sync write-back ({@link syncAfterUpdate}) is queued **only**
- * when the old or new state is `finalized` — a parked→parked edit can't move monday
- * totals (the aggregation RPCs count `finalized` rows only), so the sync is skipped.
+ * On success, a column-sync write-back ({@link syncAfterUpdate}) is queued whenever the
+ * old or new state is `finalized` — including edits that only change `user_id`, `comment`
+ * or `role_id` (a role change alters the time-by-role and budget columns). A parked→parked
+ * edit can't move monday totals (the aggregation RPCs count `finalized` rows only), so the
+ * sync is skipped for those.
  *
  * @param request - The incoming request; carries the `Authorization` header and JSON body.
  * @param params  - Route params resolving to `{ id }`, the `time_entry` UUID to update.
  * @returns `200` `{ success, data }` with the updated row; `400` on a finalized edit
- *   missing task/role; `401` unauthenticated; `404` unknown user or entry; `409` on an
+ *   missing task/role or an invalid reassignment target; `401` unauthenticated; `403` when
+ *   editing someone else's entry without permission; `404` unknown user or entry; `409` on an
  *   optimistic-lock conflict; `500` otherwise.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -54,6 +61,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		}
 
 		const userId = userProfile.id;
+		const canManageOthers = await hasPermission(userProfile, session.isAdmin, PERMISSIONS.MANAGE_OTHERS_ENTRIES);
 
 		const paramsData = await params;
 		const id = await paramsData.id;
@@ -84,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 		// Update time entry with optimistic locking
 		try {
-			const { old: oldEntry, new: newEntry } = await updateTimeEntry(id, updates, userId, expectedUpdatedAt);
+			const { old: oldEntry, new: newEntry } = await updateTimeEntry(id, updates, userId, expectedUpdatedAt, { canManageOthers });
 
 			// A parked-to-parked edit can't change monday totals — aggregation RPCs only
 			// count timer_state = 'finalized' entries — so skip queuing a no-op sync.
@@ -113,13 +121,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 		}
 	} catch (error: any) {
 		console.error("[API] Error updating time entry:", error);
+		if (error.statusCode === 403 || error.statusCode === 400) {
+			return NextResponse.json({ error: error.message }, { status: error.statusCode });
+		}
 		return NextResponse.json({ error: error.message || "Fehler beim Aktualisieren des Zeiteintrags" }, { status: 500 });
 	}
 }
 
 /**
  * DELETE /api/time-entries/[id]
- * Soft-delete a time entry with undo support
+ * Soft-delete a time entry with undo support. Owners and users holding
+ * `time_entries.manage_others` may delete; others get `403`.
  */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	try {
@@ -141,12 +153,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		}
 
 		const userId = userProfile.id;
+		const canManageOthers = await hasPermission(userProfile, session.isAdmin, PERMISSIONS.MANAGE_OTHERS_ENTRIES);
 
 		const paramsData = await params;
 		const id = await paramsData.id;
 
 		// Soft delete the entry
-		const { entry, undoToken } = await softDeleteTimeEntry(id, userId);
+		const { entry, undoToken } = await softDeleteTimeEntry(id, userId, { canManageOthers });
 
 		// Queue sync operation (non-blocking)
 		syncAfterDelete(entry, userId).catch((err) => {
@@ -161,6 +174,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		});
 	} catch (error: any) {
 		console.error("[API] Error deleting time entry:", error);
+		if (error.statusCode === 403) {
+			return NextResponse.json({ error: error.message }, { status: 403 });
+		}
 		return NextResponse.json({ error: error.message || "Fehler beim Löschen des Zeiteintrags" }, { status: 500 });
 	}
 }

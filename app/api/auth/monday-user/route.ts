@@ -1,6 +1,7 @@
 // app/api/auth/monday-user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
+import { getEffectivePermissions } from "@/lib/database/permissions";
 import { findOrCreateUserByMondayId } from "@/lib/database/users";
 import { getUserDetails } from "@/lib/monday";
 import { verifyMondayJwt } from "@/lib/monday-auth";
@@ -26,7 +27,9 @@ export async function POST(request: NextRequest) {
 		// This uses supabaseAdmin from server.ts - safe on server
 		const userProfile = await findOrCreateUserByMondayId(session.userId, session.accountId, email, name, teamIds, photo_urls, session.isAdmin);
 
-		return NextResponse.json({ userProfile, mondayUser: { name, email, photo_urls } });
+		const permissions = await getEffectivePermissions(userProfile, session.isAdmin);
+
+		return NextResponse.json({ userProfile, permissions, mondayUser: { name, email, photo_urls } });
 	} catch (error) {
 		console.error("Error in monday-user API:", error);
 		return NextResponse.json({ error: "Failed to authenticate user" }, { status: 500 });

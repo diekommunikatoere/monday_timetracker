@@ -22,8 +22,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `supabase/server.ts` | `supabaseAdmin` (service-role, RLS-bypassing) — all server DB access |
 | `supabase/client.ts` | `supabase` (anon key) — client-side real-time subscriptions only |
 | `supabase/pagination.ts` | Paginates past Supabase's 1 000-row cap |
-| `permissions/timeEntry.ts` | Ownership-based permission flags (`getTimeEntryPermissions`) |
-| `permissions/routes.ts` | Route-level access gating (`canAccessRoute`) — admin-only / `NEXT_PUBLIC_ANALYTICS_TEAM_IDS` allowlist for `/admin` and `/dashboards/analytics/auswertung` |
+| `database/permissions.ts` | `permission_grant` CRUD + `getEffectivePermissions` / `hasPermission` (admins implicitly hold all; team grants match `user_profiles.team_ids`) + `listAccountUsers` |
+| `permissions/keys.ts` | Isomorphic registry of permission keys (`PERMISSIONS`) and their German UI definitions |
+| `permissions/timeEntry.ts` | Ownership + `manage_others` permission flags (`getTimeEntryPermissions`), editable-field whitelists |
+| `permissions/routes.ts` | Route-level access gating (`canAccessRoute`) — admin-only for `/admin`; admin or `analytics.auswertung` for `/dashboards/analytics/auswertung` |
 | `time/calculations.ts` | Local-timezone time math helpers (all values in **seconds**) |
 | `time/formatting.ts` | Display formatters — see `formatTime` trap below |
 | `store-utils.ts` | `useHydration` / `useSSRSafeValue` — SSR hydration gate for persisted Zustand stores |
@@ -61,7 +63,9 @@ Elapsed time and all timer state transitions are handled by RPC functions — `t
 
 **`formatTime` takes milliseconds, not seconds.** Despite the parameter name `seconds`, the implementation divides by 1 000. Passing actual seconds will produce values 1 000× too small. See `lib/time/formatting.ts`.
 
-**Undo token is not a signed JWT.** `softDeleteTimeEntry` returns a base64-encoded JSON payload `{ entryId, userId, exp }`. It prevents accidental misuse but is not cryptographically verified — ownership is enforced by the `.eq("user_id", userId)` DB filter in `restoreTimeEntry`.
+**Undo token is not a signed JWT.** `softDeleteTimeEntry` returns a base64-encoded JSON payload `{ entryId, userId, exp }` where `userId` is the **actor** who deleted. It prevents accidental misuse but is not cryptographically verified — `restoreTimeEntry` requires the token's `userId` to equal the actor and checks the actor owns the entry or holds `time_entries.manage_others`.
+
+**Time-entry writes take an actor, not an owner.** `insertTimeEntry` / `updateTimeEntry` / `softDeleteTimeEntry` / `restoreTimeEntry` take `actorId` plus `{ canManageOthers }` (resolved by the route via `hasPermission`); they stamp `created_by`/`updated_by`/`deleted_by` with the actor and throw errors carrying `statusCode` 403/400 that routes map to responses. Reassigning (`user_id`) is only in the privileged whitelist and requires a target profile in the actor's monday account.
 
 **`getMondayContext` in `monday.ts` is deprecated.** It parses the `monday-context` header (legacy). Prefer `verifyMondayJwt` from `monday-auth.ts` for all new routes.
 

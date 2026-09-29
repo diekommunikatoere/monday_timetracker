@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuswertungData } from "@/lib/auswertung";
+import { getEffectivePermissions } from "@/lib/database/permissions";
 import { getUserProfileByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
 import { canAccessRoute } from "@/lib/permissions";
@@ -19,8 +20,8 @@ import { canAccessRoute } from "@/lib/permissions";
  * would be the most expensive query in the app, and the client always has a week
  * selected, so missing/unparseable bounds are a 400 rather than "unbounded".
  *
- * Gated the same as the `/dashboards/analytics/auswertung` page (analytics-team
- * allowlist or admin) via `lib/permissions/routes.ts` — enforced here server-side,
+ * Gated the same as the `/dashboards/analytics/auswertung` page (the
+ * `analytics.auswertung` permission or admin) via `lib/permissions/routes.ts` — enforced here server-side,
  * not just by `DashboardMenuButton` hiding the nav link (which Abrechnung's route
  * relies on alone today).
  */
@@ -37,7 +38,8 @@ export async function GET(request: NextRequest) {
 		}
 
 		const userProfile = await getUserProfileByMondayId(session.userId);
-		const canAccess = canAccessRoute("/dashboards/analytics/auswertung", { isAdmin: session.isAdmin, teamIds: userProfile?.team_ids });
+		const permissions = userProfile ? await getEffectivePermissions(userProfile, session.isAdmin) : [];
+		const canAccess = canAccessRoute("/dashboards/analytics/auswertung", { isAdmin: session.isAdmin, permissions });
 		if (!canAccess) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}

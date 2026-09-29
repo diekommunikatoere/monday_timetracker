@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { syncAfterFinalize } from "@/lib/columnSync";
 import { insertTimeEntry } from "@/lib/database";
+import { hasPermission } from "@/lib/database/permissions";
 import { getUserProfileByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import { roundDuration } from "@/lib/utils";
 
 interface ManualTimeEntryRequest {
+	/** Owner of the new entry: the caller, or (with `time_entries.manage_others`) another user of the same account. */
 	userId: string;
 	taskName?: string;
 	comment?: string;
@@ -48,9 +51,15 @@ export async function POST(request: NextRequest) {
 		const body: ManualTimeEntryRequest = await request.json();
 		const { userId, taskName, comment, boardId, boardName, itemId, itemName, parentItemId, parentItemName, roleId, duration, date, startTime, endTime, asDraft } = body;
 
-		// Validate required fields
-		if (!userId || userId !== userProfile.id) {
+		// Validate required fields. Booking for someone else needs the permission; the
+		// same-account check on the target happens in insertTimeEntry.
+		if (!userId) {
 			return NextResponse.json({ error: "Ungültige Benutzer-ID." }, { status: 400 });
+		}
+
+		const canManageOthers = await hasPermission(userProfile, session.isAdmin, PERMISSIONS.MANAGE_OTHERS_ENTRIES);
+		if (userId !== userProfile.id && !canManageOthers) {
+			return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
 		}
 
 		// A draft may be created without a task/board/role assignment; a finalized
@@ -124,7 +133,8 @@ export async function POST(request: NextRequest) {
 				parent_item_id: asDraft ? undefined : parentItemId,
 				parent_item_name: asDraft ? undefined : parentItemName,
 			},
-			userId,
+			userProfile.id,
+			{ canManageOthers },
 		);
 
 		if (!timeEntry) {
@@ -145,8 +155,11 @@ export async function POST(request: NextRequest) {
 			success: true,
 			data: timeEntry,
 		});
-	} catch (error) {
+	} catch (error: any) {
 		console.error("Error in manual time entry endpoint:", error);
+		if (error?.statusCode === 403 || error?.statusCode === 400) {
+			return NextResponse.json({ error: error.message }, { status: error.statusCode });
+		}
 		return NextResponse.json({ error: error instanceof Error ? error.message : "Interner Serverfehler" }, { status: 500 });
 	}
 }

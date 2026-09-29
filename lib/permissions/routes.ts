@@ -5,41 +5,28 @@
 // rule for a path. Isomorphic — usable from client pages/components today,
 // and from server route preambles once analytics API routes exist.
 
+import { PERMISSIONS, type PermissionKey } from "./keys";
+
 export interface RouteUser {
 	isAdmin?: boolean | null;
-	teamIds?: string[] | null;
+	/** Effective permission keys (see `getEffectivePermissions`); admins may omit — {@link isAdmin} short-circuits. */
+	permissions?: PermissionKey[] | null;
 }
 
 type RouteRequirement = (user: RouteUser) => boolean;
 
-function parseTeamIds(raw: string | undefined): string[] {
-	return (raw ?? "")
-		.split(",")
-		.map((id) => id.trim())
-		.filter(Boolean);
-}
-
 /** True when the user is a monday admin (mondayUser.isAdmin / session.isAdmin). */
 export const isAdmin: RouteRequirement = (user) => !!user.isAdmin;
 
-/**
- * Requirement factory: user.teamIds must intersect `allowedTeamIds`.
- * Deny-by-default when either list is empty.
- *
- * NOTE: resolve `NEXT_PUBLIC_*` env vars as a static `process.env.NEXT_PUBLIC_X`
- * reference at the call site (see ANALYTICS_TEAM_IDS below) — Next.js only
- * inlines static property access into the client bundle, not `process.env[dynamicKey]`.
- */
-export function inTeamAllowlist(allowedTeamIds: string[]): RouteRequirement {
-	return (user) => allowedTeamIds.length > 0 && !!user.teamIds?.some((id) => allowedTeamIds.includes(id));
+/** Requirement factory: the user's effective permissions must include `key`. */
+export function hasPermissionKey(key: PermissionKey): RouteRequirement {
+	return (user) => !!user.permissions?.includes(key);
 }
-
-const ANALYTICS_TEAM_IDS = parseTeamIds(process.env.NEXT_PUBLIC_ANALYTICS_TEAM_IDS);
 
 /** Path -> requirement. Add an entry here for each route that needs gating. */
 const ROUTE_REQUIREMENTS: Record<string, RouteRequirement> = {
 	"/admin": isAdmin,
-	"/dashboards/analytics/auswertung": (user) => [inTeamAllowlist(ANALYTICS_TEAM_IDS), isAdmin].some((r) => r(user)),
+	"/dashboards/analytics/auswertung": (user) => [hasPermissionKey(PERMISSIONS.VIEW_AUSWERTUNG), isAdmin].some((r) => r(user)),
 };
 
 /**

@@ -108,6 +108,10 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 				},
 			});
 
+			if (response.status === 403) {
+				showToast("Keine Berechtigung", "negative", 2000);
+				return;
+			}
 			if (!response.ok) throw new Error("Löschen fehlgeschlagen");
 
 			showToast("Eintrag gelöscht", "positive", 2000);
@@ -202,7 +206,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 				)}
 			</ScrollArea>
 
-			<DeleteConfirmationDialog show={showDeleteConfirm} onConfirm={handleConfirmDelete} onCancel={() => setShowDeleteConfirm(false)} count={1} />
+			<DeleteConfirmationDialog show={showDeleteConfirm} onConfirm={handleConfirmDelete} onCancel={() => setShowDeleteConfirm(false)} count={1} ownerName={pendingDelete && pendingDelete.user_id !== currentUserId ? pendingDelete.user_name || "Unbekannter Benutzer" : undefined} />
 		</Flex>
 	);
 }

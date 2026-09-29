@@ -827,7 +827,7 @@ export default function BoardConfigPage() {
 		<div id="admin-app">
 			<header className="admin-header">
 				<Flex align="center" gap={16}>
-					<Button leftSection={<Icon name="chevron_left" size={21} />} onClick={() => router.back()}>
+					<Button leftSection={<Icon name="chevron_left" size={21} />} onClick={() => router.push("/admin?tab=boards")}>
 						Zurück
 					</Button>
 					<Logo size={{ height: 21 }} style="brand" loading="eager" />
@@ -838,7 +838,7 @@ export default function BoardConfigPage() {
 				<Anchor component={Link} href="/admin">
 					Admin
 				</Anchor>
-				<Anchor component={Link} href="/admin">
+				<Anchor component={Link} href="/admin?tab=boards">
 					Boards
 				</Anchor>
 				<Text>{(boardConfig as any).monday_board?.name || (boardConfig as any).board_name || boardConfig.board_id}</Text>
