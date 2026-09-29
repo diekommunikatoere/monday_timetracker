@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { queueItemSync } from "@/lib/columnSync";
 import { restoreTimeEntry } from "@/lib/database";
+import { hasPermission } from "@/lib/database/permissions";
 import { getUserProfileByMondayId } from "@/lib/database/users";
 import { verifyMondayJwt } from "@/lib/monday-auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 /**
  * POST /api/time-entries/[id]/undo
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 		}
 
 		const userId = userProfile.id;
+		const canManageOthers = await hasPermission(userProfile, session.isAdmin, PERMISSIONS.MANAGE_OTHERS_ENTRIES);
 
 		const { id } = await params;
 		const body = await request.json();
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 		}
 
 		// Restore the entry
-		const restoredEntry = await restoreTimeEntry(id, userId, undoToken);
+		const restoredEntry = await restoreTimeEntry(id, userId, undoToken, { canManageOthers });
 
 		// Queue sync operation (non-blocking)
 		if (restoredEntry.item_id && restoredEntry.board_id) {
@@ -54,6 +57,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 		});
 	} catch (error: any) {
 		console.error("[API] Error restoring time entry:", error);
-		return NextResponse.json({ error: error.message || "Failed to restore time entry" }, { status: 400 });
+		return NextResponse.json({ error: error.message || "Failed to restore time entry" }, { status: error.statusCode === 403 ? 403 : 400 });
 	}
 }

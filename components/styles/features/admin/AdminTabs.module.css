@@ -1,0 +1,35 @@
+/* Vertical tab layout for /admin (Boards · Rollen · Berechtigungen). */
+.root {
+	gap: 24px;
+	align-items: flex-start;
+}
+
+.list {
+	min-width: 180px;
+	position: sticky;
+	top: 24px;
+}
+
+.tab {
+	justify-content: flex-start;
+	font-weight: 500;
+}
+
+.panel {
+	min-width: 0;
+	flex: 1;
+}
+
+@media (max-width: 768px) {
+	.root {
+		flex-direction: column;
+	}
+
+	.list {
+		position: static;
+		flex-direction: row;
+		min-width: 0;
+		width: 100%;
+		overflow-x: auto;
+	}
+}

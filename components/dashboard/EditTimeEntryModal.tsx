@@ -6,15 +6,19 @@ import { useState, useEffect } from "react";
 
 import { Button, Modal } from "@/components";
 import { useToast } from "@/components/ToastProvider";
+import { PERMISSIONS } from "@/lib/permissions/keys";
 import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 import { TimeEntry } from "@/types/time-entry";
 
+import { useAssignableUsers } from "../shared/hooks/useAssignableUsers";
+import { useHasPermission } from "../shared/hooks/useHasPermission";
 import { useRoles } from "../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
+import { UserSelect } from "../shared/UserSelect";
 import TaskItemSelector, { TaskSelection } from "../TaskItemSelector";
 
 import "@mantine/dates/styles.css";
@@ -48,11 +52,18 @@ interface EditTimeEntryModalProps {
  * board/item so the user can reassign the task; role is tracked separately via
  * a standalone `RoleSelector` (seeded from `entry.role_id`).
  *
+ * Users holding `time_entries.manage_others` (monday admins implicitly) additionally get a
+ * {@link UserSelect}, seeded from `entry.user_id`, to reassign the entry to another user of the
+ * account. A hint shows "Eintrag von <Name>" when the owner isn't the caller, and
+ * "Neu zugewiesen: <Alt> → <Neu>" once the owner is changed; `user_id` is sent only when changed.
+ * The role is kept on reassignment and stays editable.
+ *
  * On save it PATCHes `/api/time-entries/:id` with the new fields — `duration`
  * back to **seconds** via `durationToSeconds`, start/end combined into **ISO 8601**
  * — and sends `expectedUpdatedAt` (`entry.updated_at`) for optimistic-concurrency
  * control. A `409` response is surfaced as a conflict toast and the save is
- * aborted without closing; other errors set the inline error. On success it
+ * aborted without closing; a `403` (permission revoked mid-session) shows "Keine Berechtigung";
+ * other errors set the inline error. On success it
  * `refetch`es `useTimeEntriesStore` for the current user, calls `onSaved`, and
  * closes.
  *
@@ -65,6 +76,7 @@ interface EditTimeEntryModalProps {
 export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: EditTimeEntryModalProps) {
 	const [selectedTask, setSelectedTask] = useState<TaskSelection | null>(null);
 	const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+	const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +87,11 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
 	const { sessionToken } = useMondayStore();
+
+	const canManageOthers = useHasPermission(PERMISSIONS.MANAGE_OTHERS_ENTRIES);
+	const { users, isLoading: loadingUsers } = useAssignableUsers();
+	const nameOf = (userId: string | null) => (userId === entry.user_id && entry.user_name) || users.find((user) => user.id === userId)?.name || "Unbekannter Benutzer";
+	const ownerChanged = canManageOthers && !!selectedUserId && selectedUserId !== entry.user_id;
 
 	// Initialize form with entry data
 	useEffect(() => {
@@ -103,6 +120,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				parentItemName: entry.parent_item_name || undefined,
 			});
 			setSelectedRoleId(entry.role_id || "");
+			setSelectedUserId(entry.user_id);
 		}
 	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
 
@@ -141,6 +159,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 					duration: durationSeconds,
 					start_time: startTimeIso,
 					end_time: endTimeIso,
+					...(ownerChanged ? { user_id: selectedUserId } : {}),
 					expectedUpdatedAt: entry.updated_at,
 				}),
 			});
@@ -150,6 +169,11 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 				if (response.status === 409) {
 					setError("Dieser Eintrag wurde von einem anderen Benutzer geändert.");
 					showToast("Konflikt erkannt", "negative", 3000);
+					return;
+				}
+				if (response.status === 403) {
+					setError("Keine Berechtigung");
+					showToast("Keine Berechtigung", "negative", 3000);
 					return;
 				}
 				throw new Error(errorData.error || "Failed to update time entry");
@@ -205,6 +229,25 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 								{ label: "-1h", minutes: -60 },
 							],
 							onAdjust: handlers.adjustDuration,
+						}}
+						userSelector={{
+							show: canManageOthers,
+							node: (
+								<Flex direction="column" gap={4}>
+									<UserSelect users={users} value={selectedUserId} onChange={setSelectedUserId} loading={loadingUsers} />
+									{ownerChanged ? (
+										<Text size="xs" c="dimmed">
+											Neu zugewiesen: {nameOf(entry.user_id)} → {nameOf(selectedUserId)}
+										</Text>
+									) : (
+										entry.user_id !== userProfile?.id && (
+											<Text size="xs" c="dimmed">
+												Eintrag von {nameOf(entry.user_id)}
+											</Text>
+										)
+									)}
+								</Flex>
+							),
 						}}
 						taskSelector={{
 							show: true,

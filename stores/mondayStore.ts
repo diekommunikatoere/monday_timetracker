@@ -112,7 +112,7 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 				throw new Error("Failed to authenticate user");
 			}
 
-			const { userProfile, mondayUser: mondayUserDetails } = await response.json();
+			const { userProfile, permissions, mondayUser: mondayUserDetails } = await response.json();
 
 			// Update user store with Supabase user + the server-resolved monday user details
 			useUserStore.setState({
@@ -123,6 +123,7 @@ export const useMondayStore = create<MondayState>()((set, get) => ({
 					photoUrls: mondayUserDetails?.photo_urls ?? null,
 				},
 				supabaseUser: userProfile,
+				permissions: permissions ?? [],
 				authenticated: true,
 			});
 

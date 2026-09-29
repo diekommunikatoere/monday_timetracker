@@ -1134,30 +1134,48 @@ async function processQueueBatch(items: SyncQueueItem[]): Promise<ItemSyncResult
 }
 
 /**
+ * Resolve the item whose columns actually receive time for `itemId`: the parent for a
+ * subitem (`monday_item.parent_item_id`), otherwise the item itself. Mirrors the redirect
+ * in {@link syncItemColumns}, but done up-front so queue keys dedupe per effective item.
+ */
+async function resolveEffectiveSyncTarget(itemId: string, boardId: string): Promise<{ itemId: string; boardId: string }> {
+	const { data } = await supabaseAdmin.from("monday_item").select("parent_item_id").eq("id", itemId).not("parent_item_id", "is", null).maybeSingle();
+	return { itemId: data?.parent_item_id ?? itemId, boardId };
+}
+
+/**
  * Queue column syncs after a time entry is updated.
  *
- * When the entry has been moved to a different item or board, **both** the old
- * and the new target are queued so columns on both sides reflect the change.
- * If the item/board is unchanged, only the new target is queued.
+ * Queues the **old** target (resolved from `oldEntry`, i.e. the row as it was before the
+ * update — never from the request body) and the **new** target. Each is first resolved to
+ * its effective item (a subitem's parent, see {@link resolveEffectiveSyncTarget}) and the
+ * pair is deduplicated, so:
+ * - an edit that keeps the item (duration, role, comment, owner) queues that item once;
+ * - moving between two subitems of the same parent queues the parent once;
+ * - moving between different parents, or between a subitem and a top-level item, queues both.
+ *
+ * There is intentionally no "nothing relevant changed" shortcut: a role change alters the
+ * time-by-role and budget columns even when the item is unchanged.
  *
  * Uses {@link queueItemSync} (debounced) rather than {@link syncItemColumns}
  * directly to absorb rapid consecutive edits.
  *
  * @param newEntry - Updated time entry object (needs `.item_id`, `.board_id`, `.id`).
  * @param oldEntry - Previous time entry object before the update.
- * @param userId   - Actor user ID forwarded to `sync_log`.
+ * @param userId   - Actor user ID forwarded to `sync_log` (the user who made the edit, not necessarily the entry owner).
  */
 export async function syncAfterUpdate(newEntry: any, oldEntry: any, userId: string): Promise<void> {
-	const itemChanged = oldEntry.item_id !== newEntry.item_id || oldEntry.board_id !== newEntry.board_id;
+	const targets = new Map<string, { itemId: string; boardId: string; timeEntryId: string }>();
 
-	if (itemChanged && oldEntry.item_id && oldEntry.board_id) {
-		console.log(`[ColumnSync] Item changed - queueing old item ${oldEntry.item_id}`);
-		await queueItemSync(oldEntry.item_id, oldEntry.board_id, userId, oldEntry.id);
+	for (const entry of [oldEntry, newEntry]) {
+		if (!entry?.item_id || !entry?.board_id) continue;
+		const target = await resolveEffectiveSyncTarget(entry.item_id, entry.board_id);
+		targets.set(`${target.itemId}:${target.boardId}`, { ...target, timeEntryId: entry.id });
 	}
 
-	if (newEntry.item_id && newEntry.board_id) {
-		console.log(`[ColumnSync] Queueing updated item ${newEntry.item_id}`);
-		await queueItemSync(newEntry.item_id, newEntry.board_id, userId, newEntry.id);
+	for (const target of targets.values()) {
+		console.log(`[ColumnSync] Queueing item ${target.itemId} on board ${target.boardId} after update`);
+		await queueItemSync(target.itemId, target.boardId, userId, target.timeEntryId);
 	}
 }
 

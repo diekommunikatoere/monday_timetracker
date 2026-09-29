@@ -12,12 +12,14 @@ import { Button, Modal } from "@/components";
  * @property onConfirm- Called when the user confirms deletion (the actual delete is the caller's responsibility).
  * @property onCancel - Called on dismiss / cancel button; the same callback is used for the modal's `onClose`.
  * @property count    - Number of entries being deleted; drives singular vs plural copy (`"Eintrag"` / `"Einträge"`).
+ * @property ownerName - Optional; when set (a privileged user deleting someone else's entry), the copy names the owner: "Eintrag von <Name> löschen?".
  */
 interface DeleteConfirmationDialogProps {
 	show: boolean;
 	onConfirm: () => void;
 	onCancel: () => void;
 	count: number;
+	ownerName?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ interface DeleteConfirmationDialogProps {
  * @param props - {@link DeleteConfirmationDialogProps}.
  * @returns A `Modal` (from `@/components`) with confirm/cancel buttons, or the modal's empty close state.
  */
-export default function DeleteConfirmationDialog({ show, onConfirm, onCancel, count }: DeleteConfirmationDialogProps) {
+export default function DeleteConfirmationDialog({ show, onConfirm, onCancel, count, ownerName }: DeleteConfirmationDialogProps) {
 	return (
 		<Modal show={show} onClose={onCancel}>
 			<Modal.Header>
@@ -40,7 +42,13 @@ export default function DeleteConfirmationDialog({ show, onConfirm, onCancel, co
 			</Modal.Header>
 			<Modal.Body>
 				<Text size="sm" mb="md">
-					Möchten Sie wirklich {count} {count === 1 ? "Eintrag" : "Einträge"} löschen?
+					{ownerName ? (
+						<>Möchten Sie wirklich den Eintrag von {ownerName} löschen?</>
+					) : (
+						<>
+							Möchten Sie wirklich {count} {count === 1 ? "Eintrag" : "Einträge"} löschen?
+						</>
+					)}
 				</Text>
 				<Text size="xs" c="dimmed" mb="lg">
 					Sie haben 5 Sekunden Zeit, um die Löschung rückgängig zu machen.

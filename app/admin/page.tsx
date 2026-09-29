@@ -3,22 +3,32 @@
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Accordion, TextInput, NumberInput, Switch, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Checkbox, ScrollArea, Select, SegmentedControl, Table } from "@mantine/core";
+import { Accordion, Tabs, TextInput, NumberInput, Switch, Modal, Loader, Badge, Tooltip, ColorInput, Textarea, Group, Stack, Text, Flex, Checkbox, ScrollArea, Select, SegmentedControl, Table } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 
 import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
+import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { Logo } from "@/components/Logo";
 import { canAccessRoute } from "@/lib/permissions";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useUserStore } from "@/stores/userStore";
 
 import "@/public/css/components/AdminPage.css";
+import tabStyles from "@/components/styles/features/admin/AdminTabs.module.css";
 
 import type { Role } from "@/types/database";
 
 const DEFAULT_WORKSPACE_ID = "__default__";
+
+/** Admin page tabs, addressed via `?tab=`; the first entry is the default. */
+const ADMIN_TABS = [
+	{ value: "boards", label: "Boards" },
+	{ value: "rollen", label: "Rollen" },
+	{ value: "berechtigungen", label: "Berechtigungen" },
+] as const;
+type AdminTab = (typeof ADMIN_TABS)[number]["value"];
 
 interface WorkspaceBoardGroup {
 	workspaceId: string;
@@ -136,7 +146,28 @@ function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemov
 	);
 }
 
+/**
+ * `/admin` — admin settings, split into the tabs Boards · Rollen · Berechtigungen. The active
+ * tab lives in the URL (`?tab=`), so it survives reloads and is linkable. `useSearchParams`
+ * requires a Suspense boundary, hence the thin wrapper around {@link AdminPageContent}.
+ */
 export default function AdminPage() {
+	return (
+		<Suspense fallback={<LoadingState />}>
+			<AdminPageContent />
+		</Suspense>
+	);
+}
+
+function AdminPageContent() {
+	const router = useRouter();
+	const searchParams = useSearchParams();
+	const tabParam = searchParams.get("tab");
+	const activeTab: AdminTab = ADMIN_TABS.some((t) => t.value === tabParam) ? (tabParam as AdminTab) : "boards";
+	const handleTabChange = (value: string | null) => {
+		if (value) router.replace(`/admin?tab=${value}`);
+	};
+
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [allBoardConfigs, setAllBoardConfigs] = useState<any[]>([]);
 	const [pickerGroups, setPickerGroups] = useState<WorkspaceBoardGroup[]>([]);
@@ -1140,325 +1171,343 @@ export default function AdminPage() {
 
 			{error && <div className="admin-error">{error}</div>}
 
-			{/* Boards verwalten */}
-			<div className="admin-section">
-				<div className="admin-section-header">
-					<div>
-						<h2>Boards verwalten</h2>
-						<p className="admin-section-description">Boards für die Zeiterfassung freigeben und ihre Reihenfolge in der Board-Auswahl festlegen.</p>
-					</div>
-					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={handleOpenPicker}>
-						Board hinzufügen
-					</Button>
-				</div>
+			<Tabs value={activeTab} onChange={handleTabChange} orientation="vertical" keepMounted={false} classNames={{ root: tabStyles.root, list: tabStyles.list, tab: tabStyles.tab, panel: tabStyles.panel }}>
+				<Tabs.List>
+					{ADMIN_TABS.map((tab) => (
+						<Tabs.Tab key={tab.value} value={tab.value}>
+							{tab.label}
+						</Tabs.Tab>
+					))}
+				</Tabs.List>
 
-				{loading ? (
-					<div className="admin-loading">
-						<Loader />
+				<Tabs.Panel value="boards">
+					{/* Boards verwalten */}
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Boards verwalten</h2>
+								<p className="admin-section-description">Boards für die Zeiterfassung freigeben und ihre Reihenfolge in der Board-Auswahl festlegen.</p>
+							</div>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={handleOpenPicker}>
+								Board hinzufügen
+							</Button>
+						</div>
+
+						{loading ? (
+							<div className="admin-loading">
+								<Loader />
+							</div>
+						) : displayBoards.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">Keine Boards aktiviert</div>
+								<p className="empty-state-description">Aktivieren Sie ein Board, damit es in der Zeiterfassung ausgewählt werden kann.</p>
+								<Button onClick={handleOpenPicker}>Board hinzufügen</Button>
+							</div>
+						) : (
+							<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+								<SortableContext items={displayBoards.map((b) => b.board_id)} strategy={verticalListSortingStrategy}>
+									<div className="board-sortable-list" aria-busy={savingBoards}>
+										{displayBoards.map((board) => (
+											<SortableBoardRow key={board.board_id} board={board} onRemove={handleRemoveBoard} />
+										))}
+									</div>
+								</SortableContext>
+							</DndContext>
+						)}
 					</div>
-				) : displayBoards.length === 0 ? (
-					<div className="empty-state">
-						<div className="empty-state-title">Keine Boards aktiviert</div>
-						<p className="empty-state-description">Aktivieren Sie ein Board, damit es in der Zeiterfassung ausgewählt werden kann.</p>
-						<Button onClick={handleOpenPicker}>Board hinzufügen</Button>
+
+					{/* Budget-Boards */}
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Budget-Boards</h2>
+								<p className="admin-section-description">Boards mit Budget-Items (z. B. „Retainer") für die Abrechnungs-Ansicht konfigurieren. Jedes Jahr wird ein archiviertes Board neu hinzugefügt, sobald Budget-Items ans Archiv-Board verschoben werden.</p>
+							</div>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBudgetBoardModal()}>
+								Board hinzufügen
+							</Button>
+						</div>
+
+						{loading ? (
+							<div className="admin-loading">
+								<Loader />
+							</div>
+						) : budgetBoardRows.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">Keine Budget-Boards konfiguriert</div>
+								<p className="empty-state-description">Füge das Budget-Board (z. B. „Retainer") hinzu, um die Abrechnungs-Ansicht zu befüllen.</p>
+								<Button onClick={() => handleOpenBudgetBoardModal()}>Board hinzufügen</Button>
+							</div>
+						) : (
+							<Stack gap="lg">
+								<div>
+									<Text fw={600} size="sm" c="dimmed" mb="xs">
+										Aktiv
+									</Text>
+									{activeBudgetBoards.length === 0 ? (
+										<Text size="sm" c="dimmed">
+											Kein aktives Budget-Board.
+										</Text>
+									) : (
+										<Table withTableBorder>
+											<Table.Thead>
+												<Table.Tr>
+													<Table.Th>Board</Table.Th>
+													<Table.Th>Workspace</Table.Th>
+													<Table.Th>Aktionen</Table.Th>
+												</Table.Tr>
+											</Table.Thead>
+											<Table.Tbody>
+												{activeBudgetBoards.map((board) => (
+													<Table.Tr key={board.board_id}>
+														<Table.Td>
+															<Text fw={500}>{board.board_name}</Text>
+														</Table.Td>
+														<Table.Td>{board.workspace_name}</Table.Td>
+														<Table.Td>
+															<Group gap="xs">
+																<IconButton variant="light" onClick={() => handleOpenBudgetBoardModal(board)}>
+																	<Icon name="edit" size={21} />
+																</IconButton>
+																<IconButton variant="light" color="red" onClick={() => handleRemoveBudgetBoard(board)}>
+																	<Icon name="delete" size={21} />
+																</IconButton>
+															</Group>
+														</Table.Td>
+													</Table.Tr>
+												))}
+											</Table.Tbody>
+										</Table>
+									)}
+								</div>
+
+								<div>
+									<Text fw={600} size="sm" c="dimmed" mb="xs">
+										Archiviert
+									</Text>
+									{archivedBudgetBoards.length === 0 ? (
+										<Text size="sm" c="dimmed">
+											Keine archivierten Budget-Boards.
+										</Text>
+									) : (
+										<Table withTableBorder>
+											<Table.Thead>
+												<Table.Tr>
+													<Table.Th>Board</Table.Th>
+													<Table.Th>Zeitraum</Table.Th>
+													<Table.Th>Workspace</Table.Th>
+													<Table.Th>Aktionen</Table.Th>
+												</Table.Tr>
+											</Table.Thead>
+											<Table.Tbody>
+												{archivedBudgetBoards.map((board) => (
+													<Table.Tr key={board.board_id}>
+														<Table.Td>
+															<Text fw={500}>{board.board_name}</Text>
+														</Table.Td>
+														<Table.Td>
+															<Badge variant="light">{board.label || "–"}</Badge>
+														</Table.Td>
+														<Table.Td>{board.workspace_name}</Table.Td>
+														<Table.Td>
+															<Group gap="xs">
+																<IconButton variant="light" onClick={() => handleOpenBudgetBoardModal(board)}>
+																	<Icon name="edit" size={21} />
+																</IconButton>
+																<IconButton variant="light" color="red" onClick={() => handleRemoveBudgetBoard(board)}>
+																	<Icon name="delete" size={21} />
+																</IconButton>
+															</Group>
+														</Table.Td>
+													</Table.Tr>
+												))}
+											</Table.Tbody>
+										</Table>
+									)}
+								</div>
+							</Stack>
+						)}
 					</div>
-				) : (
-					<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-						<SortableContext items={displayBoards.map((b) => b.board_id)} strategy={verticalListSortingStrategy}>
-							<div className="board-sortable-list" aria-busy={savingBoards}>
-								{displayBoards.map((board) => (
-									<SortableBoardRow key={board.board_id} board={board} onRemove={handleRemoveBoard} />
+
+					{/* Job-Boards */}
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Job-Boards</h2>
+								<p className="admin-section-description">Status-Spalte der Boards, auf denen die verknüpften Agentur-Projekte liegen.</p>
+							</div>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenJobBoardModal()}>
+								Board hinzufügen
+							</Button>
+						</div>
+						{loading ? (
+							<div className="admin-loading">
+								<Loader />
+							</div>
+						) : jobBoardRows.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">Keine Job-Boards konfiguriert</div>
+								<p className="empty-state-description">Ordne einem Job-Board seine Status-Spalte zu, damit verknüpfte Agentur-Projekte in der Abrechnungs-Ansicht ihren Status zeigen.</p>
+								<Button onClick={() => handleOpenJobBoardModal()}>Board hinzufügen</Button>
+							</div>
+						) : (
+							<Table withTableBorder>
+								<Table.Thead>
+									<Table.Tr>
+										<Table.Th>Board</Table.Th>
+										<Table.Th>Workspace</Table.Th>
+										<Table.Th>Status-Spalte</Table.Th>
+										<Table.Th>Aktionen</Table.Th>
+									</Table.Tr>
+								</Table.Thead>
+								<Table.Tbody>
+									{jobBoardRows.map((board) => (
+										<Table.Tr key={board.board_id}>
+											<Table.Td>
+												<Text fw={500}>{board.board_name}</Text>
+											</Table.Td>
+											<Table.Td>{board.workspace_name}</Table.Td>
+											<Table.Td>
+												<Badge variant="light">{board.job_status_column_id}</Badge>
+											</Table.Td>
+											<Table.Td>
+												<Group gap="xs">
+													<IconButton variant="light" onClick={() => handleOpenJobBoardModal(board)}>
+														<Icon name="edit" size={21} />
+													</IconButton>
+													<IconButton variant="light" color="red" onClick={() => handleRemoveJobBoard(board)}>
+														<Icon name="delete" size={21} />
+													</IconButton>
+												</Group>
+											</Table.Td>
+										</Table.Tr>
+									))}
+								</Table.Tbody>
+							</Table>
+						)}
+					</div>
+
+					{/* Third-Party-Boards */}
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Fremdkosten-Boards</h2>
+								<p className="admin-section-description">Status- und Kostenspalte der Boards, auf denen die verknüpften Fremdleistungen liegen.</p>
+							</div>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenThirdPartyBoardModal()}>
+								Board hinzufügen
+							</Button>
+						</div>
+						{loading ? (
+							<div className="admin-loading">
+								<Loader />
+							</div>
+						) : thirdPartyBoardRows.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">Keine Fremdkosten-Boards konfiguriert</div>
+								<p className="empty-state-description">Ordne einem Fremdkosten-Board seine Status-Spalte zu, damit verknüpfte Fremdleistungen in der Abrechnungs-Ansicht ihren Status zeigen.</p>
+								<Button onClick={() => handleOpenThirdPartyBoardModal()}>Board hinzufügen</Button>
+							</div>
+						) : (
+							<Table withTableBorder>
+								<Table.Thead>
+									<Table.Tr>
+										<Table.Th>Board</Table.Th>
+										<Table.Th>Workspace</Table.Th>
+										<Table.Th>Status-Spalte</Table.Th>
+										<Table.Th>Aktionen</Table.Th>
+									</Table.Tr>
+								</Table.Thead>
+								<Table.Tbody>
+									{thirdPartyBoardRows.map((board) => (
+										<Table.Tr key={board.board_id}>
+											<Table.Td>
+												<Text fw={500}>{board.board_name}</Text>
+											</Table.Td>
+											<Table.Td>{board.workspace_name}</Table.Td>
+											<Table.Td>
+												<Badge variant="light">{board.third_party_status_column_id}</Badge>
+											</Table.Td>
+											<Table.Td>
+												<Group gap="xs">
+													<IconButton variant="light" onClick={() => handleOpenThirdPartyBoardModal(board)}>
+														<Icon name="edit" size={21} />
+													</IconButton>
+													<IconButton variant="light" color="red" onClick={() => handleRemoveThirdPartyBoard(board)}>
+														<Icon name="delete" size={21} />
+													</IconButton>
+												</Group>
+											</Table.Td>
+										</Table.Tr>
+									))}
+								</Table.Tbody>
+							</Table>
+						)}
+					</div>
+				</Tabs.Panel>
+
+				<Tabs.Panel value="rollen">
+					{/* Rollen */}
+					<div className="admin-section">
+						<div className="admin-section-header">
+							<div>
+								<h2>Rollen</h2>
+								<p className="admin-section-description">Rollen und ihre Standard-Stundensätze für die Zeiterfassung definieren.</p>
+							</div>
+							<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenRoleModal()}>
+								Rolle hinzufügen
+							</Button>
+						</div>
+
+						{loading ? (
+							<div className="admin-loading">
+								<Loader />
+							</div>
+						) : roles.length === 0 ? (
+							<div className="empty-state">
+								<div className="empty-state-title">Keine Rollen definiert</div>
+								<p className="empty-state-description">Erstellen Sie Ihre erste Rolle, um Zeit nach Rolle zu erfassen.</p>
+								<Button onClick={() => handleOpenRoleModal()}>Rolle erstellen</Button>
+							</div>
+						) : (
+							<div className="role-grid">
+								{sortedRoles.map((role) => (
+									<div key={role.id} className="role-card">
+										<div className="role-card-header">
+											<div className="role-card-title">
+												<div className="role-color-indicator" style={{ backgroundColor: role.color_hex || "#0073ea" }} />
+												<span className="role-card-name">{role.name}</span>
+											</div>
+											<span className={`role-card-status ${role.is_active ? "active" : "inactive"}`}>{role.is_active ? "Aktiv" : "Inaktiv"}</span>
+										</div>
+										<div className="role-card-details">
+											<div className="role-detail-row">
+												<span className="role-detail-label">Beschreibung</span>
+												<span className="role-detail-value">{role.description}</span>
+											</div>
+											<div className="role-detail-row">
+												<span className="role-detail-label">Stundensatz</span>
+												<span className="role-detail-value">{role.hourly_rate.toFixed(2)} €</span>
+											</div>
+										</div>
+										<div className="role-card-actions">
+											<Tooltip label="Rolle bearbeiten">
+												<IconButton colorVariant="primary-muted" onClick={() => handleOpenRoleModal(role)}>
+													<Icon name="edit" size={21} />
+												</IconButton>
+											</Tooltip>
+										</div>
+									</div>
 								))}
 							</div>
-						</SortableContext>
-					</DndContext>
-				)}
-			</div>
+						)}
+					</div>
+				</Tabs.Panel>
 
-			{/* Rollen */}
-			<div className="admin-section">
-				<div className="admin-section-header">
-					<div>
-						<h2>Rollen</h2>
-						<p className="admin-section-description">Rollen und ihre Standard-Stundensätze für die Zeiterfassung definieren.</p>
-					</div>
-					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenRoleModal()}>
-						Rolle hinzufügen
-					</Button>
-				</div>
-
-				{loading ? (
-					<div className="admin-loading">
-						<Loader />
-					</div>
-				) : roles.length === 0 ? (
-					<div className="empty-state">
-						<div className="empty-state-title">Keine Rollen definiert</div>
-						<p className="empty-state-description">Erstellen Sie Ihre erste Rolle, um Zeit nach Rolle zu erfassen.</p>
-						<Button onClick={() => handleOpenRoleModal()}>Rolle erstellen</Button>
-					</div>
-				) : (
-					<div className="role-grid">
-						{sortedRoles.map((role) => (
-							<div key={role.id} className="role-card">
-								<div className="role-card-header">
-									<div className="role-card-title">
-										<div className="role-color-indicator" style={{ backgroundColor: role.color_hex || "#0073ea" }} />
-										<span className="role-card-name">{role.name}</span>
-									</div>
-									<span className={`role-card-status ${role.is_active ? "active" : "inactive"}`}>{role.is_active ? "Aktiv" : "Inaktiv"}</span>
-								</div>
-								<div className="role-card-details">
-									<div className="role-detail-row">
-										<span className="role-detail-label">Beschreibung</span>
-										<span className="role-detail-value">{role.description}</span>
-									</div>
-									<div className="role-detail-row">
-										<span className="role-detail-label">Stundensatz</span>
-										<span className="role-detail-value">{role.hourly_rate.toFixed(2)} €</span>
-									</div>
-								</div>
-								<div className="role-card-actions">
-									<Tooltip label="Rolle bearbeiten">
-										<IconButton colorVariant="primary-muted" onClick={() => handleOpenRoleModal(role)}>
-											<Icon name="edit" size={21} />
-										</IconButton>
-									</Tooltip>
-								</div>
-							</div>
-						))}
-					</div>
-				)}
-			</div>
-
-			{/* Budget-Boards */}
-			<div className="admin-section">
-				<div className="admin-section-header">
-					<div>
-						<h2>Budget-Boards</h2>
-						<p className="admin-section-description">Boards mit Budget-Items (z. B. „Retainer") für die Abrechnungs-Ansicht konfigurieren. Jedes Jahr wird ein archiviertes Board neu hinzugefügt, sobald Budget-Items ans Archiv-Board verschoben werden.</p>
-					</div>
-					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenBudgetBoardModal()}>
-						Board hinzufügen
-					</Button>
-				</div>
-
-				{loading ? (
-					<div className="admin-loading">
-						<Loader />
-					</div>
-				) : budgetBoardRows.length === 0 ? (
-					<div className="empty-state">
-						<div className="empty-state-title">Keine Budget-Boards konfiguriert</div>
-						<p className="empty-state-description">Füge das Budget-Board (z. B. „Retainer") hinzu, um die Abrechnungs-Ansicht zu befüllen.</p>
-						<Button onClick={() => handleOpenBudgetBoardModal()}>Board hinzufügen</Button>
-					</div>
-				) : (
-					<Stack gap="lg">
-						<div>
-							<Text fw={600} size="sm" c="dimmed" mb="xs">
-								Aktiv
-							</Text>
-							{activeBudgetBoards.length === 0 ? (
-								<Text size="sm" c="dimmed">
-									Kein aktives Budget-Board.
-								</Text>
-							) : (
-								<Table withTableBorder>
-									<Table.Thead>
-										<Table.Tr>
-											<Table.Th>Board</Table.Th>
-											<Table.Th>Workspace</Table.Th>
-											<Table.Th>Aktionen</Table.Th>
-										</Table.Tr>
-									</Table.Thead>
-									<Table.Tbody>
-										{activeBudgetBoards.map((board) => (
-											<Table.Tr key={board.board_id}>
-												<Table.Td>
-													<Text fw={500}>{board.board_name}</Text>
-												</Table.Td>
-												<Table.Td>{board.workspace_name}</Table.Td>
-												<Table.Td>
-													<Group gap="xs">
-														<IconButton variant="light" onClick={() => handleOpenBudgetBoardModal(board)}>
-															<Icon name="edit" size={21} />
-														</IconButton>
-														<IconButton variant="light" color="red" onClick={() => handleRemoveBudgetBoard(board)}>
-															<Icon name="delete" size={21} />
-														</IconButton>
-													</Group>
-												</Table.Td>
-											</Table.Tr>
-										))}
-									</Table.Tbody>
-								</Table>
-							)}
-						</div>
-
-						<div>
-							<Text fw={600} size="sm" c="dimmed" mb="xs">
-								Archiviert
-							</Text>
-							{archivedBudgetBoards.length === 0 ? (
-								<Text size="sm" c="dimmed">
-									Keine archivierten Budget-Boards.
-								</Text>
-							) : (
-								<Table withTableBorder>
-									<Table.Thead>
-										<Table.Tr>
-											<Table.Th>Board</Table.Th>
-											<Table.Th>Zeitraum</Table.Th>
-											<Table.Th>Workspace</Table.Th>
-											<Table.Th>Aktionen</Table.Th>
-										</Table.Tr>
-									</Table.Thead>
-									<Table.Tbody>
-										{archivedBudgetBoards.map((board) => (
-											<Table.Tr key={board.board_id}>
-												<Table.Td>
-													<Text fw={500}>{board.board_name}</Text>
-												</Table.Td>
-												<Table.Td>
-													<Badge variant="light">{board.label || "–"}</Badge>
-												</Table.Td>
-												<Table.Td>{board.workspace_name}</Table.Td>
-												<Table.Td>
-													<Group gap="xs">
-														<IconButton variant="light" onClick={() => handleOpenBudgetBoardModal(board)}>
-															<Icon name="edit" size={21} />
-														</IconButton>
-														<IconButton variant="light" color="red" onClick={() => handleRemoveBudgetBoard(board)}>
-															<Icon name="delete" size={21} />
-														</IconButton>
-													</Group>
-												</Table.Td>
-											</Table.Tr>
-										))}
-									</Table.Tbody>
-								</Table>
-							)}
-						</div>
-					</Stack>
-				)}
-			</div>
-
-			{/* Job-Boards */}
-			<div className="admin-section">
-				<div className="admin-section-header">
-					<div>
-						<h2>Job-Boards</h2>
-						<p className="admin-section-description">Status-Spalte der Boards, auf denen die verknüpften Agentur-Projekte liegen.</p>
-					</div>
-					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenJobBoardModal()}>
-						Board hinzufügen
-					</Button>
-				</div>
-				{loading ? (
-					<div className="admin-loading">
-						<Loader />
-					</div>
-				) : jobBoardRows.length === 0 ? (
-					<div className="empty-state">
-						<div className="empty-state-title">Keine Job-Boards konfiguriert</div>
-						<p className="empty-state-description">Ordne einem Job-Board seine Status-Spalte zu, damit verknüpfte Agentur-Projekte in der Abrechnungs-Ansicht ihren Status zeigen.</p>
-						<Button onClick={() => handleOpenJobBoardModal()}>Board hinzufügen</Button>
-					</div>
-				) : (
-					<Table withTableBorder>
-						<Table.Thead>
-							<Table.Tr>
-								<Table.Th>Board</Table.Th>
-								<Table.Th>Workspace</Table.Th>
-								<Table.Th>Status-Spalte</Table.Th>
-								<Table.Th>Aktionen</Table.Th>
-							</Table.Tr>
-						</Table.Thead>
-						<Table.Tbody>
-							{jobBoardRows.map((board) => (
-								<Table.Tr key={board.board_id}>
-									<Table.Td>
-										<Text fw={500}>{board.board_name}</Text>
-									</Table.Td>
-									<Table.Td>{board.workspace_name}</Table.Td>
-									<Table.Td>
-										<Badge variant="light">{board.job_status_column_id}</Badge>
-									</Table.Td>
-									<Table.Td>
-										<Group gap="xs">
-											<IconButton variant="light" onClick={() => handleOpenJobBoardModal(board)}>
-												<Icon name="edit" size={21} />
-											</IconButton>
-											<IconButton variant="light" color="red" onClick={() => handleRemoveJobBoard(board)}>
-												<Icon name="delete" size={21} />
-											</IconButton>
-										</Group>
-									</Table.Td>
-								</Table.Tr>
-							))}
-						</Table.Tbody>
-					</Table>
-				)}
-			</div>
-
-			{/* Third-Party-Boards */}
-			<div className="admin-section">
-				<div className="admin-section-header">
-					<div>
-						<h2>Fremdkosten-Boards</h2>
-						<p className="admin-section-description">Status- und Kostenspalte der Boards, auf denen die verknüpften Fremdleistungen liegen.</p>
-					</div>
-					<Button leftSection={<Icon name="add" size={21} color="white" />} onClick={() => handleOpenThirdPartyBoardModal()}>
-						Board hinzufügen
-					</Button>
-				</div>
-				{loading ? (
-					<div className="admin-loading">
-						<Loader />
-					</div>
-				) : thirdPartyBoardRows.length === 0 ? (
-					<div className="empty-state">
-						<div className="empty-state-title">Keine Fremdkosten-Boards konfiguriert</div>
-						<p className="empty-state-description">Ordne einem Fremdkosten-Board seine Status-Spalte zu, damit verknüpfte Fremdleistungen in der Abrechnungs-Ansicht ihren Status zeigen.</p>
-						<Button onClick={() => handleOpenThirdPartyBoardModal()}>Board hinzufügen</Button>
-					</div>
-				) : (
-					<Table withTableBorder>
-						<Table.Thead>
-							<Table.Tr>
-								<Table.Th>Board</Table.Th>
-								<Table.Th>Workspace</Table.Th>
-								<Table.Th>Status-Spalte</Table.Th>
-								<Table.Th>Aktionen</Table.Th>
-							</Table.Tr>
-						</Table.Thead>
-						<Table.Tbody>
-							{thirdPartyBoardRows.map((board) => (
-								<Table.Tr key={board.board_id}>
-									<Table.Td>
-										<Text fw={500}>{board.board_name}</Text>
-									</Table.Td>
-									<Table.Td>{board.workspace_name}</Table.Td>
-									<Table.Td>
-										<Badge variant="light">{board.third_party_status_column_id}</Badge>
-									</Table.Td>
-									<Table.Td>
-										<Group gap="xs">
-											<IconButton variant="light" onClick={() => handleOpenThirdPartyBoardModal(board)}>
-												<Icon name="edit" size={21} />
-											</IconButton>
-											<IconButton variant="light" color="red" onClick={() => handleRemoveThirdPartyBoard(board)}>
-												<Icon name="delete" size={21} />
-											</IconButton>
-										</Group>
-									</Table.Td>
-								</Table.Tr>
-							))}
-						</Table.Tbody>
-					</Table>
-				)}
-			</div>
+				<Tabs.Panel value="berechtigungen">
+					<PermissionsTab />
+				</Tabs.Panel>
+			</Tabs>
 
 			{/* Board Picker Modal */}
 			<Modal opened={pickerOpen} onClose={() => setPickerOpen(false)} title="Boards hinzufügen" size="lg">

@@ -10,7 +10,8 @@ import { useUserStore } from "@/stores/userStore";
 
 export function DashboardMenuButton() {
 	const supabaseUser = useUserStore((state) => state.supabaseUser);
-	const user = { teamIds: supabaseUser?.team_ids, isAdmin: supabaseUser?.is_admin };
+	const permissions = useUserStore((state) => state.permissions);
+	const user = { permissions, isAdmin: supabaseUser?.is_admin };
 	const appTheme = useUserStore((state) => state.appTheme);
 	const setTheme = useUserStore((state) => state.setTheme);
 	const pathname = usePathname();

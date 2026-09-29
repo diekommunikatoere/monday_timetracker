@@ -1,8 +1,11 @@
 // components/shared/hooks/useTimeEntryPermissions.ts
 "use client";
 
+import { PERMISSIONS } from "@/lib/permissions/keys";
 import { getTimeEntryPermissions, TimeEntryPermissions } from "@/lib/permissions/timeEntry";
 import { TimeEntry } from "@/types/time-entry";
+
+import { useHasPermission } from "./useHasPermission";
 
 /**
  * Props for {@link useTimeEntryPermissions}.
@@ -25,17 +28,18 @@ export interface UseTimeEntryPermissionsOptions {
  *
  * Derives the fine-grained permission flags (`canView`, `canCreate`,
  * `canEdit`, `canDelete`, `canBulkSelect`) for a single {@link TimeEntry}
- * against the currently logged-in user. The permission model is **pure
- * ownership**: edit/delete/bulk-select are granted **only** when
- * `entry.user_id === currentUserId`. There is no admin-role elevation in this
- * hook — admin gates live at the API route layer via `session.isAdmin` from
- * `verifyMondayJwt`. Reads the current user id from {@link useUserStore} at the
- * call site (e.g. `TimeEntryRowMenu`).
+ * against the currently logged-in user. Edit/delete are granted to the entry
+ * owner (`entry.user_id === currentUserId`) **and** to users holding
+ * `time_entries.manage_others` (monday admins implicitly, via
+ * {@link useHasPermission}); bulk-select stays owner-only. These flags only drive
+ * the UI — the API routes re-check independently. Reads the current user id from
+ * {@link useUserStore} at the call site (e.g. `TimeEntryRowMenu`).
  *
  * @param options - {@link UseTimeEntryPermissionsOptions}; `entry` and `currentUserId`.
  * @returns A {@link TimeEntryPermissions} object; never `null` (every flag is always defined).
  */
 export function useTimeEntryPermissions(options: UseTimeEntryPermissionsOptions): TimeEntryPermissions {
 	const { entry, currentUserId } = options;
-	return getTimeEntryPermissions(entry, currentUserId);
+	const canManageOthers = useHasPermission(PERMISSIONS.MANAGE_OTHERS_ENTRIES);
+	return getTimeEntryPermissions(entry, currentUserId, canManageOthers);
 }

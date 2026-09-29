@@ -49,6 +49,7 @@ export type TimeEntryQuickAdjust = {
  * @property onStartTimeNowClick   - Optional; when provided, renders a "now" icon button that sets the start time (works even while the start input is read-only).
  * @property onEndTimeNowClick     - Optional; when provided, renders a "now" icon button that sets the end time (works even while the end input is read-only).
  * @property quickAdjustments      - Optional `{ add?, subtract?, onAdjust }` to render quick-add / quick-subtract button groups; buttons pass their {@link TimeEntryQuickAdjust.minutes} to `onAdjust`. Disabled while `durationLocked`.
+ * @property userSelector         - Optional `{ show, node }`; when `show` is true, `node` (a {@link UserSelect} plus hint, for users with `time_entries.manage_others`) is inserted above the task selector.
  * @property taskSelector         - Optional `{ show, node }`; when `show` is true, `node` is inserted into the form (e.g. a monday task picker).
  * @property roleSelector         - Optional `{ show, roles, selectedRoleId, onRoleChange, loading?, required? }`; when `show` is true, renders a {@link RoleSelector}.
  */
@@ -82,7 +83,11 @@ export interface TimeEntryFormFieldsProps {
 		onAdjust: (minutes: number) => void;
 	};
 
-	// Optional content insertion (e.g. Task selector)
+	// Optional content insertion (e.g. User / Task selector)
+	userSelector?: {
+		show: boolean;
+		node: React.ReactNode;
+	};
 	taskSelector?: {
 		show: boolean;
 		node: React.ReactNode;
@@ -154,6 +159,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 		onStartTimeNowClick,
 		onEndTimeNowClick,
 		quickAdjustments,
+		userSelector,
 		taskSelector,
 		roleSelector,
 	} = props;
@@ -271,6 +277,9 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					</ButtonGroup>
 				</Flex>
 			) : null}
+
+			{/* User selector (privileged users only) */}
+			{userSelector?.show ? userSelector.node : null}
 
 			{/* Task selector */}
 			{taskSelector?.show ? taskSelector.node : null}

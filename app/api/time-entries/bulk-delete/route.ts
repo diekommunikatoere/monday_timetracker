@@ -7,7 +7,8 @@ import { verifyMondayJwt } from "@/lib/monday-auth";
 
 /**
  * POST /api/time-entries/bulk-delete
- * Bulk delete time entries with batching
+ * Bulk delete time entries with batching. Owner-only by design: bulk actions never touch
+ * other users' entries, even for users holding `time_entries.manage_others`.
  */
 export async function POST(request: NextRequest) {
 	try {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 			// Process batch in parallel
 			const batchResults = await Promise.allSettled(
 				batch.map(async (id: string) => {
-					const { entry } = await softDeleteTimeEntry(id, userId);
+					const { entry } = await softDeleteTimeEntry(id, userId, { canManageOthers: false });
 
 					// Queue sync (non-blocking)
 					syncAfterDelete(entry, userId).catch((err) => {

@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest) {
 
 		const { error } = await supabaseAdmin
 			.from("time_entry")
-			.update({ comment: comment ?? "", updated_at: new Date().toISOString() })
+			.update({ comment: comment ?? "", updated_at: new Date().toISOString(), updated_by: userProfile.id })
 			.eq("id", entryId)
 			.eq("user_id", userProfile.id)
 			.neq("timer_state", "finalized");
