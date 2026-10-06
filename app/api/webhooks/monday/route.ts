@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { syncItemColumns } from "@/lib/columnSync";
 import { clearBudgetBoardItemsCache, getItemDetails } from "@/lib/monday";
+import { cacheHelper } from "@/lib/redis";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
@@ -37,6 +38,25 @@ async function resyncItemBudget(itemId: string | undefined, includeSelf: boolean
 	} catch (error) {
 		console.error(`[webhook] Failed to re-sync budget for item ${targetItemId}:`, error);
 	}
+}
+
+/**
+ * Re-points the time entries of moved items to their new board, so column sync and the
+ * board_role_override rate join (both keyed on time_entry.board_id) follow the item.
+ * Only rows whose board actually changes are touched, and those get updated_by = NULL so
+ * the audit trigger logs the change as a system action instead of crediting the row's
+ * last human editor. Returns the number of re-pointed entries.
+ */
+async function repointTimeEntriesToBoard(itemIds: string[], boardId: string): Promise<number> {
+	const { data, error } = await supabaseAdmin.from("time_entry").update({ board_id: boardId, updated_by: null, updated_at: new Date().toISOString() }).in("item_id", itemIds).or(`board_id.is.null,board_id.neq.${boardId}`).select("id");
+
+	if (error) {
+		console.error(`[webhook] Failed to re-point time entries of items ${itemIds.join(", ")} to board ${boardId}:`, error);
+		return 0;
+	}
+
+	if (data.length > 0) await cacheHelper.clearPattern("time_entry:*");
+	return data.length;
 }
 
 /**
@@ -196,6 +216,10 @@ export async function POST(request: NextRequest) {
 				const newGroupId = event.destGroupId?.toString();
 				const now = new Date().toISOString();
 
+				// Old board/parent, read before the update: needed for cache invalidation and
+				// for re-syncing a former parent when a subitem was converted to an item.
+				const { data: previousRow } = await supabaseAdmin.from("monday_item").select("board_id, parent_item_id").eq("id", movedItemId).maybeSingle();
+
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
@@ -207,14 +231,38 @@ export async function POST(request: NextRequest) {
 					.eq("id", movedItemId);
 
 				// Subitems follow their parent to the new board and group.
-				await supabaseAdmin
+				const { data: movedSubitems } = await supabaseAdmin
 					.from("monday_item")
 					.update({
 						board_id: newBoardId,
 						group_id: newGroupId,
 						updated_at: now,
 					})
-					.eq("parent_item_id", movedItemId);
+					.eq("parent_item_id", movedItemId)
+					.select("id");
+
+				// Subitem entries carry their parent's board, so they move along too.
+				const repointedCount = await repointTimeEntriesToBoard([movedItemId, ...(movedSubitems ?? []).map((s) => s.id)], newBoardId);
+
+				if (repointedCount > 0) {
+					try {
+						await syncItemColumns(movedItemId, newBoardId, "webhook:monday-move");
+					} catch (error) {
+						console.error(`[webhook] Failed to sync moved item ${movedItemId} on board ${newBoardId}:`, error);
+					}
+				}
+
+				// Subitem -> item conversion: the former parent lost this item's time.
+				if (previousRow?.parent_item_id && previousRow.board_id) {
+					try {
+						await syncItemColumns(previousRow.parent_item_id, previousRow.board_id, "webhook:monday-move");
+					} catch (error) {
+						console.error(`[webhook] Failed to re-sync former parent ${previousRow.parent_item_id}:`, error);
+					}
+				}
+
+				await invalidateBudgetItemsCache(previousRow?.board_id);
+				if (previousRow?.board_id !== newBoardId) await invalidateBudgetItemsCache(newBoardId);
 				break;
 			}
 
