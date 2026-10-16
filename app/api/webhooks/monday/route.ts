@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { syncItemColumns } from "@/lib/columnSync";
 import { clearBudgetBoardItemsCache, getItemDetails } from "@/lib/monday";
 import { cacheHelper } from "@/lib/redis";
+import { sentinel } from "@/lib/sentinel";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
@@ -14,30 +14,6 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 async function invalidateBudgetItemsCache(boardId: string | null | undefined): Promise<void> {
 	if (!boardId) return;
 	await clearBudgetBoardItemsCache(boardId);
-}
-
-/**
- * After an item is trashed or restored, the parent item's budget/time columns in
- * Monday are stale until something re-pushes them. Trigger that re-sync.
- * - Subitem: syncItemColumns redirects to and re-pushes the parent's columns.
- * - Top-level item: only on restore (includeSelf) — a trashed top-level item is
- *   gone from Monday, so there's no column to update.
- * A subitem's stored board_id is its parent's board, which is what the sync needs.
- */
-async function resyncItemBudget(itemId: string | undefined, includeSelf: boolean): Promise<void> {
-	if (!itemId) return;
-
-	const { data: row } = await supabaseAdmin.from("monday_item").select("parent_item_id, board_id").eq("id", itemId).maybeSingle();
-	if (!row?.board_id) return;
-
-	const targetItemId = row.parent_item_id || (includeSelf ? itemId : null);
-	if (!targetItemId) return;
-
-	try {
-		await syncItemColumns(targetItemId, row.board_id, "webhook:monday-lifecycle");
-	} catch (error) {
-		console.error(`[webhook] Failed to re-sync budget for item ${targetItemId}:`, error);
-	}
 }
 
 /**
@@ -244,22 +220,15 @@ export async function POST(request: NextRequest) {
 				// Subitem entries carry their parent's board, so they move along too.
 				const repointedCount = await repointTimeEntriesToBoard([movedItemId, ...(movedSubitems ?? []).map((s) => s.id)], newBoardId);
 
-				if (repointedCount > 0) {
-					try {
-						await syncItemColumns(movedItemId, newBoardId, "webhook:monday-move");
-					} catch (error) {
-						console.error(`[webhook] Failed to sync moved item ${movedItemId} on board ${newBoardId}:`, error);
-					}
-				}
-
-				// Subitem -> item conversion: the former parent lost this item's time.
-				if (previousRow?.parent_item_id && previousRow.board_id) {
-					try {
-						await syncItemColumns(previousRow.parent_item_id, previousRow.board_id, "webhook:monday-move");
-					} catch (error) {
-						console.error(`[webhook] Failed to re-sync former parent ${previousRow.parent_item_id}:`, error);
-					}
-				}
+				// Column syncs are handed to Sentinel: the moved item if its entries followed it, and —
+				// for a subitem -> item conversion — the former parent, which lost this item's time.
+				await sentinel.observe({
+					type: "item.moved_board",
+					itemId: movedItemId,
+					toBoardId: newBoardId,
+					entriesRepointed: repointedCount,
+					formerParent: previousRow?.parent_item_id && previousRow.board_id ? { parentId: previousRow.parent_item_id, boardId: previousRow.board_id } : null,
+				});
 
 				await invalidateBudgetItemsCache(previousRow?.board_id);
 				if (previousRow?.board_id !== newBoardId) await invalidateBudgetItemsCache(newBoardId);
@@ -276,7 +245,7 @@ export async function POST(request: NextRequest) {
 				// Board id for the cache invalidation below — the event payload doesn't
 				// reliably carry one for this event type, so read it before the row is
 				// (still non-destructively) updated.
-				const { data: deletedItemRow } = await supabaseAdmin.from("monday_item").select("board_id").eq("id", deletedItemId).maybeSingle();
+				const { data: deletedItemRow } = await supabaseAdmin.from("monday_item").select("board_id, parent_item_id").eq("id", deletedItemId).maybeSingle();
 
 				await supabaseAdmin
 					.from("monday_item")
@@ -299,8 +268,9 @@ export async function POST(request: NextRequest) {
 					.eq("parent_item_id", deletedItemId)
 					.is("deleted_at", null);
 
-				// Re-push the parent's budget column now that this item's time is excluded.
-				await resyncItemBudget(deletedItemId, false);
+				// The parent's budget columns must be re-pushed now that this item's time is excluded.
+				// A trashed top-level item is gone from monday, so Sentinel has nothing to do for it.
+				await sentinel.observe({ type: "item.trashed", itemId: deletedItemId, parentId: deletedItemRow?.parent_item_id ?? null, boardId: deletedItemRow?.board_id ?? null });
 				await invalidateBudgetItemsCache(event.boardId?.toString() || deletedItemRow?.board_id);
 				break;
 			}
@@ -342,8 +312,10 @@ export async function POST(request: NextRequest) {
 					.eq("id", restoredItemId);
 
 				// Re-push budget now that this item's time counts again (parent for a
-				// subitem; the item itself for a restored top-level item).
-				await resyncItemBudget(restoredItemId, true);
+				// subitem; the item itself for a restored top-level item). parent_item_id and
+				// board_id are untouched by the update above.
+				const { data: restoredItemRow } = await supabaseAdmin.from("monday_item").select("parent_item_id, board_id").eq("id", restoredItemId).maybeSingle();
+				await sentinel.observe({ type: "item.restored", itemId: restoredItemId, parentId: restoredItemRow?.parent_item_id ?? null, boardId: restoredItemRow?.board_id ?? null });
 				break;
 			}
 
@@ -373,24 +345,13 @@ export async function POST(request: NextRequest) {
 
 				if (movedSubitemId && newBoardId) await repointTimeEntriesToBoard([movedSubitemId], newBoardId);
 
-				// Totals only move when the parent actually changed.
-				if (previousRow?.parent_item_id !== newParentItemId) {
-					if (previousRow?.parent_item_id && previousRow.board_id) {
-						try {
-							await syncItemColumns(previousRow.parent_item_id, previousRow.board_id, "webhook:monday-move");
-						} catch (error) {
-							console.error(`[webhook] Failed to re-sync former parent ${previousRow.parent_item_id}:`, error);
-						}
-					}
-
-					if (newParentItemId && newBoardId) {
-						try {
-							await syncItemColumns(newParentItemId, newBoardId, "webhook:monday-move");
-						} catch (error) {
-							console.error(`[webhook] Failed to sync new parent ${newParentItemId}:`, error);
-						}
-					}
-				}
+				// Both parents' totals changed (Sentinel skips this when the parent is unchanged).
+				await sentinel.observe({
+					type: "subitem.reparented",
+					subitemId: movedSubitemId,
+					from: previousRow?.parent_item_id && previousRow.board_id ? { parentId: previousRow.parent_item_id, boardId: previousRow.board_id } : null,
+					to: newParentItemId && newBoardId ? { parentId: newParentItemId, boardId: newBoardId } : null,
+				});
 
 				await invalidateBudgetItemsCache(previousRow?.board_id);
 				if (previousRow?.board_id !== newBoardId) await invalidateBudgetItemsCache(newBoardId);

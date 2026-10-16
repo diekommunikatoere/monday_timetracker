@@ -27,6 +27,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `permissions/routes.ts` | Route-level access gating (`canAccessRoute`) — admin-only for `/admin`; admin or `analytics.auswertung` for `/dashboards/analytics/auswertung` |
 | `time/calculations.ts` | Local-timezone time math helpers (all values in **seconds**) |
 | `time/formatting.ts` | Display formatters — see `formatTime` trap below |
+| `settings.ts` | Generic `app_settings` key/value store (`getSetting` with 10 s cache + last-good fallback, `setSetting`) |
+| `sentinel/` | Deferred, deduplicated column syncs for monday webhook events — Sentinel (rules) → Pipe (Redis) → Valve (timer/lock) → Outlet (drain). Barrel exports `sentinel`, `valve`, `getSentinelStatus`; see the Sentinel section in the root CLAUDE.md |
 | `store-utils.ts` | `useHydration` / `useSSRSafeValue` — SSR hydration gate for persisted Zustand stores |
 | `utils.ts` | Barrel: re-exports `./time` and `./permissions` |
 | `monday-browser-sdk.ts` | Lazily-constructed, memoized browser-only monday embed SDK singleton (`getMondaySdk`) — defers `mondaySdk()` construction past module load so Next.js SSR never builds the deprecated server SDK |

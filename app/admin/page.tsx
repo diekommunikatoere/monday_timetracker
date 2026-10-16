@@ -10,6 +10,7 @@ import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 
 import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
+import { SentinelTab } from "@/components/admin/SentinelTab";
 import { Logo } from "@/components/Logo";
 import { canAccessRoute } from "@/lib/permissions";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -27,6 +28,7 @@ const ADMIN_TABS = [
 	{ value: "boards", label: "Boards" },
 	{ value: "rollen", label: "Rollen" },
 	{ value: "berechtigungen", label: "Berechtigungen" },
+	{ value: "sentinel", label: "Sentinel" },
 ] as const;
 type AdminTab = (typeof ADMIN_TABS)[number]["value"];
 
@@ -147,7 +149,7 @@ function SortableBoardRow({ board, onRemove }: { board: DisplayBoardRow; onRemov
 }
 
 /**
- * `/admin` — admin settings, split into the tabs Boards · Rollen · Berechtigungen. The active
+ * `/admin` — admin settings, split into the tabs Boards · Rollen · Berechtigungen · Sentinel. The active
  * tab lives in the URL (`?tab=`), so it survives reloads and is linkable. `useSearchParams`
  * requires a Suspense boundary, hence the thin wrapper around {@link AdminPageContent}.
  */
@@ -1506,6 +1508,10 @@ function AdminPageContent() {
 
 				<Tabs.Panel value="berechtigungen">
 					<PermissionsTab />
+				</Tabs.Panel>
+
+				<Tabs.Panel value="sentinel">
+					<SentinelTab />
 				</Tabs.Panel>
 			</Tabs>
 

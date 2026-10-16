@@ -82,14 +82,36 @@ All monday API access goes through [lib/monday.ts](lib/monday.ts) (and `lib/mond
 
 **Column sync** ([lib/columnSync.ts](lib/columnSync.ts)) is the write-back path: after a time entry is finalized/updated/deleted it computes total time / per-role breakdown / remaining budget and writes them to configured monday board columns (config in the `board_config` / `column_sync_config` tables). Syncs can be queued (`queueItemSync` → `flushSyncQueue`) rather than run inline. For subitems, sync redirects to the parent item's columns.
 
-**Webhooks** (`app/api/webhooks/monday/route.ts`): handles monday's `challenge` handshake, then a `switch` on event type (`create_pulse`, `update_name`, `move_pulse_into_group`, `move_pulse_into_board`, `delete_pulse`, `archive_pulse`, `restore_pulse`, `move_subitem`) to keep the local `monday_item` / `monday_group` mirror in sync and re-push stale parent budgets. **Known gap (see memory): group ops and moves to untracked boards fire no webhooks — the reconciliation cron is the backstop.**
+**Webhooks** (`app/api/webhooks/monday/route.ts`): handles monday's `challenge` handshake, then a `switch` on event type (`create_pulse`, `update_name`, `move_pulse_into_group`, `move_pulse_into_board`, `delete_pulse`, `archive_pulse`, `restore_pulse`, `move_subitem`) to keep the local `monday_item` / `monday_group` mirror in sync. Data maintenance, time-entry re-pointing and cache invalidation stay inline; the column syncs they imply (moves, trash, restore) are handed to Sentinel (`sentinel.observe(...)`) instead of running inline. **Known gap (see memory): group ops and moves to untracked boards fire no webhooks — the reconciliation cron is the backstop.**
 
 **Cron routes** (auth: optional `Bearer ${CRON_SECRET}`, no user session):
 
 - `/api/cron/sync-boards` — reconciles `monday_board` rows with the monday API and registers/reconciles webhooks (`?reconcile=true` prunes stale ones).
 - `/api/cron/cleanup-soft-deletes` — purges orphaned soft-deletes, drains the Redis `hard_delete:*` queue into column syncs, and purges trashed monday items.
+- `/api/cron/sentinel` — runs one Sentinel Valve cycle (respects a closed Valve). **Not scheduled by default** — a recurring ping would keep the Railway app from sleeping; use it for manual recovery.
 
 There is no `vercel.json`; cron scheduling is configured on the deployment platform, not in-repo.
+
+## Sentinel (deferred, deduplicated column syncs)
+
+`lib/sentinel/` batches the column syncs triggered by **monday webhooks** (item moved / trashed / restored, subitem re-parented). Time-entry syncs (`syncAfterFinalize/Update/Delete`, undo, `queueItemSync`) are untouched and stay live.
+
+| Part | Job |
+|---|---|
+| **Sentinel** (`sentinel.ts`, `rules.ts`) | Decides. `observe(observation)` matches a code registry of rules (trigger → condition → action) and enqueues the resulting sync targets. Never syncs itself, except as the inline fallback. |
+| **Pipe** (`pipe.ts`) | A batch of pending targets in Redis (hash: item id → `PipeEntry`). One **open** Pipe receives work; **sealed** Pipes wait to be drained. |
+| **Valve** (`valve.ts`) | Seals the open Pipe (atomic `RENAME`) on a timer and hands sealed Pipes to the Outlet. Admin-closable (work keeps collecting). |
+| **Outlet** (`outlet.ts`) | Drains a sealed Pipe: resolves each target against the *current* `monday_item` row, calls `syncItemColumns`, requeues failures (max 5 attempts). |
+
+Principles: **queue what's stale, never what changed** (an entry means "recompute this item's columns from the DB", so duplicates collapse); **resolve late** (board/existence are read at drain time); **never worse than today** (Redis down, timeout or kill switch ⇒ inline `syncItemColumns`).
+
+- **Redis**: own ioredis client (`lib/sentinel/redis.ts`, 2 s per-call timeout; `lib/redis.ts` untouched). Keys `sentinel:<RAILWAY_ENVIRONMENT_NAME|local>:` + `pipe:open`, `pipe:sealed:<uuid>`, `valve:lock` (cross-process cycle lock, renewed per batch), `status` (best-effort JSON for the admin tab).
+- **Runtime state** lives on `globalThis.__sentinel` (`state.ts`): `instrumentation.ts` is a separate bundle from route handlers, so module-level state is not shared.
+- **Armed by work, not a loop**: `enqueue` arms a one-shot timer; after a cycle the Valve re-arms only while work remains, so an idle app can sleep (Railway sleeps a service 5–10 min after its last outbound traffic; hence the 120 s interval cap). `register()` in `instrumentation.ts` schedules a boot-recovery cycle 10 s after every start/wake.
+- **Settings**: `app_settings` row `sentinel` (`intervalSeconds` 15–120, default 60; `valveOpen`), read through `lib/settings.ts` (10 s in-process cache, keeps the last good value on DB errors). Admin tab **Sentinel** → `/api/admin/sentinel` (GET status, PATCH settings, POST run-now).
+- **Kill switch** `SENTINEL_DISABLED=1` gates only intake (inline syncs, no enqueue). Boot recovery and drain re-arms still run so queued work is never stranded; a closed Valve still holds work until opened.
+- Sync log: Sentinel-driven syncs record `trigger_source = 'sentinel:<observation type>'` in `item_sync_log`.
+- Rollback: confirm open queue and sealed count are 0 in the admin tab (use "Jetzt ausführen") before reverting the code, otherwise queued syncs are lost.
 
 ## Client state (Zustand, not hooks)
 
@@ -106,7 +128,7 @@ Persisted stores use `skipHydration: true` + the `useHydration()` helper in [lib
 
 ## App surfaces
 
-App-Router entry pages render into different monday widget contexts: `app/dashboards/` (main widget — a table/calendar view switcher over time entries, `userStore.dashboardViewMode`), `app/dashboards/analytics/abrechnung/` and `.../auswertung/` (budget reconciliation and per-user weekly-utilization dashboards; Auswertung is gated by `lib/permissions/routes.ts` — admin or the `analytics.auswertung` permission), `app/dashboards/timerView/` (now just redirects client-side to `/dashboards`, kept for monday widget-context compatibility), `app/sidebar/itemView/` (per-item sidebar), and `app/admin/` (vertical tabs via `?tab=`: **Boards** — board/column-sync/budget/job/third-party config · **Rollen** · **Berechtigungen** — permission grants). `app/page.tsx` is intentionally empty. Components are organized as `components/ui/` (the in-house design system, barrel-exported from `components/index.ts`), `components/features/`, `components/dashboard/` (including `calendar/` and `analytics/`), `components/shared/`, `components/sidebar/`. Path aliases: `@/*` → repo root, `@api/*` → `app/api/*`.
+App-Router entry pages render into different monday widget contexts: `app/dashboards/` (main widget — a table/calendar view switcher over time entries, `userStore.dashboardViewMode`), `app/dashboards/analytics/abrechnung/` and `.../auswertung/` (budget reconciliation and per-user weekly-utilization dashboards; Auswertung is gated by `lib/permissions/routes.ts` — admin or the `analytics.auswertung` permission), `app/dashboards/timerView/` (now just redirects client-side to `/dashboards`, kept for monday widget-context compatibility), `app/sidebar/itemView/` (per-item sidebar), and `app/admin/` (vertical tabs via `?tab=`: **Boards** — board/column-sync/budget/job/third-party config · **Rollen** · **Berechtigungen** — permission grants · **Sentinel** — Valve switch/interval/queue status). `app/page.tsx` is intentionally empty. Components are organized as `components/ui/` (the in-house design system, barrel-exported from `components/index.ts`), `components/features/`, `components/dashboard/` (including `calendar/` and `analytics/`), `components/shared/`, `components/sidebar/`. Path aliases: `@/*` → repo root, `@api/*` → `app/api/*`.
 
 ## Styling
 
@@ -124,6 +146,7 @@ NEXT_SUPABASE_SECRET_KEY                          # service role (server)
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY      # anon (client)
 REDIS_URL                                         # ioredis connection string
 CRON_SECRET                                        # optional, gates /api/cron/*
+SENTINEL_DISABLED                                  # "1" = Sentinel kill switch (intake syncs inline)
 APP_ID, PORT (8301), NODE_ENV
 ```
 
