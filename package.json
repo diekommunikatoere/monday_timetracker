@@ -1,6 +1,6 @@
 {
 	"name": "timetracker",
-	"version": "0.15.1",
+	"version": "0.15.2",
 	"private": true,
 	"scripts": {
 		"dev": "next dev",
@@ -48,7 +48,7 @@
 		"cross-port-killer": "^1.4.0",
 		"oxfmt": "^0.61.0",
 		"oxlint": "^1.76.0",
-		"supabase": "^2.104.0",
+		"supabase": "^2.121.0",
 		"typescript": "^7.0.2"
 	},
 	"overrides": {
