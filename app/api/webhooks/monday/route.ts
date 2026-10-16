@@ -352,15 +352,48 @@ export async function POST(request: NextRequest) {
 				const newParentItemId = event.destPulseId?.toString() || null;
 				const newParentDetails = await getItemDetails(newParentItemId);
 				const newGroupId = newParentDetails?.groupId || null;
+				const movedSubitemId = event.subitem?.toString();
+
+				// Old parent/board, read before the update: the former parent has to be
+				// re-synced because it just lost this subitem's time.
+				const { data: previousRow } = await supabaseAdmin.from("monday_item").select("board_id, parent_item_id").eq("id", movedSubitemId).maybeSingle();
+
+				// A subitem's stored board is its parent's board, so it can change with the parent.
+				const newBoardId = newParentDetails?.boardId || previousRow?.board_id || null;
 
 				await supabaseAdmin
 					.from("monday_item")
 					.update({
 						parent_item_id: newParentItemId,
 						group_id: newGroupId,
+						...(newBoardId && { board_id: newBoardId }),
 						updated_at: new Date().toISOString(),
 					})
-					.eq("id", event.subitem?.toString());
+					.eq("id", movedSubitemId);
+
+				if (movedSubitemId && newBoardId) await repointTimeEntriesToBoard([movedSubitemId], newBoardId);
+
+				// Totals only move when the parent actually changed.
+				if (previousRow?.parent_item_id !== newParentItemId) {
+					if (previousRow?.parent_item_id && previousRow.board_id) {
+						try {
+							await syncItemColumns(previousRow.parent_item_id, previousRow.board_id, "webhook:monday-move");
+						} catch (error) {
+							console.error(`[webhook] Failed to re-sync former parent ${previousRow.parent_item_id}:`, error);
+						}
+					}
+
+					if (newParentItemId && newBoardId) {
+						try {
+							await syncItemColumns(newParentItemId, newBoardId, "webhook:monday-move");
+						} catch (error) {
+							console.error(`[webhook] Failed to sync new parent ${newParentItemId}:`, error);
+						}
+					}
+				}
+
+				await invalidateBudgetItemsCache(previousRow?.board_id);
+				if (previousRow?.board_id !== newBoardId) await invalidateBudgetItemsCache(newBoardId);
 				break;
 			}
 

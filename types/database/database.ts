@@ -178,6 +178,53 @@ export type Database = {
           },
         ]
       }
+      item_sync_log: {
+        Row: {
+          actor_id: string | null
+          board_id: string
+          columns: Json
+          created_at: string
+          error_message: string | null
+          id: string
+          item_id: string
+          success: boolean
+          time_entry_id: string | null
+          trigger_source: string
+        }
+        Insert: {
+          actor_id?: string | null
+          board_id: string
+          columns?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          item_id: string
+          success: boolean
+          time_entry_id?: string | null
+          trigger_source: string
+        }
+        Update: {
+          actor_id?: string | null
+          board_id?: string
+          columns?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          item_id?: string
+          success?: boolean
+          time_entry_id?: string | null
+          trigger_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_sync_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monday_board: {
         Row: {
           board_kind: string | null

@@ -11,10 +11,16 @@
  * - Heavy time math is handled by Postgres RPC functions (`get_item_total_time`,
  *   `get_item_time_by_role`, `calculate_remaining_budget`); results are formatted here.
  * - Sub-items are automatically redirected to their parent item's columns.
- * - Writes use a {@link withRetry} loop with exponential back-off (3 retries, 1 s base).
+ * - All configured columns of an item are computed once ({@link computeColumnValues}) and
+ *   written with a single `change_multiple_column_values` mutation
+ *   ({@link updateItemColumnValues}); if that batch fails with a non-transient error, each
+ *   column is retried on its own so one bad column doesn't block the others.
+ * - Writes use a {@link withRetry} loop with exponential back-off (3 retries, 1 s base),
+ *   but only for transient monday failures ({@link isTransientMondayError}).
  * - A Redis-backed debounced queue ({@link queueItemSync} / {@link flushSyncQueue})
  *   absorbs burst writes and deduplicates rapid updates to the same item.
- * - Every write attempt is recorded in the `sync_log` table via {@link logSyncOperation}.
+ * - Every item sync is recorded as one `item_sync_log` row (all columns inside) via
+ *   {@link writeItemSyncLog}. The older per-column `sync_log` table is read-only history.
  *
  * Main entry points:
  * - {@link syncAfterFinalize} — called from the finalize time-entry API route.
@@ -28,18 +34,17 @@ import { ClientError } from "@mondaydotcomorg/api";
 import { parseNumericColumnText } from "@/lib/monday/utils";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-import type { SyncPurpose, TimeFormat, SyncColumnType, GetItemTimeByRoleResult, CalculateRemainingBudgetResult } from "@/types/database";
+import type { SyncPurpose, TimeFormat, SyncColumnType, GetItemTimeByRoleResult, CalculateRemainingBudgetResult, ItemSyncLogInsert, ItemSyncLogColumn, Json } from "@/types/database";
 
 // Types
 
 /**
  * Outcome of a single column write-back attempt.
  *
- * Returned by the internal `syncColumn` function and collected into
- * {@link ItemSyncResult.results}. Also written to `sync_log` by
- * `logSyncOperation`.
+ * One entry per {@link ColumnMapping} is collected into {@link ItemSyncResult.results}
+ * and mirrored into the `columns` array of the item's `item_sync_log` row.
  *
- * @property success      - `true` if the monday API accepted the write.
+ * @property success      - `true` if the value was computed and the monday API accepted the write.
  * @property columnId     - The monday column ID that was written to.
  * @property syncPurpose  - What kind of data was written (see {@link SyncPurpose}).
  * @property value        - The string value that was sent to monday (empty on error).
@@ -104,7 +109,7 @@ export interface RoleTimeBreakdown {
  *
  * Budget source and linked-board roll-up now live on monday's own mirror
  * columns, so `sync_enabled` is the only sync gate left — `budget_used` is the
- * one remaining computed write-back (see `syncColumn`'s `budget_used` case).
+ * one remaining computed write-back (see {@link computeColumnValues}'s `budget_used` case).
  *
  * @property boardId     - monday board ID (string representation of the numeric ID).
  * @property boardName   - Display name from `monday_board.name`; falls back to `"Unbenanntes Board"`.
@@ -166,26 +171,53 @@ function sleep(ms: number): Promise<void> {
 /**
  * Retry `fn` up to `retries` times with exponential back-off on failure.
  *
- * Each retry doubles `delay`. After the final attempt the error is re-thrown.
- * Used by {@link updateColumnValue} to handle transient monday API failures.
+ * Each retry doubles `delay`. After the final attempt — or immediately, when
+ * `shouldRetry` returns `false` for the thrown error — the error is re-thrown.
+ * Used by {@link updateColumnValue} and {@link updateItemColumnValues} to handle
+ * transient monday API failures.
  *
  * @typeParam T     - Return type of `fn`.
- * @param fn        - Async function to retry.
- * @param retries   - Remaining retry attempts (default {@link MAX_RETRIES} = 3).
- * @param delay     - Delay before the next retry in milliseconds (default {@link INITIAL_DELAY_MS} = 1000).
+ * @param fn          - Async function to retry.
+ * @param shouldRetry - Predicate deciding whether an error is worth retrying (default: retry everything).
+ * @param retries     - Remaining retry attempts (default {@link MAX_RETRIES} = 3).
+ * @param delay       - Delay before the next retry in milliseconds (default {@link INITIAL_DELAY_MS} = 1000).
  * @returns The resolved value of `fn` on the first successful call.
  */
-async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES, delay = INITIAL_DELAY_MS): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, shouldRetry: (error: unknown) => boolean = () => true, retries = MAX_RETRIES, delay = INITIAL_DELAY_MS): Promise<T> {
 	try {
 		return await fn();
 	} catch (error) {
-		if (retries > 0) {
+		if (retries > 0 && shouldRetry(error)) {
 			console.log(`Retrying in ${delay}ms... (${retries} retries left)`);
 			await sleep(delay);
-			return withRetry(fn, retries - 1, delay * 2);
+			return withRetry(fn, shouldRetry, retries - 1, delay * 2);
 		}
 		throw error;
 	}
+}
+
+/** monday GraphQL error codes (`errors[].extensions.code`) that clear up on their own. monday often returns these with HTTP 200. */
+const TRANSIENT_MONDAY_ERROR_CODES = new Set(["ComplexityException", "RATE_LIMIT_EXCEEDED", "maxConcurrencyExceeded"]);
+
+/**
+ * Decide whether a failed monday request is worth retrying.
+ *
+ * Transient (`true`): anything that is not a `ClientError` (network failure, timeout), HTTP
+ * 429 / ≥ 500, and the {@link TRANSIENT_MONDAY_ERROR_CODES} error codes.
+ *
+ * Everything else — validation errors, a deleted column or item, permissions,
+ * `DAILY_LIMIT_EXCEEDED`, unknown `ClientError` shapes — is permanent and fails fast.
+ *
+ * @param error - The value thrown by the monday client.
+ * @returns `true` if a retry may succeed.
+ */
+export function isTransientMondayError(error: unknown): boolean {
+	if (!(error instanceof ClientError)) return true;
+
+	const { status, errors } = error.response;
+	if (status === 429 || status >= 500) return true;
+
+	return !!errors?.some((e) => TRANSIENT_MONDAY_ERROR_CODES.has(String(e.extensions?.code)));
 }
 
 // =====================================
@@ -520,49 +552,58 @@ export async function calculateRemainingBudget(boardId: string, itemId: string, 
 	return data[0];
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * Record a column write attempt in the `sync_log` table.
+ * Split the free-form `triggeredBy` string callers pass into the two `item_sync_log` fields.
  *
- * Called at the end of `syncColumn` regardless of success or failure, providing
- * an audit trail for debugging and monitoring sync health. Failures here are
- * swallowed (logged to console only) so they never abort the sync path.
+ * - A UUID is a `user_profiles.id` → `{ trigger_source: "user", actor_id }`.
+ * - Any other non-empty string is a source label (e.g. `"webhook:monday-move"`) → `actor_id: null`.
+ * - Empty/undefined → `"unknown"`.
  *
- * @param boardId      - The monday board ID.
- * @param itemId       - The monday item ID that was synced.
- * @param columnId     - The monday column ID that was written.
- * @param syncPurpose  - What kind of data was synced ({@link SyncPurpose}).
- * @param valueSynced  - The string value that was sent (empty string on error).
- * @param success      - Whether the monday API accepted the write.
- * @param errorMessage - Error detail on failure.
- * @param triggeredBy  - Identifier of the actor that triggered the sync (e.g. user ID or cron name).
- * @param timeEntryId  - The `time_entry.id` that caused this sync, if applicable.
+ * @param triggeredBy - Actor user ID or source label from the sync entry point.
  */
-async function logSyncOperation(boardId: string, itemId: string, columnId: string, syncPurpose: SyncPurpose, valueSynced: string, success: boolean, errorMessage?: string, triggeredBy?: string, timeEntryId?: string): Promise<void> {
+function resolveTrigger(triggeredBy?: string): { trigger_source: string; actor_id: string | null } {
+	if (!triggeredBy) return { trigger_source: "unknown", actor_id: null };
+	if (UUID_RE.test(triggeredBy)) return { trigger_source: "user", actor_id: triggeredBy };
+	return { trigger_source: triggeredBy, actor_id: null };
+}
+
+/**
+ * Record one item sync (all columns) as a single `item_sync_log` row.
+ *
+ * Never throws: a failed insert is only logged to the console so it can't abort the sync path.
+ * If the insert violates the `actor_id` foreign key (stale/unknown user), it is retried once
+ * without an actor.
+ *
+ * @param entry - The row to insert (see {@link ItemSyncLogInsert}).
+ */
+async function writeItemSyncLog(entry: ItemSyncLogInsert): Promise<void> {
 	try {
-		await supabaseAdmin.from("sync_log").insert({
-			board_id: boardId,
-			item_id: itemId,
-			column_id: columnId,
-			sync_purpose: syncPurpose,
-			value_synced: valueSynced,
-			success,
-			error_message: errorMessage || null,
-			triggered_by: triggeredBy || null,
-			time_entry_id: timeEntryId || null,
-		});
+		let { error } = await supabaseAdmin.from("item_sync_log").insert(entry);
+
+		if (error?.code === "23503" && entry.actor_id) {
+			({ error } = await supabaseAdmin.from("item_sync_log").insert({ ...entry, actor_id: null }));
+		}
+
+		if (error) {
+			console.error("Error logging item sync:", error);
+		}
 	} catch (error) {
-		console.error("Error logging sync operation:", error);
+		console.error("Error logging item sync:", error);
 	}
 }
 
 /**
- * Stamp `last_synced_at = now()` on a `column_sync_config` row after a successful write.
+ * Stamp `last_synced_at = now()` on the `column_sync_config` rows that were written successfully.
  *
- * @param configId - The `column_sync_config.id` UUID to update.
+ * @param configIds - The `column_sync_config.id` UUIDs to update; no-op when empty.
  */
-async function updateLastSyncedAt(configId: string): Promise<void> {
+async function updateLastSyncedAt(configIds: string[]): Promise<void> {
+	if (configIds.length === 0) return;
+
 	try {
-		await supabaseAdmin.from("column_sync_config").update({ last_synced_at: new Date().toISOString() }).eq("id", configId);
+		await supabaseAdmin.from("column_sync_config").update({ last_synced_at: new Date().toISOString() }).in("id", configIds);
 	} catch (error) {
 		console.error("Error updating last_synced_at:", error);
 	}
@@ -572,15 +613,40 @@ async function updateLastSyncedAt(configId: string): Promise<void> {
 // Monday.com API Functions
 // =====================================
 
+/** monday's character limit for a `long_text` column value. */
+const LONG_TEXT_MAX_LENGTH = 2000;
+
+/**
+ * Build the value placed under a column id in a monday write, per column type.
+ *
+ * `long_text` takes `{ text }`; `numbers`, `text` and `time_tracking` (written as text for
+ * now) take the plain string. Shared by {@link updateColumnValue} and
+ * {@link updateItemColumnValues} so both write paths always agree.
+ *
+ * @param columnType - Column type ({@link SyncColumnType}).
+ * @param value      - Pre-formatted string value.
+ */
+export function formatColumnValue(columnType: SyncColumnType, value: string): string | { text: string } {
+	return columnType === "long_text" ? { text: value } : value;
+}
+
+/**
+ * Unwrap a thrown monday client error into a readable message.
+ *
+ * @param error - The value thrown by the monday client.
+ */
+function getMondayErrorMessage(error: unknown): string {
+	return error instanceof ClientError ? error.response?.errors?.[0]?.message || error.message : error instanceof Error ? error.message : "Unknown error";
+}
+
 /**
  * Write a value to a monday board column via the `change_column_value` mutation.
  *
- * The `value` string is JSON-encoded differently depending on `columnType`:
- * - `"numbers"`, `"text"`, `"long_text"`, `"time_tracking"` all receive a
- *   JSON-stringified string (i.e. `JSON.stringify(value)`).
+ * The value is built by {@link formatColumnValue} and JSON-encoded. The mutation is
+ * wrapped in {@link withRetry} (transient failures only, see {@link isTransientMondayError}).
+ * Errors from `ClientError` are unwrapped for a clean message.
  *
- * The mutation is wrapped in {@link withRetry} for resilience against transient
- * monday API errors. Errors from `ClientError` are unwrapped for a clean message.
+ * Used as the per-column fallback when the batch write in {@link updateItemColumnValues} fails.
  *
  * **Note:** `MONDAY_API_TOKEN` must be set; returns `{ success: false }` immediately
  * when the API client singleton is `null`.
@@ -589,7 +655,7 @@ async function updateLastSyncedAt(configId: string): Promise<void> {
  * @param itemId     - The monday item ID to update.
  * @param columnId   - The monday column ID to write to.
  * @param value      - Pre-formatted string value to write (see `formatTime` / `formatTimeByRole*`).
- * @param columnType - Column type, controls JSON encoding ({@link SyncColumnType}).
+ * @param columnType - Column type, controls the value shape ({@link SyncColumnType}).
  * @returns `{ success: true }` or `{ success: false, error: "<message>" }`.
  */
 export async function updateColumnValue(boardId: string, itemId: string, columnId: string, value: string, columnType: SyncColumnType): Promise<{ success: boolean; error?: string }> {
@@ -597,26 +663,7 @@ export async function updateColumnValue(boardId: string, itemId: string, columnI
 		return { success: false, error: "Monday API client not available" };
 	}
 
-	// Format value based on column type
-	let formattedValue: string;
-	switch (columnType) {
-		case "numbers":
-			// Numbers column expects a JSON-encoded string value
-			formattedValue = JSON.stringify(value);
-			break;
-		case "text":
-		case "long_text":
-			// Text columns expect a string
-			formattedValue = JSON.stringify(value);
-			break;
-		case "time_tracking":
-			// Time tracking column has a specific format
-			// For now, we'll use text columns instead
-			formattedValue = JSON.stringify(value);
-			break;
-		default:
-			formattedValue = JSON.stringify(value);
-	}
+	const formattedValue = JSON.stringify(formatColumnValue(columnType, value));
 
 	const mutation = `
 		mutation($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
@@ -645,14 +692,57 @@ export async function updateColumnValue(boardId: string, itemId: string, columnI
 			}
 
 			return response;
-		});
+		}, isTransientMondayError);
 
 		return { success: true };
 	} catch (error) {
-		const errorMessage = error instanceof ClientError ? error.response?.errors?.[0]?.message || error.message : error instanceof Error ? error.message : "Unknown error";
+		const errorMessage = getMondayErrorMessage(error);
 
 		console.error("Error updating monday.com column:", errorMessage);
 		return { success: false, error: errorMessage };
+	}
+}
+
+/**
+ * Write several columns of one item with a single `change_multiple_column_values` mutation.
+ *
+ * Treated as atomic: monday's partial-failure semantics are undocumented, so on failure the
+ * caller must assume no column was written. Wrapped in {@link withRetry} (transient failures only).
+ *
+ * @param boardId - The monday board ID.
+ * @param itemId  - The monday item ID to update.
+ * @param columns - Columns to write; each id must be unique.
+ * @returns `{ success: true }`, or `{ success: false, error, transient }` where `transient`
+ *   says the failure was of a kind that already exhausted its retries (monday outage / rate limit).
+ */
+export async function updateItemColumnValues(boardId: string, itemId: string, columns: Array<{ columnId: string; columnType: SyncColumnType; value: string }>): Promise<{ success: boolean; error?: string; transient?: boolean }> {
+	if (!client) {
+		return { success: false, error: "Monday API client not available" };
+	}
+
+	const columnValues = JSON.stringify(Object.fromEntries(columns.map((c) => [c.columnId, formatColumnValue(c.columnType, c.value)])));
+
+	const mutation = `
+		mutation($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+			change_multiple_column_values(
+				board_id: $boardId,
+				item_id: $itemId,
+				column_values: $columnValues
+			) {
+				id
+			}
+		}
+	`;
+
+	try {
+		await withRetry(() => client.request(mutation, { boardId, itemId, columnValues }), isTransientMondayError);
+
+		return { success: true };
+	} catch (error) {
+		const errorMessage = getMondayErrorMessage(error);
+
+		console.error("Error updating monday.com columns:", errorMessage);
+		return { success: false, error: errorMessage, transient: isTransientMondayError(error) };
 	}
 }
 
@@ -661,117 +751,108 @@ export async function updateColumnValue(boardId: string, itemId: string, columnI
 // =====================================
 
 /**
- * Compute and write the value for one column mapping on a monday item.
+ * A column mapping together with its computed value, or the reason it has none.
  *
- * Dispatches on {@link ColumnMapping.syncPurpose} to fetch the right data
- * (`total_time` → {@link getItemTotalTime}, `time_by_role` → {@link getItemTimeByRole},
- * `remaining_budget` / `budget_used` → {@link getBudgetFromColumn} + {@link calculateRemainingBudget}),
- * formats the result, calls {@link updateColumnValue}, updates `last_synced_at`
- * on success, and always calls {@link logSyncOperation}.
- *
- * `value` is set to `""` when the computation itself throws; the error is captured
- * and reported in the returned {@link SyncResult}.
- *
- * @param boardId       - The monday board ID.
- * @param itemId        - The monday item ID (already resolved to parent by {@link syncItemColumns}).
- * @param columnMapping - The enabled {@link ColumnMapping} to process.
- * @param boardConfig   - Loaded {@link BoardConfig} for the board.
- * @param triggeredBy   - Actor string forwarded to {@link logSyncOperation}.
- * @param timeEntryId   - `time_entry.id` forwarded to {@link logSyncOperation}.
- * @returns {@link SyncResult} describing the outcome.
+ * @property mapping - The {@link ColumnMapping} this value is for.
+ * @property value   - Formatted string to write; undefined when `error` is set.
+ * @property error   - Why no value could be produced (computation threw, or a monday limit was exceeded).
  */
-async function syncColumn(boardId: string, itemId: string, columnMapping: ColumnMapping, boardConfig: BoardConfig, triggeredBy?: string, timeEntryId?: string): Promise<SyncResult> {
-	const { columnId, syncPurpose, columnType, timeFormat, includeBreakdown } = columnMapping;
+interface ComputedColumn {
+	mapping: ColumnMapping;
+	value?: string;
+	error?: string;
+}
 
-	console.log(`[ColumnSync] Syncing column ${columnId} (${syncPurpose}) for item ${itemId} on board ${boardId}`);
+/** Wrap `fn` so it runs at most once (lazily) and every caller shares the same promise. */
+function memoize<T>(fn: () => Promise<T>): () => Promise<T> {
+	let promise: Promise<T> | undefined;
+	return () => (promise ??= fn());
+}
 
-	let value: string;
-	let success = false;
-	let error: string | undefined;
+/**
+ * Compute the value for every column mapping of one item.
+ *
+ * Dispatches on {@link ColumnMapping.syncPurpose}: `total_time` → {@link getItemTotalTime},
+ * `time_by_role` → {@link getItemTimeByRole}, `remaining_budget` / `budget_used` →
+ * {@link calculateRemainingBudget}. Each data source is fetched at most once per call
+ * (and only if a mapping needs it), however many columns share it.
+ *
+ * A computation that throws marks only its own column with `error`. A `long_text` value
+ * over monday's 2000-character limit is marked with `error` too, so it is excluded from the write.
+ *
+ * @param itemId   - The monday item ID (already resolved to parent by {@link syncItemColumns}).
+ * @param boardId  - The monday board ID.
+ * @param mappings - The enabled column mappings, in order.
+ * @returns One {@link ComputedColumn} per mapping, in the same order.
+ */
+async function computeColumnValues(itemId: string, boardId: string, mappings: ColumnMapping[]): Promise<ComputedColumn[]> {
+	const totalTime = memoize(() => getItemTotalTime(itemId, boardId));
+	const timeByRole = memoize(() => getItemTimeByRole(itemId, boardId));
+	// budgetAmount only affects remaining_budget; total_cost (budget_used) doesn't depend on it, and no
+	// budget source column is configured on board_config anymore (monday mirror columns handle budgets).
+	const budget = memoize(() => calculateRemainingBudget(boardId, itemId, 0));
 
-	try {
-		switch (syncPurpose) {
-			case "total_time": {
-				const totalSeconds = await getItemTotalTime(itemId, boardId);
-				value = formatTime(totalSeconds, timeFormat);
-				console.log(`[ColumnSync] Calculated total_time: ${value} (${totalSeconds}s)`);
-				break;
-			}
+	return Promise.all(
+		mappings.map(async (mapping): Promise<ComputedColumn> => {
+			const { columnId, syncPurpose, columnType, timeFormat, includeBreakdown } = mapping;
 
-			case "time_by_role": {
-				const breakdown = await getItemTimeByRole(itemId, boardId);
-				if (columnType === "long_text" || includeBreakdown) {
-					value = formatTimeByRoleJson(breakdown);
-				} else {
-					value = formatTimeByRoleText(breakdown);
+			try {
+				let value: string;
+
+				switch (syncPurpose) {
+					case "total_time": {
+						const totalSeconds = await totalTime();
+						value = formatTime(totalSeconds, timeFormat);
+						console.log(`[ColumnSync] Calculated total_time: ${value} (${totalSeconds}s)`);
+						break;
+					}
+
+					case "time_by_role": {
+						const breakdown = await timeByRole();
+						value = columnType === "long_text" || includeBreakdown ? formatTimeByRoleJson(breakdown) : formatTimeByRoleText(breakdown);
+						console.log(`[ColumnSync] Calculated time_by_role breakdown for ${breakdown.length} roles`);
+						break;
+					}
+
+					case "remaining_budget": {
+						const budgetResult = await budget();
+						if (budgetResult) {
+							value = budgetResult.remaining_budget.toFixed(2);
+							console.log(`[ColumnSync] Calculated remaining_budget: ${value} (Total Cost: ${budgetResult.total_cost})`);
+						} else {
+							value = "0.00";
+							console.log(`[ColumnSync] Failed to calculate remaining_budget, defaulting to 0.00`);
+						}
+						break;
+					}
+
+					case "budget_used": {
+						const budgetResult = await budget();
+						if (budgetResult) {
+							value = budgetResult.total_cost.toFixed(2);
+							console.log(`[ColumnSync] Calculated budget_used (Total Cost): ${value}`);
+						} else {
+							value = "0.00";
+							console.log(`[ColumnSync] Failed to calculate budget_used, defaulting to 0.00`);
+						}
+						break;
+					}
+
+					default:
+						throw new Error(`Unknown sync purpose: ${syncPurpose}`);
 				}
-				console.log(`[ColumnSync] Calculated time_by_role breakdown for ${breakdown.length} roles`);
-				break;
-			}
 
-			case "remaining_budget": {
-				// Legacy purpose; the budget source column is no longer configured on
-				// board_config (monday mirror columns handle budget amounts now).
-				const budgetResult = await calculateRemainingBudget(boardId, itemId, 0);
-				if (budgetResult) {
-					value = budgetResult.remaining_budget.toFixed(2);
-					console.log(`[ColumnSync] Calculated remaining_budget: ${value} (Total Cost: ${budgetResult.total_cost})`);
-				} else {
-					value = "0.00";
-					console.log(`[ColumnSync] Failed to calculate remaining_budget, defaulting to 0.00`);
+				if (columnType === "long_text" && value.length > LONG_TEXT_MAX_LENGTH) {
+					return { mapping, error: `value exceeds monday long_text limit (${LONG_TEXT_MAX_LENGTH} chars)` };
 				}
-				break;
+
+				return { mapping, value };
+			} catch (err) {
+				console.error(`[ColumnSync] Failed to compute column ${columnId} (${syncPurpose}):`, err);
+				return { mapping, error: err instanceof Error ? err.message : "Unknown error" };
 			}
-
-			case "budget_used": {
-				// budgetAmount only affects remaining_budget; total_cost (what we write here)
-				// doesn't depend on it, so 0 is safe now that no budget column is configured.
-				const budgetResult = await calculateRemainingBudget(boardId, itemId, 0);
-				if (budgetResult) {
-					value = budgetResult.total_cost.toFixed(2);
-					console.log(`[ColumnSync] Calculated budget_used (Total Cost): ${value}`);
-				} else {
-					value = "0.00";
-					console.log(`[ColumnSync] Failed to calculate budget_used, defaulting to 0.00`);
-				}
-				break;
-			}
-
-			default:
-				throw new Error(`Unknown sync purpose: ${syncPurpose}`);
-		}
-
-		// Update the column in monday.com
-		console.log(`[ColumnSync] Sending update to monday.com: Board ${boardId}, Item ${itemId}, Column ${columnId}, Value ${value}`);
-		const updateResult = await updateColumnValue(boardId, itemId, columnId, value, columnType);
-		success = updateResult.success;
-		error = updateResult.error;
-
-		if (success) {
-			console.log(`[ColumnSync] Successfully updated column ${columnId} for item ${itemId}`);
-		} else {
-			console.error(`[ColumnSync] Failed to update column ${columnId}: ${error}`);
-		}
-
-		// Update last_synced_at
-		if (success) {
-			await updateLastSyncedAt(columnMapping.id);
-		}
-	} catch (err) {
-		error = err instanceof Error ? err.message : "Unknown error";
-		value = "";
-	}
-
-	// Log the sync operation
-	await logSyncOperation(boardId, itemId, columnId, syncPurpose, value, success, error, triggeredBy, timeEntryId);
-
-	return {
-		success,
-		columnId,
-		syncPurpose,
-		value,
-		error,
-	};
+		}),
+	);
 }
 
 /**
@@ -788,12 +869,16 @@ async function syncColumn(boardId: string, itemId: string, columnMapping: Column
  * - `boardConfig.syncEnabled` is `false`.
  * - No enabled `column_sync_config` rows for `boardId`.
  *
+ * Computes all column values once, writes them with one `change_multiple_column_values`
+ * mutation (falling back to per-column writes on a permanent batch failure) and logs one
+ * `item_sync_log` row.
+ *
  * @param itemId          - The monday item ID to sync. Sub-items are auto-redirected.
  * @param boardId         - The monday board the item belongs to.
- * @param triggeredBy     - Actor string forwarded to `sync_log` (e.g. user ID or `"cron"`).
- * @param timeEntryId     - `time_entry.id` that caused this sync, forwarded to `sync_log`.
+ * @param triggeredBy     - Actor user ID or source label (e.g. `"webhook:monday-move"`), recorded in `item_sync_log` (see {@link resolveTrigger}).
+ * @param timeEntryId     - `time_entry.id` that caused this sync, recorded in `item_sync_log`.
  * @param isRecursiveCall - Unused; retained for call-site compatibility with historical linked-board recursion (now removed — mirror columns handle roll-ups).
- * @returns {@link ItemSyncResult} with per-column outcomes and overall success flag.
+ * @returns {@link ItemSyncResult} with exactly one outcome per column mapping and an overall success flag.
  */
 export async function syncItemColumns(itemId: string, boardId: string, triggeredBy?: string, timeEntryId?: string, isRecursiveCall = false): Promise<ItemSyncResult> {
 	console.log(`[ColumnSync] syncItemColumns called for item ${itemId} on board ${boardId} (isRecursiveCall: ${isRecursiveCall})`);
@@ -806,8 +891,6 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
 		console.log(`[ColumnSync] Item ${itemId} is a sub-item. Redirecting sync to parent ${parentInfo.parent_item_id}`);
 		return syncItemColumns(parentInfo.parent_item_id, boardId, triggeredBy, timeEntryId, isRecursiveCall);
 	}
-
-	const results: SyncResult[] = [];
 
 	// Get board config
 	const boardConfig = await getBoardConfig(boardId);
@@ -845,18 +928,60 @@ export async function syncItemColumns(itemId: string, boardId: string, triggered
 
 	console.log(`[ColumnSync] Found ${columnMappings.length} column mappings for board ${boardId}`);
 
-	// Sync each configured column — sync_enabled (checked above) is the only board-level gate left.
-	for (const mapping of columnMappings) {
-		const result = await syncColumn(boardId, itemId, mapping, boardConfig, triggeredBy, timeEntryId);
-		results.push(result);
+	// Compute every value once, then write them all with one mutation.
+	const computed = await computeColumnValues(itemId, boardId, columnMappings);
+	const writable = computed.filter((c) => c.value !== undefined);
+
+	const outcomes = new Map<string, { success: boolean; error?: string }>();
+
+	if (writable.length > 0) {
+		console.log(`[ColumnSync] Writing ${writable.length} column(s) to monday.com: Board ${boardId}, Item ${itemId}`);
+		const batch = await updateItemColumnValues(
+			boardId,
+			itemId,
+			writable.map((c) => ({ columnId: c.mapping.columnId, columnType: c.mapping.columnType, value: c.value! })),
+		);
+
+		if (batch.success || writable.length === 1 || batch.transient) {
+			// One column has nothing to fall back to; a transient failure already exhausted its retries.
+			for (const c of writable) outcomes.set(c.mapping.id, { success: batch.success, error: batch.error });
+		} else {
+			// Permanent batch failure (e.g. a column deleted in monday): isolate the bad column(s).
+			console.warn(`[ColumnSync] Batch write failed for item ${itemId} (${batch.error}); falling back to per-column writes`);
+			for (const c of writable) {
+				outcomes.set(c.mapping.id, await updateColumnValue(boardId, itemId, c.mapping.columnId, c.value!, c.mapping.columnType));
+			}
+		}
 	}
 
-	return {
-		itemId,
-		boardId,
-		results,
-		overallSuccess: results.every((r) => r.success),
-	};
+	const results: SyncResult[] = computed.map((c) => {
+		const outcome = c.value === undefined ? { success: false, error: c.error } : outcomes.get(c.mapping.id)!;
+		if (!outcome.success) {
+			console.error(`[ColumnSync] Failed to update column ${c.mapping.columnId}: ${outcome.error}`);
+		}
+		return {
+			success: outcome.success,
+			columnId: c.mapping.columnId,
+			syncPurpose: c.mapping.syncPurpose,
+			value: c.value ?? "",
+			error: outcome.success ? undefined : outcome.error,
+		};
+	});
+	const overallSuccess = results.every((r) => r.success);
+
+	await updateLastSyncedAt(columnMappings.filter((_, i) => results[i].success).map((m) => m.id));
+
+	await writeItemSyncLog({
+		board_id: boardId,
+		item_id: itemId,
+		success: overallSuccess,
+		error_message: results.find((r) => !r.success)?.error ?? null,
+		columns: results.map<ItemSyncLogColumn>((r) => ({ column_id: r.columnId, sync_purpose: r.syncPurpose, value: r.value, success: r.success, ...(r.error && { error: r.error }) })) as unknown as Json,
+		...resolveTrigger(triggeredBy),
+		time_entry_id: timeEntryId || null,
+	});
+
+	return { itemId, boardId, results, overallSuccess };
 }
 
 /**
@@ -885,7 +1010,7 @@ export async function shouldSyncOnFinalize(boardId: string): Promise<boolean> {
  *
  * @param itemId      - The monday item ID of the finalized entry.
  * @param boardId     - The monday board the item belongs to.
- * @param userId      - Internal Supabase user ID (passed as `triggeredBy` to `sync_log`).
+ * @param userId      - Internal Supabase user ID (passed as `triggeredBy`, logged as the `item_sync_log` actor).
  * @param timeEntryId - The `time_entry.id` that was just finalized.
  * @returns {@link ItemSyncResult} or `null` when sync is disabled/skipped.
  */
@@ -939,7 +1064,7 @@ export async function syncAfterFinalize(itemId: string, boardId: string, userId:
  *
  * @property itemId      - The monday item ID to sync.
  * @property boardId     - The monday board the item belongs to.
- * @property userId      - Actor user ID forwarded to `sync_log`.
+ * @property userId      - Actor user ID forwarded to `item_sync_log`.
  * @property timeEntryId - Optional `time_entry.id` that triggered the queue.
  * @property queuedAt    - Unix epoch (ms) when the item was enqueued.
  */
@@ -982,7 +1107,7 @@ let debounceTimer: NodeJS.Timeout | null = null;
  *
  * @param itemId      - The monday item ID.
  * @param boardId     - The monday board the item belongs to.
- * @param userId      - Actor user ID forwarded to `sync_log`.
+ * @param userId      - Actor user ID forwarded to `item_sync_log`.
  * @param timeEntryId - Optional `time_entry.id` that caused this queue request.
  */
 export async function queueItemSync(itemId: string, boardId: string, userId: string, timeEntryId?: string): Promise<void> {
@@ -1162,7 +1287,7 @@ async function resolveEffectiveSyncTarget(itemId: string, boardId: string): Prom
  *
  * @param newEntry - Updated time entry object (needs `.item_id`, `.board_id`, `.id`).
  * @param oldEntry - Previous time entry object before the update.
- * @param userId   - Actor user ID forwarded to `sync_log` (the user who made the edit, not necessarily the entry owner).
+ * @param userId   - Actor user ID forwarded to `item_sync_log` (the user who made the edit, not necessarily the entry owner).
  */
 export async function syncAfterUpdate(newEntry: any, oldEntry: any, userId: string): Promise<void> {
 	const targets = new Map<string, { itemId: string; boardId: string; timeEntryId: string }>();
@@ -1187,7 +1312,7 @@ export async function syncAfterUpdate(newEntry: any, oldEntry: any, userId: stri
  * via {@link queueItemSync} so the columns reflect the removed time.
  *
  * @param deletedEntry - The deleted (or soft-deleted) time entry object.
- * @param userId       - Actor user ID forwarded to `sync_log`.
+ * @param userId       - Actor user ID forwarded to `item_sync_log`.
  */
 export async function syncAfterDelete(deletedEntry: any, userId: string): Promise<void> {
 	if (!deletedEntry.item_id || !deletedEntry.board_id) {

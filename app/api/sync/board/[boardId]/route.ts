@@ -226,31 +226,32 @@ export async function GET(request: NextRequest, { params }: Props) {
 
 		const { boardId } = await params;
 		const { searchParams } = new URL(request.url);
-		const limit = parseInt(searchParams.get("limit") || "50", 10);
+		const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1), 200);
 
 		// Get board config
 		const boardConfig = await getBoardConfig(boardId);
 
-		// Get recent sync history
-		const { data: syncHistory, error: historyError } = await supabaseAdmin.from("sync_log").select("*").eq("board_id", boardId).order("created_at", { ascending: false }).limit(limit);
+		// Get recent sync history (one row per item sync; rows carry full values, hence the cap on `limit`)
+		const { data: syncHistory, error: historyError } = await supabaseAdmin.from("item_sync_log").select("id, item_id, success, error_message, columns, trigger_source, actor_id, time_entry_id, created_at").eq("board_id", boardId).order("created_at", { ascending: false }).limit(limit);
 
 		if (historyError) {
 			console.error("Error fetching sync history:", historyError);
 		}
 
-		// Get sync statistics
-		const { data: stats, error: statsError } = await supabaseAdmin
-			.from("sync_log")
-			.select("success, created_at")
-			.eq("board_id", boardId)
-			.gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+		// Get sync statistics for the last 24 hours (counted in the database, not capped at 1000 rows).
+		// A sync counts as failed if any of its columns failed.
+		const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+		const [{ count: successCountRaw, error: successError }, { count: failureCountRaw, error: failureError }] = await Promise.all([
+			supabaseAdmin.from("item_sync_log").select("id", { count: "exact", head: true }).eq("board_id", boardId).eq("success", true).gte("created_at", since),
+			supabaseAdmin.from("item_sync_log").select("id", { count: "exact", head: true }).eq("board_id", boardId).eq("success", false).gte("created_at", since),
+		]);
 
-		if (statsError) {
-			console.error("Error fetching sync stats:", statsError);
+		if (successError || failureError) {
+			console.error("Error fetching sync stats:", successError || failureError);
 		}
 
-		const successCount = stats?.filter((s) => s.success).length || 0;
-		const failureCount = stats?.filter((s) => !s.success).length || 0;
+		const successCount = successCountRaw || 0;
+		const failureCount = failureCountRaw || 0;
 
 		// Get unique items synced. A board can have far more than 1000 finalized
 		// entries (Supabase's per-query cap), so this paginates via `id` (unique)

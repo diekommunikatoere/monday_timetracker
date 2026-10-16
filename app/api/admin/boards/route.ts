@@ -35,18 +35,20 @@ export async function GET(request: NextRequest) {
 		let boardsWithBudgetMapping = new Set<string>();
 
 		if (boardIds.length > 0) {
-			const [{ data: syncLogs }, { data: budgetMappings }] = await Promise.all([
-				supabaseAdmin.from("sync_log").select("board_id, created_at, success").in("board_id", boardIds).order("created_at", { ascending: false }),
-				supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true),
-			]);
+			// Latest sync per board: one limit(1) query each (a single select over all rows hits the 1000-row cap).
+			// Boards without an item_sync_log row yet fall back to the legacy per-column sync_log. A query error counts as "no row".
+			const latestSync = async (board_id: string) => {
+				for (const table of ["item_sync_log", "sync_log"] as const) {
+					const { data } = await supabaseAdmin.from(table).select("created_at, success").eq("board_id", board_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+					if (data) return { board_id, ...data };
+				}
+				return null;
+			};
 
-			// Group by board_id and take the first (latest) one
-			if (syncLogs) {
-				syncLogs.forEach((log: any) => {
-					if (!lastSyncs[log.board_id]) {
-						lastSyncs[log.board_id] = log;
-					}
-				});
+			const [latestSyncs, { data: budgetMappings }] = await Promise.all([Promise.all(boardIds.map(latestSync)), supabaseAdmin.from("column_sync_config").select("board_id").in("board_id", boardIds).eq("sync_purpose", "budget_used").eq("sync_enabled", true)]);
+
+			for (const sync of latestSyncs) {
+				if (sync) lastSyncs[sync.board_id] = sync;
 			}
 
 			boardsWithBudgetMapping = new Set((budgetMappings || []).map((m: any) => m.board_id));
