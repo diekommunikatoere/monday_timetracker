@@ -41,10 +41,25 @@ export type ColumnSyncConfig = Database["public"]["Tables"]["column_sync_config"
 export type ColumnSyncConfigInsert = Database["public"]["Tables"]["column_sync_config"]["Insert"];
 export type ColumnSyncConfigUpdate = Database["public"]["Tables"]["column_sync_config"]["Update"];
 
-/** Audit trail of column write-backs — one row per attempt, with `success`/`error_message`. Written by `logSyncOperation` in `lib/columnSync.ts`. */
+/** Legacy per-column audit trail of write-backs (one row per column attempt). No longer written — superseded by {@link ItemSyncLog}; kept as read-only history. */
 export type SyncLog = Database["public"]["Tables"]["sync_log"]["Row"];
 export type SyncLogInsert = Database["public"]["Tables"]["sync_log"]["Insert"];
 export type SyncLogUpdate = Database["public"]["Tables"]["sync_log"]["Update"];
+
+/** Audit trail of column write-backs — one row per item sync, with every column's outcome in `columns` ({@link ItemSyncLogColumn}[]). Written by `writeItemSyncLog` in `lib/columnSync.ts`. */
+export type ItemSyncLog = Database["public"]["Tables"]["item_sync_log"]["Row"];
+export type ItemSyncLogInsert = Database["public"]["Tables"]["item_sync_log"]["Insert"];
+export type ItemSyncLogUpdate = Database["public"]["Tables"]["item_sync_log"]["Update"];
+
+/** One element of `item_sync_log.columns`: the outcome for a single configured column in an item sync. */
+export interface ItemSyncLogColumn {
+	column_id: string;
+	sync_purpose: SyncPurpose;
+	/** The string sent to monday (empty when the value could not be computed). */
+	value: string;
+	success: boolean;
+	error?: string;
+}
 
 /** A billing role (e.g. "Developer", "Designer") with a global `hourly_rate`. The source of truth a `time_entry` points at via `role_id`. */
 export type Role = Database["public"]["Tables"]["role"]["Row"];
