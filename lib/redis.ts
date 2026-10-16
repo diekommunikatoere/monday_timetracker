@@ -5,6 +5,8 @@
 //   `time_entry:<id>`  — individual time-entry rows, 300 s TTL.
 //   `time_entry:all`   — full result set from getAllTimeEntries, 300 s TTL.
 //   `hard_delete:<id>` — deferred hard-delete queue drained by the cleanup cron.
+//   `sentinel:<env>:*` — Sentinel's Pipes/lock/status; owned by lib/sentinel/ with its own
+//                        client (not this one).
 //
 // After any write to the `time_entry` table, callers must call
 // `cacheHelper.clearPattern("time_entry:*")` to evict stale reads.

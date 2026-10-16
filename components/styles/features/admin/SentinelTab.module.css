@@ -1,0 +1,33 @@
+/* "Sentinel" admin tab: valve switch + interval, then queue status. */
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.sectionTitle {
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--color--text-primary);
+	margin: 0;
+}
+
+.intervalRow {
+	display: flex;
+	align-items: flex-end;
+	gap: 12px;
+}
+
+.intervalInput {
+	width: 200px;
+}
+
+.statusList {
+	margin: 0;
+	padding-left: 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	color: var(--color--text-secondary);
+	font-size: 14px;
+}

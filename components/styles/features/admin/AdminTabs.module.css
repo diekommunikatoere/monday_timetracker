@@ -1,4 +1,4 @@
-/* Vertical tab layout for /admin (Boards · Rollen · Berechtigungen). */
+/* Vertical tab layout for /admin (Boards · Rollen · Berechtigungen · Sentinel). */
 .root {
 	gap: 24px;
 	align-items: flex-start;
