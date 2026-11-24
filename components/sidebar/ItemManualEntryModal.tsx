@@ -14,6 +14,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useUserStore } from "@/stores/userStore";
 
 import { useAssignableUsers } from "../shared/hooks/useAssignableUsers";
+import { useEntryEditSession } from "../shared/hooks/useEntryEditSession";
 import { useHasPermission } from "../shared/hooks/useHasPermission";
 import { useRoles } from "../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
@@ -96,6 +97,8 @@ export function ItemManualEntryModal({ show, onClose, itemId, boardId, itemName,
 	const { showToast } = useToast();
 	const { rawContext, sessionToken } = useMondayStore();
 	const userProfile = useUserStore((state) => state.supabaseUser);
+	const dirty = show && (values.duration !== "00:00" || values.comment !== "");
+	useEntryEditSession(null, show, dirty);
 
 	// Synchronize selectedRoleId with prop if it changes
 	useEffect(() => {

@@ -50,6 +50,8 @@ type MondayUser = {
 type SupabaseUser = {
 	id: string;
 	email: string;
+	name?: string | null;
+	monday_account_id?: string | null;
 	is_active?: boolean;
 	team_ids?: string[] | null;
 	is_admin?: boolean | null;

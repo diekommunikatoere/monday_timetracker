@@ -21,6 +21,7 @@ export interface UserSelectProps {
 	value: string | null;
 	onChange: (userId: string) => void;
 	loading?: boolean;
+	disabled?: boolean;
 	label?: string;
 	/** Optional current owner to display (non-reselectable) if not in the active `users` list. */
 	fallbackUser?: {
@@ -34,7 +35,7 @@ export interface UserSelectProps {
  * Presentational, fully-controlled user picker: a searchable `Select` whose options show the
  * user's avatar and name. Holds no state and does not fetch.
  */
-export function UserSelect({ users, value, onChange, loading, label = "Benutzer", fallbackUser }: UserSelectProps) {
+export function UserSelect({ users, value, onChange, loading, disabled, label = "Benutzer", fallbackUser }: UserSelectProps) {
 	const data: ComboboxItem[] = users.map((user) => ({ value: user.id, label: user.name || "Unbekannter Benutzer" }));
 	const photoById = new Map(users.map((user) => [user.id, user.photo_urls?.thumb_small ?? null]));
 
@@ -54,7 +55,7 @@ export function UserSelect({ users, value, onChange, loading, label = "Benutzer"
 			data={data}
 			value={value || null}
 			onChange={(val) => val && onChange(val)}
-			disabled={loading}
+			disabled={loading || disabled}
 			searchable
 			allowDeselect={false}
 			nothingFoundMessage="Keine Benutzer gefunden"

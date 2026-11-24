@@ -1,10 +1,10 @@
 // components/dashboard/EditDraftEntryModal.tsx
 "use client";
 
-import { Flex, Text, Group } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { Alert, Flex, Text, Group } from "@mantine/core";
+import { useState, useEffect, useMemo } from "react";
 
-import { Button, Modal } from "@/components";
+import { Button, Icon, Modal } from "@/components";
 import { useToast } from "@/components/ToastProvider";
 import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -12,6 +12,7 @@ import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 import { TimeEntry } from "@/types/time-entry";
 
+import { useEntryEditSession } from "../shared/hooks/useEntryEditSession";
 import { useRoles } from "../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
@@ -104,8 +105,23 @@ export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: E
 				false,
 			);
 			setSelectedRoleId(entry.role_id || "");
+			setError(null);
 		}
 	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
+
+	const dirty = useMemo(() => {
+		if (!show || !entry) return false;
+		const start = new Date(entry.start_time);
+		const end = new Date(entry.end_time);
+		const initStart = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+		const initEnd = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+		const initDuration = secondsToDuration(entry.duration);
+
+		return values.date.toDateString() !== start.toDateString() || values.startTime !== initStart || values.endTime !== initEnd || values.duration !== initDuration || values.comment !== (entry.comment || "") || selectedRoleId !== (entry.role_id || "");
+	}, [show, entry, values, selectedRoleId]);
+
+	const { takenOverBy, connectionLost } = useEntryEditSession(entry?.id, show, dirty);
+	const isReadOnly = Boolean(takenOverBy);
 
 	const handleSave = async () => {
 		if (!userProfile?.id) {
@@ -170,9 +186,20 @@ export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: E
 			<Modal.Header>Entwurf bearbeiten</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
+					{takenOverBy && (
+						<Alert color="red" icon={<Icon name="lock" size={18} />}>
+							{takenOverBy} hat die Bearbeitung übernommen. Deine nicht gespeicherten Änderungen wurden nicht gespeichert.
+						</Alert>
+					)}
+					{!takenOverBy && connectionLost && (
+						<Alert color="yellow" icon={<Icon name="wifi_off" size={18} />}>
+							Verbindung unterbrochen. Andere sehen gerade nicht, dass du diesen Eintrag bearbeitest.
+						</Alert>
+					)}
 					{error && <Text c="red">{error}</Text>}
 
 					<TimeEntryFormFields
+						readOnly={isReadOnly}
 						date={values.date}
 						onDateChange={handlers.setDate}
 						duration={values.duration}
@@ -214,12 +241,20 @@ export default function EditDraftEntryModal({ show, onClose, entry, onSaved }: E
 					/>
 
 					<Group justify="flex-end" mt="md">
-						<Button variant="default" onClick={onClose}>
-							Abbrechen
-						</Button>
-						<Button onClick={handleSave} disabled={isSaving} loading={isSaving}>
-							Aktualisieren
-						</Button>
+						{isReadOnly ? (
+							<Button variant="default" onClick={onClose}>
+								Schließen
+							</Button>
+						) : (
+							<>
+								<Button variant="default" onClick={onClose}>
+									Abbrechen
+								</Button>
+								<Button onClick={handleSave} disabled={isSaving} loading={isSaving}>
+									Aktualisieren
+								</Button>
+							</>
+						)}
 					</Group>
 				</Flex>
 			</Modal.Body>

@@ -10,10 +10,12 @@ import EditDraftEntryModal from "@/components/dashboard/EditDraftEntryModal";
 import EditTimeEntryModal from "@/components/dashboard/EditTimeEntryModal";
 import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 import { ManualTimeEntryModal } from "@/components/features/timer/ManualTimeEntryModal";
+import { EntryEditLockIcon } from "@/components/shared/hooks/useEntryEditLock";
 import DeleteConfirmationDialog from "@/components/shared/time-entries/DeleteConfirmationDialog";
 import { useToast } from "@/components/ToastProvider";
 import { useTimeEntriesRefetch } from "@/contexts/TimeEntriesContext";
 import { ceilToMinute, endOfDay, endOfISOWeek, formatDuration, formatTime, formatTimeString, secondsToDuration, startOfDay, startOfISOWeek, subtractSecondsFromTimeString } from "@/lib/utils";
+import { useEditPresenceStore } from "@/stores/editPresenceStore";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { TimeEntry } from "@/types/time-entry";
@@ -66,6 +68,7 @@ const GERMAN_LABELS: ScheduleLabelsOverride = {
  */
 export function TimeEntriesCalendar() {
 	const { allEntries, loading, error, setTimeEntries } = useTimeEntriesStore();
+	const locksByEntryId = useEditPresenceStore((state) => state.locksByEntryId);
 	const { sessionToken } = useMondayStore();
 	const refetch = useTimeEntriesRefetch();
 	const { showToast } = useToast();
@@ -106,8 +109,14 @@ export function TimeEntriesCalendar() {
 	}, []);
 
 	const handleEventClick = useCallback(
-		(event: ScheduleEventData) => {
-			handleEdit(getEntryFromEvent(event));
+		(event: ScheduleEventData, e: React.MouseEvent<HTMLButtonElement>) => {
+			const entry = getEntryFromEvent(event);
+			const lockState = useEditPresenceStore.getState().getEntryLock(entry.id).state;
+			if (lockState !== "free") {
+				setContextMenu({ x: e.clientX, y: e.clientY, entry });
+				return;
+			}
+			handleEdit(entry);
 		},
 		[handleEdit],
 	);
@@ -276,13 +285,7 @@ export function TimeEntriesCalendar() {
 						{entry.parent_item_name}
 					</Text>
 				</div>
-				{/* {entry.comment && (
-					<Tooltip label={entry.comment} withArrow position="top">
-						<UnstyledButton aria-label="Kommentar anzeigen" tabIndex={-1} style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "help" }} className={styles.eventComment}>
-							<Icon name="comment" size={14} />
-						</UnstyledButton>
-					</Tooltip>
-				)} */}
+				<EntryEditLockIcon entryId={entry.id} size={12} />
 			</div>
 		);
 	}, []);
@@ -356,7 +359,15 @@ export function TimeEntriesCalendar() {
 		);
 	}, []);
 
-	const canInteractWithEvent = useCallback((event: ScheduleEventData) => !savingIds.has(String(event.id)), [savingIds]);
+	const canInteractWithEvent = useCallback(
+		(event: ScheduleEventData) => {
+			const id = String(event.id);
+			if (savingIds.has(id)) return false;
+			const lock = locksByEntryId[id];
+			return !lock || lock.state === "free";
+		},
+		[savingIds, locksByEntryId],
+	);
 
 	if (loading) {
 		return <LoadingState />;

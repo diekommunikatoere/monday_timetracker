@@ -1,10 +1,10 @@
 // components/dashboard/EditTimeEntryModal.tsx
 "use client";
 
-import { Flex, Text, Group } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { Alert, Flex, Text, Group } from "@mantine/core";
+import { useState, useEffect, useMemo } from "react";
 
-import { Button, Modal } from "@/components";
+import { Button, Icon, Modal } from "@/components";
 import { useToast } from "@/components/ToastProvider";
 import { PERMISSIONS } from "@/lib/permissions/keys";
 import { combineDateAndTime, durationToSeconds, secondsToDuration } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { useUserStore } from "@/stores/userStore";
 import { TimeEntry } from "@/types/time-entry";
 
 import { useAssignableUsers } from "../shared/hooks/useAssignableUsers";
+import { useEntryEditSession } from "../shared/hooks/useEntryEditSession";
 import { useHasPermission } from "../shared/hooks/useHasPermission";
 import { useRoles } from "../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
@@ -121,8 +122,33 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 			});
 			setSelectedRoleId(entry.role_id || "");
 			setSelectedUserId(entry.user_id);
+			setError(null);
 		}
 	}, [show, entry?.id]); // Only re-run when modal opens or entry ID changes
+
+	const dirty = useMemo(() => {
+		if (!show || !entry) return false;
+		const start = new Date(entry.start_time);
+		const end = new Date(entry.end_time);
+		const initStart = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+		const initEnd = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+		const initDuration = secondsToDuration(entry.duration);
+
+		return (
+			values.date.toDateString() !== start.toDateString() ||
+			values.startTime !== initStart ||
+			values.endTime !== initEnd ||
+			values.duration !== initDuration ||
+			values.comment !== (entry.comment || "") ||
+			(selectedTask?.boardId || "") !== (entry.board_id || "") ||
+			(selectedTask?.itemId || "") !== (entry.item_id || "") ||
+			selectedRoleId !== (entry.role_id || "") ||
+			(selectedUserId || entry.user_id) !== entry.user_id
+		);
+	}, [show, entry, values, selectedTask, selectedRoleId, selectedUserId]);
+
+	const { takenOverBy, connectionLost } = useEntryEditSession(entry?.id, show, dirty);
+	const isReadOnly = Boolean(takenOverBy);
 
 	const handleSave = async () => {
 		if (!selectedTask || !selectedRoleId || !userProfile?.id) {
@@ -196,9 +222,20 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 			<Modal.Header>Zeiteintrag bearbeiten</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
+					{takenOverBy && (
+						<Alert color="red" icon={<Icon name="lock" size={18} />}>
+							{takenOverBy} hat die Bearbeitung übernommen. Deine nicht gespeicherten Änderungen wurden nicht gespeichert.
+						</Alert>
+					)}
+					{!takenOverBy && connectionLost && (
+						<Alert color="yellow" icon={<Icon name="wifi_off" size={18} />}>
+							Verbindung unterbrochen. Andere sehen gerade nicht, dass du diesen Eintrag bearbeitest.
+						</Alert>
+					)}
 					{error && <Text c="red">{error}</Text>}
 
 					<TimeEntryFormFields
+						readOnly={isReadOnly}
 						date={values.date}
 						onDateChange={handlers.setDate}
 						duration={values.duration}
@@ -239,6 +276,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 										value={selectedUserId}
 										onChange={setSelectedUserId}
 										loading={loadingUsers}
+										disabled={isReadOnly}
 										fallbackUser={{
 											id: entry.user_id,
 											name: entry.user_name ?? null,
@@ -263,6 +301,7 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 							show: true,
 							node: (
 								<TaskItemSelector
+									disabled={isReadOnly}
 									onSelectionChange={setSelectedTask}
 									initialValues={
 										selectedTask
@@ -288,12 +327,20 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 					/>
 
 					<Group justify="flex-end" mt="md">
-						<Button variant="default" onClick={onClose}>
-							Abbrechen
-						</Button>
-						<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId || isSaving} loading={isSaving}>
-							Aktualisieren
-						</Button>
+						{isReadOnly ? (
+							<Button variant="default" onClick={onClose}>
+								Schließen
+							</Button>
+						) : (
+							<>
+								<Button variant="default" onClick={onClose}>
+									Abbrechen
+								</Button>
+								<Button onClick={handleSave} disabled={!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId || isSaving} loading={isSaving}>
+									Aktualisieren
+								</Button>
+							</>
+						)}
 					</Group>
 				</Flex>
 			</Modal.Body>

@@ -1,11 +1,13 @@
 "use client";
 
 import { Menu } from "@mantine/core";
+import { useState } from "react";
 
 import { IconButton, Icon } from "@/components";
 import { useUserStore } from "@/stores/userStore";
 import { TimeEntry } from "@/types/time-entry";
 
+import { EditLockMenuItem } from "../hooks/useEntryEditLock";
 import { useTimeEntryPermissions } from "../hooks/useTimeEntryPermissions";
 
 /**
@@ -61,12 +63,14 @@ export function TimeEntryRowMenu<T extends { id: string; user_id: string; timer_
 	// would seed garbage and be silently discarded on the next timer transition.
 	const isEditable = entry.timer_state === undefined || entry.timer_state === "finalized" || entry.timer_state === "parked";
 
+	const [opened, setOpened] = useState(false);
+
 	if (!canEdit && !canDelete) {
 		return null;
 	}
 
 	return (
-		<Menu width={150} position="bottom-end" withArrow styles={{ arrow: { borderColor: "var(--color--border-ui)" }, dropdown: { backgroundColor: "var(--color--background-primary)", borderColor: "var(--color--border-ui)", boxShadow: "var(--box-shadow--md)" } }}>
+		<Menu opened={opened} onChange={setOpened} width={180} position="bottom-end" withArrow styles={{ arrow: { borderColor: "var(--color--border-ui)" }, dropdown: { backgroundColor: "var(--color--background-primary)", borderColor: "var(--color--border-ui)", boxShadow: "var(--box-shadow--md)" } }}>
 			<Menu.Target>
 				<IconButton variant="filled" colorVariant="tertiary" size="sm" aria-label="Aktionen" style={style}>
 					<Icon name="more_vert" size={18} />
@@ -74,21 +78,40 @@ export function TimeEntryRowMenu<T extends { id: string; user_id: string; timer_
 			</Menu.Target>
 
 			<Menu.Dropdown>
-				{isDraft && canEdit ? (
+				{isDraft && onSaveDraft && canEdit ? (
 					<>
-						<Menu.Item leftSection={<Icon name="save" size={18} />} onClick={() => onSaveDraft?.(entry)}>
-							Zuweisen
-						</Menu.Item>
+						<EditLockMenuItem
+							entryId={entry.id}
+							defaultLabel="Zuweisen"
+							defaultIcon="save"
+							onTrigger={() => {
+								setOpened(false);
+								onSaveDraft(entry);
+							}}
+						/>
 						<Menu.Divider />
 					</>
 				) : null}
 				{isEditable && onEdit && canEdit ? (
-					<Menu.Item leftSection={<Icon name="edit" size={18} />} onClick={() => onEdit(entry)}>
-						Bearbeiten
-					</Menu.Item>
+					<EditLockMenuItem
+						entryId={entry.id}
+						defaultLabel="Bearbeiten"
+						defaultIcon="edit"
+						onTrigger={() => {
+							setOpened(false);
+							onEdit(entry);
+						}}
+					/>
 				) : null}
 				{onDelete && canDelete ? (
-					<Menu.Item leftSection={<Icon name="delete" size={18} />} color="red" onClick={() => onDelete(entry)}>
+					<Menu.Item
+						leftSection={<Icon name="delete" size={18} />}
+						color="red"
+						onClick={() => {
+							setOpened(false);
+							onDelete(entry);
+						}}
+					>
 						Löschen
 					</Menu.Item>
 				) : null}

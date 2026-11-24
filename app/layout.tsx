@@ -12,6 +12,7 @@ import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { TimerProvider } from "@/components/features/timer/TimerProvider";
+import { EditPresenceProvider } from "@/components/shared/EditPresenceProvider";
 import { StoreProvider } from "@/components/StoreProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { themeTokens } from "@/components/ui/theme/tokens";
@@ -52,7 +53,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 					<QueryClientProvider client={queryClient}>
 						<StoreProvider>
 							<TimerProvider>
-								<ToastProvider>{children}</ToastProvider>
+								<EditPresenceProvider>
+									<ToastProvider>{children}</ToastProvider>
+								</EditPresenceProvider>
 							</TimerProvider>
 						</StoreProvider>
 					</QueryClientProvider>

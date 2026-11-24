@@ -13,6 +13,7 @@ import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
 
+import { useEntryEditSession } from "../../shared/hooks/useEntryEditSession";
 import { useRoles } from "../../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../../shared/hooks/useTimeEntryForm";
 import { TimeEntryFormFields } from "../../shared/time-entries/TimeEntryFormFields";
@@ -82,6 +83,8 @@ export function ManualTimeEntryModal({ show, onClose, initialRange }: ManualTime
 	const { rawContext, sessionToken } = useMondayStore();
 	const { showToast } = useToast();
 	const userProfile = useUserStore((state) => state.supabaseUser);
+	const dirty = show && (values.duration !== "00:00" || values.comment !== "" || Boolean(selectedTask?.itemId) || Boolean(selectedRoleId));
+	useEntryEditSession(null, show, dirty);
 
 	// Reset form when modal opens: end-locked, seeded from a calendar slot selection
 	// when provided, otherwise the "now" / zero-duration default.

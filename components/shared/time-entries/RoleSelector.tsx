@@ -20,6 +20,7 @@ export interface RoleSelectorProps {
 	onChange: (roleId: string) => void;
 	loading?: boolean;
 	required?: boolean;
+	disabled?: boolean;
 }
 
 /**
@@ -38,8 +39,22 @@ export interface RoleSelectorProps {
  * @param props - {@link RoleSelectorProps}.
  * @returns A labelled, searchable, clearable `Select`.
  */
-export function RoleSelector({ roles, selectedRoleId, onChange, loading, required }: RoleSelectorProps) {
-	return <Select label="Rolle" placeholder="Rolle auswählen..." data={roles} value={selectedRoleId || null} onChange={(val) => onChange(val || "")} disabled={loading} searchable clearable clearButtonProps={{ "aria-label": "Auswahl löschen" }} nothingFoundMessage="Keine Rollen verfügbar" required={required} />;
+export function RoleSelector({ roles, selectedRoleId, onChange, loading, required, disabled }: RoleSelectorProps) {
+	return (
+		<Select
+			label="Rolle"
+			placeholder="Rolle auswählen..."
+			data={roles}
+			value={selectedRoleId || null}
+			onChange={(val) => onChange(val || "")}
+			disabled={loading || disabled}
+			searchable
+			clearable
+			clearButtonProps={{ "aria-label": "Auswahl löschen" }}
+			nothingFoundMessage="Keine Rollen verfügbar"
+			required={required}
+		/>
+	);
 }
 
 export default RoleSelector;

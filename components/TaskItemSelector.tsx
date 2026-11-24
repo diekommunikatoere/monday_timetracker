@@ -53,6 +53,7 @@ export interface TaskSelection {
 interface TaskItemSelectorProps {
 	onSelectionChange: (data: TaskSelection) => void;
 	onResetRef?: (resetFn: () => void) => void;
+	disabled?: boolean;
 	initialValues?: {
 		boardId?: string;
 		boardName?: string;
@@ -149,7 +150,7 @@ type ColorTreeNodeData = TreeNodeData & { color?: string };
  * @param props.initialValues     - Optional preselection to reconcile against loaded data.
  * @returns A vertical `Flex` of two labelled selectors (board / task) with skeleton loading and inline error text.
  */
-export default function TaskItemSelector({ onSelectionChange, onResetRef, initialValues }: TaskItemSelectorProps) {
+export default function TaskItemSelector({ onSelectionChange, onResetRef, disabled = false, initialValues }: TaskItemSelectorProps) {
 	// State management for selections
 	const [selectedBoard, setSelectedBoard] = useState<DropdownOption | null>(null);
 	const [selectedTask, setSelectedTask] = useState<DropdownOption | null>(null);
@@ -753,7 +754,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 		return "Aufgabe auswählen...";
 	}, [selectedBoard, isTaskDropdownLoading]);
 
-	const isTaskDropdownDisabled = !selectedBoard;
+	const isTaskDropdownDisabled = !selectedBoard || disabled;
 
 	// Add Checkmark before label if item is selected
 	const renderTaskNode: TreeSelectProps["renderNode"] = useCallback(
@@ -812,7 +813,21 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 
 			{/* Board Selector with skeleton loading */}
 			<div>
-				<Select id="board-selector" placeholder="Board auswählen..." label="Board" data={boards} value={selectedBoard?.value || null} onChange={handleBoardChange} clearable searchable disabled={loadingBoards} loading={loadingBoards} nothingFoundMessage="Keine Boards verfügbar" required withAsterisk />
+				<Select
+					id="board-selector"
+					placeholder="Board auswählen..."
+					label="Board"
+					data={boards}
+					value={selectedBoard?.value || null}
+					onChange={handleBoardChange}
+					clearable
+					searchable
+					disabled={loadingBoards || disabled}
+					loading={loadingBoards}
+					nothingFoundMessage="Keine Boards verfügbar"
+					required
+					withAsterisk
+				/>
 			</div>
 
 			<div>
@@ -828,7 +843,7 @@ export default function TaskItemSelector({ onSelectionChange, onResetRef, initia
 								</span>
 							</Text>
 							<Tooltip label="Aufgabenliste aktualisieren" position="left">
-								<IconButton colorVariant="tertiary" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={handleRefreshTasks} disabled={isRefreshing || isFetchingTasks || !selectedBoard} aria-label="Aufgaben aktualisieren">
+								<IconButton colorVariant="tertiary" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={handleRefreshTasks} disabled={disabled || isRefreshing || isFetchingTasks || !selectedBoard} aria-label="Aufgaben aktualisieren">
 									{isRefreshing ? <Loader size={14} /> : <Icon name="refresh" size={14} />}
 								</IconButton>
 							</Tooltip>
