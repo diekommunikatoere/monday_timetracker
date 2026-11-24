@@ -28,8 +28,16 @@ export interface ItemTimeEntriesState {
 	/** Duration totals keyed by user id. */
 	durationByUser: Record<string, { userId: string; userName: string; duration: number; isActive?: boolean }>;
 
+	/** True only during the initial fetch before entries have loaded for the current item. */
 	loading: boolean;
+	/** True during background refetches once initial data has loaded. */
+	refreshing: boolean;
 	error: string | null;
+
+	/** Internal: whether entries have loaded at least once for the current `itemId`. */
+	_hasLoaded: boolean;
+	/** Internal: monotonic latest-wins guard for concurrent fetches. */
+	_requestId: number;
 
 	/** Active filters; changing them via `setFilters` triggers a refetch. */
 	filters: {
@@ -55,7 +63,10 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 	durationByRole: {},
 	durationByUser: {},
 	loading: false,
+	refreshing: false,
 	error: null,
+	_hasLoaded: false,
+	_requestId: 0,
 	filters: {
 		dateRange: { start: null, end: null },
 		roleId: null,
@@ -63,7 +74,19 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 	},
 
 	setItemContext: (itemId, boardId) => {
-		set({ itemId, boardId });
+		set((state) =>
+			state.itemId === itemId
+				? { itemId, boardId }
+				: {
+						itemId,
+						boardId,
+						timeEntries: [],
+						totalDuration: 0,
+						durationByRole: {},
+						durationByUser: {},
+						_hasLoaded: false,
+					},
+		);
 	},
 
 	fetchItemTimeEntries: async () => {
@@ -73,8 +96,11 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 		const sessionToken = useMondayStore.getState().sessionToken;
 		if (!sessionToken) return;
 
+		const requestId = get()._requestId + 1;
+		const isInitialLoad = !get()._hasLoaded;
+
 		try {
-			set({ loading: true, error: null });
+			set({ loading: isInitialLoad, refreshing: !isInitialLoad, error: null, _requestId: requestId });
 
 			const params = new URLSearchParams({
 				boardId,
@@ -94,6 +120,8 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 
 			const data = await response.json();
 
+			if (get()._requestId !== requestId) return;
+
 			// Flatten the API's byRole/byUser arrays into lookup maps keyed by id.
 			set({
 				timeEntries: data.entries,
@@ -112,11 +140,16 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 					return acc;
 				}, {}),
 				loading: false,
+				refreshing: false,
+				_hasLoaded: true,
 			});
 		} catch (err) {
+			if (get()._requestId !== requestId) return;
+
 			set({
 				error: err instanceof Error ? err.message : "Unbekannter Fehler",
 				loading: false,
+				refreshing: false,
 			});
 		}
 	},

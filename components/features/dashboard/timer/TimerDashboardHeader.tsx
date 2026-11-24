@@ -4,7 +4,7 @@ import { Center, Flex, Tooltip, Text } from "@mantine/core";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { DashboardMenuButton, Icon, Logo, SegmentedControl } from "@/components";
+import { DashboardMenuButton, Icon, IconButton, Logo, SegmentedControl } from "@/components";
 import EmptyCommentConfirmationModal from "@/components/dashboard/EmptyCommentConfirmationModal";
 import SaveTimerModal from "@/components/dashboard/SaveTimerModal";
 import { ManualTimeEntryModal } from "@/components/features/timer";
@@ -38,8 +38,9 @@ import "@/public/css/components/AppHeader.css";
  *          timer, followed by the manual-entry, save, and empty-comment modals.
  */
 export function TimerDashboardHeader() {
-	const { allEntries } = useTimeEntriesStore();
+	const { allEntries, refreshing, refetch } = useTimeEntriesStore();
 	const userId = useUserStore((state) => state.supabaseUser?.id);
+	const pathname = usePathname();
 	const dashboardViewMode = useUserStore((state) => state.dashboardViewMode);
 	const setDashboardViewMode = useUserStore((state) => state.setDashboardViewMode);
 	const [showManualSaveModal, setShowManualSaveModal] = useState(false);
@@ -99,32 +100,49 @@ export function TimerDashboardHeader() {
 					<TimerContainer />
 				</div>
 
-				<SegmentedControl
-					data={[
-						{
-							value: "table",
-							label: (
-								<Center style={{ gap: 4 }}>
-									<Icon name="table" size={16} />
-									<span>Tabelle</span>
-								</Center>
-							),
-						},
-						{
-							value: "calendar",
-							label: (
-								<Center style={{ gap: 4 }}>
-									<Icon name="event_note" size={16} />
-									<span>Kalender</span>
-								</Center>
-							),
-						},
-					]}
-					value={dashboardViewMode === "table" ? "table" : "calendar"}
-					onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
-					radius="md"
-					disabled={usePathname() !== timeEntriesPath}
-				/>
+				<Flex align="center" gap="xs">
+					{pathname === timeEntriesPath && (
+						<Tooltip label="Aktualisieren" position="top" withArrow>
+							<IconButton
+								colorVariant="tertiary"
+								aria-label="Aktualisieren"
+								loading={refreshing}
+								disabled={!userId}
+								onClick={() => {
+									if (userId) refetch(userId);
+								}}
+							>
+								<Icon name="refresh" size={21} />
+							</IconButton>
+						</Tooltip>
+					)}
+					<SegmentedControl
+						data={[
+							{
+								value: "table",
+								label: (
+									<Center style={{ gap: 4 }}>
+										<Icon name="table" size={16} />
+										<span>Tabelle</span>
+									</Center>
+								),
+							},
+							{
+								value: "calendar",
+								label: (
+									<Center style={{ gap: 4 }}>
+										<Icon name="event_note" size={16} />
+										<span>Kalender</span>
+									</Center>
+								),
+							},
+						]}
+						value={dashboardViewMode === "table" ? "table" : "calendar"}
+						onChange={(value) => setDashboardViewMode(value === "table" ? "table" : "calendar")}
+						radius="md"
+						disabled={pathname !== timeEntriesPath}
+					/>
+				</Flex>
 			</header>
 			<ManualTimeEntryModal show={showManualSaveModal} onClose={handleManualTimeModalClose} />
 			<SaveTimerModal show={showTimerSave} onClose={closeTimerSave} />

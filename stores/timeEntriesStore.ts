@@ -47,7 +47,10 @@ const EMPTY_FILTERS: TimeEntriesFilters = {
 interface TimeEntriesState {
 	/** Every entry the user has (newest first); the source data for client-side filtering. */
 	allEntries: TimeEntry[];
+	/** True only during the initial fetch before entries have been loaded once for the user. */
 	loading: boolean;
+	/** True during background refetches once initial data has loaded. */
+	refreshing: boolean;
 	error: string | null;
 
 	/** Active search/filter criteria. */
@@ -63,6 +66,8 @@ interface TimeEntriesState {
 	 * thread it through again. Not meant to be read by components.
 	 */
 	_lastUserId: string | null;
+	/** Internal: whether entries have been loaded at least once for `_lastUserId`. */
+	_hasLoaded: boolean;
 	/**
 	 * Internal: monotonic counter used as a latest-wins guard. Incremented on
 	 * every `fetchTimeEntries` call; a response is only committed to state if
@@ -100,11 +105,13 @@ export const useTimeEntriesStore = create<TimeEntriesState>()(
 		(set, get) => ({
 			allEntries: [],
 			loading: false,
+			refreshing: false,
 			error: null,
 			filters: EMPTY_FILTERS,
 			page: 1,
 			pageSize: DEFAULT_TIME_ENTRIES_PAGE_SIZE,
 			_lastUserId: null,
+			_hasLoaded: false,
 			_requestId: 0,
 
 			fetchTimeEntries: async (userId: string) => {
@@ -114,7 +121,15 @@ export const useTimeEntriesStore = create<TimeEntriesState>()(
 				if (!sessionToken) return;
 
 				const requestId = get()._requestId + 1;
-				set({ loading: true, error: null, _requestId: requestId, _lastUserId: userId });
+				const isInitialLoad = !get()._hasLoaded || get()._lastUserId !== userId;
+				set({
+					loading: isInitialLoad,
+					refreshing: !isInitialLoad,
+					error: null,
+					_requestId: requestId,
+					_lastUserId: userId,
+					...(get()._lastUserId !== userId ? { _hasLoaded: false } : {}),
+				});
 
 				try {
 					const response = await fetch(`/api/time-entries`, {
@@ -133,13 +148,14 @@ export const useTimeEntriesStore = create<TimeEntriesState>()(
 					// rapid refetches can't resolve out of order.
 					if (get()._requestId !== requestId) return;
 
-					set({ allEntries: data.entries ?? [], loading: false });
+					set({ allEntries: data.entries ?? [], loading: false, refreshing: false, _hasLoaded: true });
 				} catch (err) {
 					if (get()._requestId !== requestId) return;
 
 					set({
 						error: err instanceof Error ? err.message : "Unbekannter Fehler",
 						loading: false,
+						refreshing: false,
 					});
 				}
 			},

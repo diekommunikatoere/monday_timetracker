@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { ErrorState, LoadingState } from "@/components";
+import { useLiveTimeEntries } from "@/components/dashboard/hooks/useLiveTimeEntries";
 import TimeEntriesTable from "@/components/dashboard/TimeEntriesTable";
 import TimerDashboardHeader from "@/components/features/dashboard/timer/TimerDashboardHeader";
 import { TimeEntriesProvider } from "@/contexts/TimeEntriesContext";
@@ -29,6 +30,9 @@ export default function DashboardsLayout(props: LayoutProps<"/dashboards">) {
 			fetchTimeEntries(userId);
 		}
 	}, [userId, fetchTimeEntries]);
+
+	// Subscribe to live time_entry changes and visibility refreshes
+	useLiveTimeEntries();
 
 	// Show loading state while initializing
 	if (mondayLoading) {

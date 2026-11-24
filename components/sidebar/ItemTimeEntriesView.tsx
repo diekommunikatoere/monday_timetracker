@@ -15,6 +15,7 @@ import { TimeEntry } from "@/types/time-entry";
 import DeleteConfirmationDialog from "../shared/time-entries/DeleteConfirmationDialog";
 import { TimeEntryTable } from "../shared/time-entries/TimeEntryTable";
 import { getSidebarColumns } from "../shared/time-entries/TimeEntryTableConfigs";
+import { useLiveItemTimeEntries } from "./hooks/useLiveItemTimeEntries";
 
 import styles from "@/components/styles/features/sidebar/ItemTimeEntriesView.module.css";
 
@@ -75,6 +76,8 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 		setItemContext(itemId, boardId);
 		fetchItemTimeEntries();
 	}, [itemId, boardId, setItemContext, fetchItemTimeEntries]);
+
+	useLiveItemTimeEntries(itemId);
 
 	const handleSelectRow = (id: string, selected: boolean) => {
 		if (selected) {
