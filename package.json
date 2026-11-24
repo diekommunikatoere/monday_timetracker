@@ -10,6 +10,7 @@
 		"lint:fix": "oxlint --fix",
 		"expose": "mapps tunnel:create -p 8301",
 		"db:migrate": "supabase db push",
+		"db:migrate-remote": "supabase db push --remote",
 		"fmt": "oxfmt",
 		"fmt:check": "oxfmt --check"
 	},
