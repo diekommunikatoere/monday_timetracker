@@ -26,7 +26,7 @@ export interface ItemTimeEntriesState {
 	/** Duration totals keyed by role id. */
 	durationByRole: Record<string, { roleId: string; roleName: string; duration: number }>;
 	/** Duration totals keyed by user id. */
-	durationByUser: Record<string, { userId: string; userName: string; duration: number }>;
+	durationByUser: Record<string, { userId: string; userName: string; duration: number; isActive?: boolean }>;
 
 	loading: boolean;
 	error: string | null;
@@ -103,7 +103,12 @@ export const useItemTimeEntriesStore = create<ItemTimeEntriesState>()((set, get)
 					return acc;
 				}, {}),
 				durationByUser: data.aggregations.byUser.reduce((acc: any, curr: any) => {
-					acc[curr.userId] = { userId: curr.userId, userName: curr.userName, duration: curr.totalDuration };
+					acc[curr.userId] = {
+						userId: curr.userId,
+						userName: curr.userName,
+						duration: curr.totalDuration,
+						isActive: curr.isActive ?? true,
+					};
 					return acc;
 				}, {}),
 				loading: false,

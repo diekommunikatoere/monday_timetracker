@@ -45,6 +45,17 @@ export function PermissionsTab() {
 	const [loadingGrants, setLoadingGrants] = useState(true);
 
 	const { users, isLoading: loadingUsers } = useAssignableUsers();
+	const { data: allAccountUsers = [] } = useQuery({
+		queryKey: ["admin-all-users"],
+		queryFn: async (): Promise<Array<{ id: string; name: string | null; photo_urls: { thumb_small?: string | null } | null; is_active: boolean }>> => {
+			const response = await fetch("/api/admin/users", { headers: authHeaders });
+			if (!response.ok) return [];
+			return (await response.json()).users ?? [];
+		},
+		enabled: !!sessionToken,
+		staleTime: 5 * 60 * 1000,
+		refetchOnWindowFocus: false,
+	});
 	const { data: teams = [], isLoading: loadingTeams } = useQuery({
 		queryKey: ["admin-monday-teams"],
 		queryFn: async (): Promise<Team[]> => {
@@ -122,10 +133,20 @@ export function PermissionsTab() {
 		if (removed) void removeGrant(removed);
 	};
 
+	const allUsersById = useMemo(() => new Map(allAccountUsers.map((u) => [u.id, u])), [allAccountUsers]);
+
 	const userData = (permission: PermissionKey): ComboboxItem[] => {
 		const items = users.map((user) => ({ value: user.id, label: user.name || "Unbekannter Benutzer" }));
 		const known = new Set(items.map((i) => i.value));
-		const unresolved = grants.filter((g) => g.permission === permission && g.user_id && !known.has(g.user_id)).map((g) => ({ value: g.user_id!, label: g.user_id! }));
+		const unresolved = grants
+			.filter((g) => g.permission === permission && g.user_id && !known.has(g.user_id))
+			.map((g) => {
+				const inactiveProfile = allUsersById.get(g.user_id!);
+				return {
+					value: g.user_id!,
+					label: inactiveProfile ? `${inactiveProfile.name || "Unbekannter Benutzer"} (Inaktiv)` : g.user_id!,
+				};
+			});
 		return [...items, ...unresolved];
 	};
 

@@ -8,13 +8,15 @@ import { useMondayStore } from "./mondayStore";
 
 import type { AuswertungUserRow } from "@/types/auswertung";
 
-/** Purely client-side filter state for the Auswertung toolbar's search box. */
+/** Purely client-side filter state for the Auswertung toolbar. */
 export interface AuswertungFilters {
 	/** Free-text query, tokenized-fuzzy matched against user names. */
 	search: string;
+	/** Whether inactive users (`user_profiles.is_active = false`) are included in the table. */
+	includeInactive: boolean;
 }
 
-const EMPTY_AUSWERTUNG_FILTERS: AuswertungFilters = { search: "" };
+const EMPTY_AUSWERTUNG_FILTERS: AuswertungFilters = { search: "", includeInactive: false };
 
 /**
  * Data for the Auswertung (per-user weekly utilization) view —

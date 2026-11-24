@@ -1,7 +1,7 @@
 // components/dashboard/analytics/AuswertungToolbar.tsx
 "use client";
 
-import { Popover, Text } from "@mantine/core";
+import { Popover, Switch, Text } from "@mantine/core";
 import { DatePicker as MantineCalendar } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
 import dayjs from "dayjs";
@@ -86,6 +86,7 @@ export default function AuswertungToolbar() {
 					/>
 				</div>
 				<div className={classes.weekNav}>
+					<Switch size="sm" label="Inaktive Benutzer einbeziehen" checked={filters.includeInactive} onChange={(event) => setFilter({ includeInactive: event.currentTarget.checked })} />
 					<IconButton size="lg" colorVariant="tertiary" onClick={() => stepWeek(-1)} aria-label="Vorherige Woche">
 						<Icon name="chevron_left" />
 					</IconButton>

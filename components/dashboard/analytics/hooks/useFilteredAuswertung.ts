@@ -59,13 +59,14 @@ export function useFilteredAuswertung(): UseFilteredAuswertungResult {
 	const hasActiveFilters = !!filters.search.trim();
 
 	const filteredRows = useMemo(() => {
+		const activeFiltered = filters.includeInactive ? rows : rows.filter((row) => row.isActive);
 		const query = filters.search.trim();
 		const matchedIds = query.length > 0 ? new Set(fuseIndex.search(query).map((hit) => hit.item.userId)) : null;
 
-		const filtered = matchedIds ? rows.filter((row) => matchedIds.has(row.userId)) : [...rows];
+		const filtered = matchedIds ? activeFiltered.filter((row) => matchedIds.has(row.userId)) : [...activeFiltered];
 
 		return filtered.sort((a, b) => a.name.localeCompare(b.name));
-	}, [rows, filters.search, fuseIndex]);
+	}, [rows, filters.search, filters.includeInactive, fuseIndex]);
 
 	return { rows: filteredRows, hasActiveFilters, matchCount: filteredRows.length };
 }

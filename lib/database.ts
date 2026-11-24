@@ -460,18 +460,21 @@ function httpError(message: string, statusCode: number): Error & { statusCode: n
 
 /**
  * Assert that `targetUserId` may be assigned an entry by `actorId`: the target profile must
- * exist and belong to the same monday account as the actor.
+ * exist, be active (`is_active = true`), and belong to the same monday account as the actor.
  *
- * @throws Error with `statusCode` 400 ("Ungültiger Benutzer") otherwise.
+ * @throws Error with `statusCode` 400 otherwise.
  */
 async function assertAssignableUser(actorId: string, targetUserId: string): Promise<void> {
-	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, monday_account_id").in("id", [actorId, targetUserId]);
+	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, monday_account_id, is_active").in("id", [actorId, targetUserId]);
 	if (error) throw error;
 
 	const actor = data?.find((p) => p.id === actorId);
 	const target = data?.find((p) => p.id === targetUserId);
 	if (!actor || !target || actor.monday_account_id !== target.monday_account_id) {
 		throw httpError("Ungültiger Benutzer", 400);
+	}
+	if (target.is_active === false) {
+		throw httpError("Inaktiver Benutzer kann nicht zugewiesen werden", 400);
 	}
 }
 

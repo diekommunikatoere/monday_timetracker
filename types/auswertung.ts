@@ -43,6 +43,7 @@ export interface AuswertungUserRow {
 	userId: string;
 	name: string;
 	photoUrl?: string | null;
+	isActive: boolean;
 	billableSeconds: number;
 	nonBillableSeconds: number;
 	unassignedSeconds: number;

@@ -234,7 +234,17 @@ export default function EditTimeEntryModal({ show, onClose, entry, onSaved }: Ed
 							show: canManageOthers,
 							node: (
 								<Flex direction="column" gap={4}>
-									<UserSelect users={users} value={selectedUserId} onChange={setSelectedUserId} loading={loadingUsers} />
+									<UserSelect
+										users={users}
+										value={selectedUserId}
+										onChange={setSelectedUserId}
+										loading={loadingUsers}
+										fallbackUser={{
+											id: entry.user_id,
+											name: entry.user_name ?? null,
+											photoUrl: entry.user_photo_urls?.thumb_small ?? null,
+										}}
+									/>
 									{ownerChanged ? (
 										<Text size="xs" c="dimmed">
 											Neu zugewiesen: {nameOf(entry.user_id)} → {nameOf(selectedUserId)}

@@ -1,7 +1,7 @@
 // components/sidebar/ItemTimeEntriesView.tsx
 "use client";
 
-import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accordion, Avatar } from "@mantine/core";
+import { Flex, Text, Card, SimpleGrid, Group, Badge, Divider, ScrollArea, Accordion, Avatar, Switch } from "@mantine/core";
 import { useEffect, useState, useMemo } from "react";
 
 import { Icon } from "@/components";
@@ -69,6 +69,7 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 	const [pendingDelete, setPendingDelete] = useState<TimeEntry | null>(null);
 
 	const [open, setOpen] = useState<string[] | null>(null);
+	const [includeInactiveUsers, setIncludeInactiveUsers] = useState(false);
 
 	useEffect(() => {
 		setItemContext(itemId, boardId);
@@ -124,21 +125,24 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 		}
 	};
 
-	const groupedEntries = useMemo(() => {
-		const groups: Record<string, { userId: string; userName: string; userPhotoUrl: string | null; entries: TimeEntry[]; totalDuration: number }> = {};
+	const allGroupedEntries = useMemo(() => {
+		const groups: Record<string, { userId: string; userName: string; userPhotoUrl: string | null; isActive: boolean; entries: TimeEntry[]; totalDuration: number }> = {};
 		timeEntries.forEach((entry) => {
 			const userId = entry.user_id;
 			const userName = (entry as any).user_name || durationByUser[userId]?.userName || "Unbekannter Benutzer";
 			const userPhotoUrl = (entry as any).user_photo_urls?.thumb_small || null;
+			const isActive = durationByUser[userId]?.isActive ?? true;
 
 			if (!groups[userId]) {
-				groups[userId] = { userId, userName, userPhotoUrl, entries: [], totalDuration: 0 };
+				groups[userId] = { userId, userName, userPhotoUrl, isActive, entries: [], totalDuration: 0 };
 			}
 			groups[userId].entries.push(entry);
 			groups[userId].totalDuration += entry.duration;
 		});
 		return Object.values(groups).sort((a, b) => b.totalDuration - a.totalDuration);
 	}, [timeEntries, durationByUser]);
+
+	const groupedEntries = useMemo(() => (includeInactiveUsers ? allGroupedEntries : allGroupedEntries.filter((g) => g.isActive)), [allGroupedEntries, includeInactiveUsers]);
 
 	const columns = getSidebarColumns({
 		onEdit,
@@ -163,6 +167,12 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 			</SimpleGrid>
 
 			<Divider color="var(--color--border-layout)" m={"sm"} />
+
+			{allGroupedEntries.length > 0 && (
+				<Flex justify="flex-end" px="sm" pb="xs">
+					<Switch size="xs" label="Inaktive Benutzer einbeziehen" checked={includeInactiveUsers} onChange={(e) => setIncludeInactiveUsers(e.currentTarget.checked)} />
+				</Flex>
+			)}
 
 			{/* Grouped Tables */}
 			<ScrollArea style={{ flex: 1 }}>
@@ -189,6 +199,11 @@ export function ItemTimeEntriesView({ timeEntries, itemId, boardId, onEdit }: It
 												{group.userName.charAt(0)}
 											</Avatar>
 											<Text fw={600}>{group.userName}</Text>
+											{!group.isActive && (
+												<Badge size="xs" color="gray" variant="light">
+													Inaktiv
+												</Badge>
+											)}
 										</Flex>
 										<Badge variant="light" size="md" style={{ pointerEvents: "none" }} classNames={{ label: styles.badgeLabel }}>
 											{formatDuration(group.totalDuration)}
