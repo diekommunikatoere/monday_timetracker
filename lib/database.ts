@@ -601,9 +601,9 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
  * (per-user keys aren't worth caching; the whole set is invalidated on every
  * write anyway).
  *
- * The RPC excludes the live running timer server-side (`timer_state <>
- * 'running'`) but still includes other non-finalized entries (paused/parked
- * drafts) — the entries table uses `timer_state` to render draft-row styling.
+ * The RPC returns only `finalized` and `parked` (saved draft) entries; live
+ * timers (`running`/`paused`) are excluded server-side. The entries table uses
+ * `timer_state` to render draft-row styling for parked rows.
  * Each row also carries a `total_count` column (identical on every row via
  * `COUNT(*) OVER()`); it's only used internally to drive the loop and is
  * otherwise ignored by the {@link TimeEntry} type.
