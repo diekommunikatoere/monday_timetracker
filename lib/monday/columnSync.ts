@@ -10,8 +10,8 @@
  *   — fetching and filtering board columns for sync configuration.
  * - {@link updateColumnValue} / {@link updateColumnValueWithRetry}
  *   — writing a value to a specific monday.com column with optional exponential-backoff retry.
- * - {@link formatTimeValue} / {@link formatTimeByRoleBreakdown} / {@link formatBudgetValue}
- *   — formatting helpers for the three sync-purpose value types.
+ * - {@link formatTimeValue} / {@link formatTimeByRoleBreakdown}
+ *   — formatting helpers for synced time value types.
  * - {@link invalidateColumnsCache} — cache invalidation after column schema changes.
  *
  * Column compatibility metadata ({@link COMPATIBLE_COLUMN_TYPES}) and purpose helpers
@@ -387,31 +387,6 @@ export function formatTimeByRoleBreakdown(breakdown: Array<{ roleName: string; t
 	}
 
 	return lines.join("\n");
-}
-
-/**
- * Formats a remaining-budget monetary value as a currency string.
- *
- * Defaults to the Euro symbol (`"€"`). Negative values are prefixed with `"-"`;
- * when `showNegative` is `false`, negatives are clamped to `"€0"`.
- *
- * **Note**: the currency symbol is a display-only hint — no exchange-rate logic is applied.
- *
- * @param remaining                   - Budget amount (may be negative for over-budget). // Monetary value
- * @param options.currencySymbol      - Symbol prepended to the formatted value. Default: `"€"`.
- * @param options.showNegative        - If `false`, values below zero are shown as `<symbol>0`. Default: `true`.
- * @returns Formatted string, e.g. `"€1234.56"`, `"-€23.00"`, or `"€0"`.
- */
-export function formatBudgetValue(remaining: number, options: { currencySymbol?: string; showNegative?: boolean } = {}): string {
-	const { currencySymbol = "€", showNegative = true } = options;
-
-	if (remaining < 0 && !showNegative) {
-		return `${currencySymbol}0`;
-	}
-
-	const formatted = Math.abs(remaining).toFixed(2);
-	const prefix = remaining < 0 ? "-" : "";
-	return `${prefix}${currencySymbol}${formatted}`;
 }
 
 // ============================================
