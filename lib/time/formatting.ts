@@ -1,4 +1,4 @@
-// lib/time/formatting.ts
+import { ceilToMinute } from "./calculations";
 // Display-layer time formatting helpers.
 //
 // UNIT TRAP: formatTime() accepts MILLISECONDS; every other function in this
@@ -102,26 +102,15 @@ export function formatTime(seconds: number): string {
 }
 
 /**
- * Applies the minimum-billing-unit rule to a duration: any non-zero duration
- * shorter than one minute is bumped up to exactly 60 seconds.
+ * Rounds a duration in **seconds** up to whole minutes via {@link ceilToMinute}:
+ * - `≤ 0` → `0` (zero stays zero — no billable time).
+ * - `> 0` → `Math.ceil(seconds / 60) * 60` (`1–60 → 60`, `61–120 → 120`, …).
  *
- * Business rules (from the implementation):
- * - `0` → `0` (zero stays zero — no billable time).
- * - `1`–`59` → `60` (rounds **up** to 1 minute; never rounds down).
- * - `≥ 60` → unchanged.
- *
- * This is applied before writing a finalized `time_entry.duration` so that
- * very short accidental timer taps don't produce sub-minute entries. Call
- * before any column-sync write-back.
- *
- * @param seconds - Finalized entry duration in **seconds**.
- * @returns Duration in **seconds**, never between 1 and 59 inclusive.
+ * @param seconds - Entry duration in **seconds**.
+ * @returns Duration in **seconds**, always a non-negative multiple of `60`.
  */
 export function roundDuration(seconds: number): number {
-	if (seconds > 0 && seconds < 60) {
-		return 60;
-	}
-	return seconds;
+	return ceilToMinute(seconds);
 }
 
 /**

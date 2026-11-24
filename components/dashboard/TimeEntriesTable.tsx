@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Select, Pagination } from "@/components";
 import { useToast } from "@/components/ToastProvider";
 import { useHydration } from "@/lib/store-utils";
-import { secondsToDuration, formatTimeString } from "@/lib/utils";
+import { ceilToMinute, secondsToDuration, formatTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore, TIME_ENTRIES_PAGE_SIZES, DEFAULT_TIME_ENTRIES_PAGE_SIZE } from "@/stores/timeEntriesStore";
 import { useUserStore } from "@/stores/userStore";
@@ -327,8 +327,8 @@ export default function TimeEntriesTable({ onRefetch }: TimeEntriesTableProps) {
 								roleName: selectedDraft.role_name || "",
 								comment: selectedDraft.comment || "",
 								date: selectedDraft.start_time ? new Date(selectedDraft.start_time) : new Date(),
-								duration: secondsToDuration(selectedDraft.duration ?? 0),
-								startTime: selectedDraft.start_time ? formatTimeString(new Date(selectedDraft.start_time)) : undefined,
+								duration: secondsToDuration(ceilToMinute(selectedDraft.duration ?? 0)),
+								startTime: selectedDraft.end_time ? subtractSecondsFromTimeString(formatTimeString(new Date(selectedDraft.end_time)), ceilToMinute(selectedDraft.duration ?? 0)) : selectedDraft.start_time ? formatTimeString(new Date(selectedDraft.start_time)) : undefined,
 								endTime: selectedDraft.end_time ? formatTimeString(new Date(selectedDraft.end_time)) : undefined,
 							}
 						: undefined

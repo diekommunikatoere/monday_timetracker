@@ -13,7 +13,7 @@ import { ManualTimeEntryModal } from "@/components/features/timer/ManualTimeEntr
 import DeleteConfirmationDialog from "@/components/shared/time-entries/DeleteConfirmationDialog";
 import { useToast } from "@/components/ToastProvider";
 import { useTimeEntriesRefetch } from "@/contexts/TimeEntriesContext";
-import { endOfDay, endOfISOWeek, formatDuration, formatTime, formatTimeString, secondsToDuration, startOfDay, startOfISOWeek } from "@/lib/utils";
+import { ceilToMinute, endOfDay, endOfISOWeek, formatDuration, formatTime, formatTimeString, secondsToDuration, startOfDay, startOfISOWeek, subtractSecondsFromTimeString } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { TimeEntry } from "@/types/time-entry";
@@ -431,8 +431,8 @@ export function TimeEntriesCalendar() {
 								roleName: selectedDraft.role_name || "",
 								comment: selectedDraft.comment || "",
 								date: selectedDraft.start_time ? new Date(selectedDraft.start_time) : new Date(),
-								duration: secondsToDuration(selectedDraft.duration ?? 0),
-								startTime: selectedDraft.start_time ? formatTimeString(new Date(selectedDraft.start_time)) : undefined,
+								duration: secondsToDuration(ceilToMinute(selectedDraft.duration ?? 0)),
+								startTime: selectedDraft.end_time ? subtractSecondsFromTimeString(formatTimeString(new Date(selectedDraft.end_time)), ceilToMinute(selectedDraft.duration ?? 0)) : selectedDraft.start_time ? formatTimeString(new Date(selectedDraft.start_time)) : undefined,
 								endTime: selectedDraft.end_time ? formatTimeString(new Date(selectedDraft.end_time)) : undefined,
 							}
 						: undefined

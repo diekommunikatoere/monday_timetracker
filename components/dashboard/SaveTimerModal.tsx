@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 
 import { Button, Modal } from "@/components";
 import { useToast } from "@/components/ToastProvider";
-import { roundDuration, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
+import { ceilToMinute, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useTimerStore } from "@/stores/timerStore";
@@ -152,10 +152,10 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			setSelectedTask(null);
 			setSelectedRoleId("");
 			setLocalComment("");
-			const roundedSeconds = roundDuration(Math.floor(useTimerStore.getState().elapsedTime / 1000));
+			const ceiled = ceilToMinute(Math.floor(useTimerStore.getState().elapsedTime / 1000));
 			const now = getCurrentTimeString();
-			const start = subtractSecondsFromTimeString(now, roundedSeconds);
-			handlers.reset({ date: new Date(), duration: secondsToDuration(roundedSeconds), startTime: start, endTime: now, comment: "" }, "end", false);
+			const start = subtractSecondsFromTimeString(now, ceiled);
+			handlers.reset({ date: new Date(), duration: secondsToDuration(ceiled), startTime: start, endTime: now, comment: "" }, "end", false);
 		}
 	}, [show, initialData]); // eslint-disable-line react-hooks/exhaustive-deps
 
