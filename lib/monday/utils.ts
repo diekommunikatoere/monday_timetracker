@@ -53,8 +53,7 @@ export function isPurposeCompatible(columnType: string, purpose: SyncPurpose): b
  *
  * Use this predicate to decide whether to call {@link formatTimeValue} /
  * {@link formatTimeByRoleBreakdown} before invoking {@link updateColumnValue}.
- * Budget purposes (`"remaining_budget"`, `"budget_used"`) are monetary and use
- * {@link formatBudgetValue} instead.
+ * Budget purposes (`"remaining_budget"`, `"budget_used"`) are monetary whole-euro values.
  *
  * @param purpose - The {@link SyncPurpose} to test.
  * @returns `true` for `"total_time"` and `"time_by_role"`.

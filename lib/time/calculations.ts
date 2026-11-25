@@ -118,6 +118,21 @@ export const durationToSeconds = (timeStr: string): number => {
 };
 
 /**
+ * Rounds any positive duration in **seconds** up to the next whole minute:
+ * `0 → 0`, `1–60 → 60`, `61–120 → 120`, …
+ *
+ * Used when parking or finalizing a timer so sub-minute remainders always
+ * round up to whole minutes matching the `HH:MM` time-entry inputs.
+ *
+ * @param seconds - Duration in **seconds**.
+ * @returns Duration in **seconds**, always a non-negative multiple of `60`.
+ */
+export const ceilToMinute = (seconds: number): number => {
+	if (seconds <= 0) return 0;
+	return Math.ceil(seconds / 60) * 60;
+};
+
+/**
  * Converts a duration in **seconds** to a zero-padded `"HH:MM"` string.
  *
  * Hours are not capped — `90000` s → `"25:00"`. Use this for duration

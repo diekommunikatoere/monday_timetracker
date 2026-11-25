@@ -1,17 +1,18 @@
 // components/dashboard/SaveTimerModal.tsx
 "use client";
 
-import { Flex, Text, Group, Switch } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { Alert, Flex, Text, Group, Switch } from "@mantine/core";
+import { useState, useEffect, useMemo } from "react";
 
-import { Button, Modal } from "@/components";
+import { Button, Icon, Modal } from "@/components";
 import { useToast } from "@/components/ToastProvider";
-import { roundDuration, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
+import { ceilToMinute, combineDateAndTime, durationToSeconds, secondsToDuration, getCurrentTimeString, subtractSecondsFromTimeString } from "@/lib/utils";
 import { useMondayStore } from "@/stores/mondayStore";
 import { useTimeEntriesStore } from "@/stores/timeEntriesStore";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUserStore } from "@/stores/userStore";
 
+import { useEntryEditSession } from "../shared/hooks/useEntryEditSession";
 import { useRoles } from "../shared/hooks/useRoles";
 import { useTimeEntryForm } from "../shared/hooks/useTimeEntryForm";
 import { TimeEntryFormFields } from "../shared/time-entries/TimeEntryFormFields";
@@ -124,6 +125,25 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 	const comment = initialData ? localComment : globalComment;
 	const setComment = initialData ? setLocalComment : setGlobalComment;
 
+	const dirty = useMemo(() => {
+		if (!show) return false;
+		if (initialData) {
+			return (
+				localComment !== (initialData.comment || "") ||
+				values.duration !== (initialData.duration || "00:00") ||
+				(initialData.startTime ? values.startTime !== initialData.startTime : false) ||
+				(initialData.endTime ? values.endTime !== initialData.endTime : false) ||
+				(selectedTask?.boardId || "") !== (initialData.taskSelection?.boardId || "") ||
+				(selectedTask?.itemId || "") !== (initialData.taskSelection?.itemId || "") ||
+				selectedRoleId !== (initialData.roleId || "")
+			);
+		}
+		return Boolean(selectedTask?.itemId || selectedRoleId);
+	}, [show, initialData, localComment, values.duration, values.startTime, values.endTime, selectedTask, selectedRoleId]);
+
+	const { takenOverBy, connectionLost } = useEntryEditSession(initialData?.entryId ?? null, show, dirty);
+	const isReadOnly = Boolean(takenOverBy);
+
 	// Initialize the form when the modal opens (live timer vs reopened draft).
 	useEffect(() => {
 		if (!show) return;
@@ -152,10 +172,10 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			setSelectedTask(null);
 			setSelectedRoleId("");
 			setLocalComment("");
-			const roundedSeconds = roundDuration(Math.floor(useTimerStore.getState().elapsedTime / 1000));
+			const ceiled = ceilToMinute(Math.floor(useTimerStore.getState().elapsedTime / 1000));
 			const now = getCurrentTimeString();
-			const start = subtractSecondsFromTimeString(now, roundedSeconds);
-			handlers.reset({ date: new Date(), duration: secondsToDuration(roundedSeconds), startTime: start, endTime: now, comment: "" }, "end", false);
+			const start = subtractSecondsFromTimeString(now, ceiled);
+			handlers.reset({ date: new Date(), duration: secondsToDuration(ceiled), startTime: start, endTime: now, comment: "" }, "end", false);
 		}
 	}, [show, initialData]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -253,9 +273,20 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 			<Modal.Header>Zeiteintrag speichern</Modal.Header>
 			<Modal.Body>
 				<Flex direction="column" gap="md">
+					{takenOverBy && (
+						<Alert color="red" icon={<Icon name="lock" size={18} />}>
+							{takenOverBy} hat die Bearbeitung übernommen. Deine nicht gespeicherten Änderungen wurden nicht gespeichert.
+						</Alert>
+					)}
+					{!takenOverBy && connectionLost && (
+						<Alert color="yellow" icon={<Icon name="wifi_off" size={18} />}>
+							Verbindung unterbrochen. Andere sehen gerade nicht, dass du diesen Eintrag bearbeitest.
+						</Alert>
+					)}
 					{error && <Text c="dki-error">{error}</Text>}
 
 					<TimeEntryFormFields
+						readOnly={isReadOnly}
 						date={values.date}
 						onDateChange={handlers.setDate}
 						duration={values.duration}
@@ -294,6 +325,7 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 										show: true,
 										node: (
 											<TaskItemSelector
+												disabled={isReadOnly}
 												onSelectionChange={setSelectedTask}
 												initialValues={
 													selectedTask
@@ -319,17 +351,25 @@ export default function SaveTimerModal({ show, onClose, initialData }: SaveTimer
 						}}
 					/>
 
-					<Flex justify="space-between" align="center" gap="sm" wrap="wrap" mt="md">
-						<Switch label="Als Entwurf speichern" checked={asDraft} onChange={(event) => setAsDraft(event.currentTarget.checked)} />
-						<Group justify="flex-end">
+					{isReadOnly ? (
+						<Group justify="flex-end" mt="md">
 							<Button variant="default" onClick={onClose}>
-								Abbrechen
-							</Button>
-							<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) || isSaving} loading={isSaving}>
-								{isSaving ? "Speichern..." : "Speichern"}
+								Schließen
 							</Button>
 						</Group>
-					</Flex>
+					) : (
+						<Flex justify="space-between" align="center" gap="sm" wrap="wrap" mt="md">
+							<Switch label="Als Entwurf speichern" checked={asDraft} onChange={(event) => setAsDraft(event.currentTarget.checked)} />
+							<Group justify="flex-end">
+								<Button variant="default" onClick={onClose}>
+									Abbrechen
+								</Button>
+								<Button onClick={handleSave} disabled={(!asDraft && (!selectedTask?.itemId || !selectedTask?.boardId || !selectedRoleId)) || isSaving} loading={isSaving}>
+									{isSaving ? "Speichern..." : "Speichern"}
+								</Button>
+							</Group>
+						</Flex>
+					)}
 				</Flex>
 			</Modal.Body>
 		</Modal>

@@ -3,6 +3,7 @@ import { Flex, Text, Badge } from "@mantine/core";
 
 import { TimeEntry } from "@/types/time-entry";
 
+import { EntryEditLockIcon } from "../../hooks/useEntryEditLock";
 import { TimeEntryRowMenu } from "../TimeEntryRowMenu";
 
 /**
@@ -46,6 +47,7 @@ export function TaskCell({ entry, onEdit, onDelete, onSaveDraft, style }: TaskCe
 				<Text size="sm" fw={500} truncate>
 					{entry.item_name || entry.task_name || "-"}
 				</Text>
+				<EntryEditLockIcon entryId={entry.id} />
 				<Text size="xs" style={{ fontStyle: "italic", color: "var(--color--text-secondary)" }}>
 					{entry.parent_item_name || ""}
 				</Text>

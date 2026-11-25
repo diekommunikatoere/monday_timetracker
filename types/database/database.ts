@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.1"
   }
   graphql_public: {
     Tables: {
@@ -768,6 +768,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_active: boolean
           is_admin: boolean | null
           monday_account_id: string
           monday_user_id: string
@@ -781,6 +782,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean
           is_admin?: boolean | null
           monday_account_id: string
           monday_user_id: string
@@ -794,6 +796,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean
           is_admin?: boolean | null
           monday_account_id?: string
           monday_user_id?: string

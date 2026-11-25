@@ -98,11 +98,11 @@ export async function removeGrant(id: string): Promise<void> {
 }
 
 /**
- * Users of one monday account, sorted by name. Source for every user picker
+ * Active users of one monday account, sorted by name. Source for every user picker
  * (never the monday API — only people who have opened the app have a profile).
  */
 export async function listAccountUsers(accountId: string): Promise<AccountUser[]> {
-	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, name, photo_urls").eq("monday_account_id", accountId).order("name", { ascending: true });
+	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, name, photo_urls").eq("monday_account_id", accountId).eq("is_active", true).order("name", { ascending: true });
 	if (error) {
 		console.error("Error listing account users:", error);
 		throw error;

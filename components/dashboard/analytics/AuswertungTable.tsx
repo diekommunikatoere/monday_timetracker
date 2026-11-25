@@ -1,7 +1,7 @@
 // components/dashboard/analytics/AuswertungTable.tsx
 "use client";
 
-import { Table, Center, Loader, Text, Avatar, Group, ActionIcon, Stack, Box, SimpleGrid, Card } from "@mantine/core";
+import { Table, Center, Loader, Text, Avatar, Badge, Group, ActionIcon, Stack, Box, SimpleGrid, Card } from "@mantine/core";
 import { Fragment, useMemo, useState } from "react";
 
 import { Icon } from "@/components";
@@ -94,6 +94,11 @@ export function AuswertungTable({ items, loading, error }: AuswertungTableProps)
 						<Text fw={500} size="sm" title={row.name}>
 							{row.name}
 						</Text>
+						{!row.isActive && (
+							<Badge size="xs" color="gray" variant="light">
+								Inaktiv
+							</Badge>
+						)}
 					</Group>
 				),
 			},

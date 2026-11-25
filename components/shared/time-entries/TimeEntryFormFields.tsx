@@ -101,6 +101,8 @@ export interface TimeEntryFormFieldsProps {
 		loading?: boolean;
 		required?: boolean;
 	};
+	/** When `true` (e.g. after edit takeover), freezes controls while keeping text selectable/copyable. */
+	readOnly?: boolean;
 }
 
 /**
@@ -162,12 +164,13 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 		userSelector,
 		taskSelector,
 		roleSelector,
+		readOnly = false,
 	} = props;
 
 	// Disabled-state matrix (see spec): a locked anchor field is read-only unless
 	// the duration is locked (then the window slides and both times are editable).
-	const startInputDisabled = startLocked;
-	const endInputDisabled = endLocked;
+	const startInputDisabled = startLocked && !readOnly;
+	const endInputDisabled = endLocked && !readOnly;
 
 	return (
 		<Flex direction="column" gap="md">
@@ -176,37 +179,39 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 				<TimeInput
 					label="Startzeit"
 					value={startTime}
-					onChange={(event) => onStartTimeChange(event.currentTarget.value)}
+					onChange={(event) => !readOnly && onStartTimeChange(event.currentTarget.value)}
 					disabled={startInputDisabled}
+					readOnly={readOnly}
 					leftSection={
 						onStartTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen" disabled={startInputDisabled}>
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onStartTimeNowClick} aria-label="Startzeit auf jetzt setzen" disabled={startInputDisabled || readOnly}>
 									<Icon name="schedule" size={18} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
 					}
-					rightSection={<LockButton active={startLocked} disabled={durationLocked} onToggle={onStartLockToggle} tooltip={startLocked ? "Startzeit entsperren" : "Startzeit sperren"} ariaLabel="Startzeit sperren" />}
+					rightSection={<LockButton active={startLocked} disabled={durationLocked || readOnly} onToggle={onStartLockToggle} tooltip={startLocked ? "Startzeit entsperren" : "Startzeit sperren"} ariaLabel="Startzeit sperren" />}
 					className={styles.inputTime}
 					style={{ flex: 1 }}
 				/>
 				<TimeInput
 					label="Endzeit"
 					value={endTime}
-					onChange={(event) => onEndTimeChange(event.currentTarget.value)}
+					onChange={(event) => !readOnly && onEndTimeChange(event.currentTarget.value)}
 					style={{ flex: 1 }}
 					disabled={endInputDisabled}
+					readOnly={readOnly}
 					leftSection={
 						onEndTimeNowClick ? (
 							<Tooltip label="Jetzt" position="top" withArrow>
-								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen" disabled={endInputDisabled}>
+								<IconButton variant="filled" colorVariant="tertiary" onClick={onEndTimeNowClick} aria-label="Endzeit auf jetzt setzen" disabled={endInputDisabled || readOnly}>
 									<Icon name="schedule" size={18} color="var(--color--text-secondary)" />
 								</IconButton>
 							</Tooltip>
 						) : undefined
 					}
-					rightSection={<LockButton active={endLocked} disabled={durationLocked} onToggle={onEndLockToggle} tooltip={endLocked ? "Endzeit entsperren" : "Endzeit sperren"} ariaLabel="Endzeit sperren" />}
+					rightSection={<LockButton active={endLocked} disabled={durationLocked || readOnly} onToggle={onEndLockToggle} tooltip={endLocked ? "Endzeit entsperren" : "Endzeit sperren"} ariaLabel="Endzeit sperren" />}
 					className={styles.inputTime}
 				/>
 			</Flex>
@@ -217,9 +222,10 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					label="Dauer"
 					required
 					value={duration}
-					onChange={(event) => onDurationChange(event.currentTarget.value)}
-					disabled={durationLocked}
-					rightSection={<LockButton active={durationLocked} onToggle={onDurationLockToggle} tooltip={durationLocked ? "Dauer entsperren" : "Dauer sperren"} ariaLabel="Dauer sperren" disabled={false} />}
+					onChange={(event) => !readOnly && onDurationChange(event.currentTarget.value)}
+					disabled={durationLocked && !readOnly}
+					readOnly={readOnly}
+					rightSection={<LockButton active={durationLocked} onToggle={onDurationLockToggle} tooltip={durationLocked ? "Dauer entsperren" : "Dauer sperren"} ariaLabel="Dauer sperren" disabled={readOnly} />}
 					className={styles.inputDuration}
 					style={{ flex: 2 }}
 				/>
@@ -228,8 +234,9 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 					placeholder="Datum auswählen"
 					value={date}
 					onChange={(newDate) => {
-						if (newDate) onDateChange(new Date(newDate));
+						if (newDate && !readOnly) onDateChange(new Date(newDate));
 					}}
+					disabled={readOnly}
 					valueFormat="DD.MM.YYYY"
 					leftSection={<Icon name="calendar_today" size={18} color="var(--color--text-placeholder)" />}
 					leftSectionPointerEvents="none"
@@ -247,7 +254,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 								key={`add-${a.label}-${idx}`}
 								size="sm"
 								variant={a.variant || "default"}
-								disabled={durationLocked}
+								disabled={durationLocked || readOnly}
 								style={{
 									flex: 1,
 									borderRadius: idx === 0 ? "5px 0 0 5px" : idx === (quickAdjustments.add?.length || 1) - 1 ? "0 5px 5px 0" : "0",
@@ -264,7 +271,7 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 								key={`sub-${a.label}-${idx}`}
 								size="sm"
 								variant={a.variant || "default"}
-								disabled={durationLocked}
+								disabled={durationLocked || readOnly}
 								style={{
 									flex: 1,
 									borderRadius: idx === 0 ? "5px 0 0 5px" : "0 5px 5px 0",
@@ -285,10 +292,10 @@ export function TimeEntryFormFields(props: TimeEntryFormFieldsProps) {
 			{taskSelector?.show ? taskSelector.node : null}
 
 			{/* Role selector */}
-			{roleSelector?.show && <RoleSelector roles={roleSelector.roles} selectedRoleId={roleSelector.selectedRoleId} onChange={roleSelector.onRoleChange} loading={roleSelector.loading} required={roleSelector.required} />}
+			{roleSelector?.show && <RoleSelector roles={roleSelector.roles} selectedRoleId={roleSelector.selectedRoleId} onChange={roleSelector.onRoleChange} loading={roleSelector.loading} required={roleSelector.required} disabled={readOnly} />}
 
 			{/* Comment */}
-			<Input label="Kommentar" value={comment} onChange={(event) => onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
+			<Input label="Kommentar" value={comment} readOnly={readOnly} onChange={(event) => !readOnly && onCommentChange(event.currentTarget.value)} placeholder="Kommentar hinzufügen..." />
 		</Flex>
 	);
 }

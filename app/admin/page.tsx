@@ -11,6 +11,7 @@ import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import { Button, IconButton, IconLink, LoadingState, ErrorState, Icon, Input } from "@/components";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { SentinelTab } from "@/components/admin/SentinelTab";
+import { UsersTab } from "@/components/admin/UsersTab";
 import { Logo } from "@/components/Logo";
 import { canAccessRoute } from "@/lib/permissions";
 import { useMondayStore } from "@/stores/mondayStore";
@@ -27,6 +28,7 @@ const DEFAULT_WORKSPACE_ID = "__default__";
 const ADMIN_TABS = [
 	{ value: "boards", label: "Boards" },
 	{ value: "rollen", label: "Rollen" },
+	{ value: "benutzer", label: "Benutzer" },
 	{ value: "berechtigungen", label: "Berechtigungen" },
 	{ value: "sentinel", label: "Sentinel" },
 ] as const;
@@ -1504,6 +1506,10 @@ function AdminPageContent() {
 							</div>
 						)}
 					</div>
+				</Tabs.Panel>
+
+				<Tabs.Panel value="benutzer">
+					<UsersTab />
 				</Tabs.Panel>
 
 				<Tabs.Panel value="berechtigungen">

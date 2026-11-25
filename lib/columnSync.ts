@@ -817,11 +817,11 @@ async function computeColumnValues(itemId: string, boardId: string, mappings: Co
 					case "remaining_budget": {
 						const budgetResult = await budget();
 						if (budgetResult) {
-							value = budgetResult.remaining_budget.toFixed(2);
+							value = String(Math.round(budgetResult.remaining_budget));
 							console.log(`[ColumnSync] Calculated remaining_budget: ${value} (Total Cost: ${budgetResult.total_cost})`);
 						} else {
-							value = "0.00";
-							console.log(`[ColumnSync] Failed to calculate remaining_budget, defaulting to 0.00`);
+							value = "0";
+							console.log(`[ColumnSync] Failed to calculate remaining_budget, defaulting to 0`);
 						}
 						break;
 					}
@@ -829,11 +829,11 @@ async function computeColumnValues(itemId: string, boardId: string, mappings: Co
 					case "budget_used": {
 						const budgetResult = await budget();
 						if (budgetResult) {
-							value = budgetResult.total_cost.toFixed(2);
+							value = String(Math.round(budgetResult.total_cost));
 							console.log(`[ColumnSync] Calculated budget_used (Total Cost): ${value}`);
 						} else {
-							value = "0.00";
-							console.log(`[ColumnSync] Failed to calculate budget_used, defaulting to 0.00`);
+							value = "0";
+							console.log(`[ColumnSync] Failed to calculate budget_used, defaulting to 0`);
 						}
 						break;
 					}

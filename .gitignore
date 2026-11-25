@@ -49,6 +49,7 @@ next-env.d.ts
 
 # kilocode
 .kilocode/package-lock.json
+.kilo/*
 
 # superpowers subagent-driven-development scratch workspace
 .superpowers/

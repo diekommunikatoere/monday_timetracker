@@ -16,13 +16,17 @@ import styles from "@/components/styles/ui/tables/Table.module.css";
 import type { AbrechnungBudgetItem, AbrechnungLinkedItem, AbrechnungThirdPartyItem, AbrechnungRoleBreakdown, AbrechnungTableRow } from "@/types/abrechnung";
 
 /**
- * Formats a euro amount for display, matching the `€{value.toFixed(2)}`
- * convention used elsewhere in the admin UI (e.g. role hourly rates).
- * Returns an em dash for `null` (no budget configured / no linked items).
+ * Formats a euro amount for display, rounded to whole euros (`Math.round`).
+ * Returns an en dash for `null` (no budget configured / no linked items).
  */
 function formatEuro(value: number | null): string {
 	if (value === null) return "–";
-	return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(value);
+	return new Intl.NumberFormat("de-DE", {
+		style: "currency",
+		currency: "EUR",
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0,
+	}).format(Math.round(value));
 }
 
 /**

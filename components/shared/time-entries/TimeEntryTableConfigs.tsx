@@ -1,10 +1,11 @@
 // components/shared/time-entries/TimeEntryTableConfigs.tsx
-import { Checkbox, Text } from "@mantine/core";
+import { Checkbox, Flex, Text } from "@mantine/core";
 
 import { ColumnDef } from "@/components/ui/tables/types";
 import { formatDuration } from "@/lib/utils";
 import { TimeEntry } from "@/types/time-entry";
 
+import { EntryEditLockIcon } from "../hooks/useEntryEditLock";
 import { RoleCell } from "./columns/RoleCell";
 import { TaskCell } from "./columns/TaskCell";
 import { TimeRangeCell } from "./columns/TimeRangeCell";
@@ -172,9 +173,12 @@ export const getSidebarColumns = ({ onEdit, onDelete, onSaveDraft }: ConfigOptio
 		header: "Dauer",
 		minWidth: 80,
 		cell: ({ row }) => (
-			<Text size="sm" fw={600}>
-				{formatDuration(row.duration)}
-			</Text>
+			<Flex align="center" gap={6}>
+				<Text size="sm" fw={600}>
+					{formatDuration(row.duration)}
+				</Text>
+				<EntryEditLockIcon entryId={row.id} />
+			</Flex>
 		),
 	},
 	{

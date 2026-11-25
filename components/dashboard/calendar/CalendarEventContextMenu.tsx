@@ -4,6 +4,7 @@
 import { Menu } from "@mantine/core";
 
 import { Icon } from "@/components";
+import { EditLockMenuItem } from "@/components/shared/hooks/useEntryEditLock";
 import { useTimeEntryPermissions } from "@/components/shared/hooks/useTimeEntryPermissions";
 import { useUserStore } from "@/stores/userStore";
 import { TimeEntry } from "@/types/time-entry";
@@ -53,7 +54,7 @@ export function CalendarEventContextMenu({ entry, position, onClose, onEdit, onS
 	const isEditable = entry.timer_state === "finalized" || entry.timer_state === "parked";
 
 	return (
-		<Menu opened onClose={onClose} position="bottom-start" withinPortal styles={{ dropdown: { backgroundColor: "var(--color--background-primary)", borderColor: "var(--color--border-ui)", boxShadow: "var(--box-shadow--md)" } }}>
+		<Menu opened onClose={onClose} width={180} position="bottom-start" withinPortal styles={{ dropdown: { backgroundColor: "var(--color--background-primary)", borderColor: "var(--color--border-ui)", boxShadow: "var(--box-shadow--md)" } }}>
 			<Menu.Target>
 				<div style={{ position: "fixed", top: position.y, left: position.x, width: 0, height: 0 }} />
 			</Menu.Target>
@@ -61,28 +62,28 @@ export function CalendarEventContextMenu({ entry, position, onClose, onEdit, onS
 			<Menu.Dropdown>
 				{isDraft && canEdit ? (
 					<>
-						<Menu.Item
-							leftSection={<Icon name="save" size={18} />}
-							onClick={() => {
+						<EditLockMenuItem
+							entryId={entry.id}
+							defaultLabel="Zuweisen"
+							defaultIcon="save"
+							onTrigger={() => {
 								onSaveDraft(entry);
 								onClose();
 							}}
-						>
-							Zuweisen
-						</Menu.Item>
+						/>
 						<Menu.Divider />
 					</>
 				) : null}
 				{isEditable && canEdit ? (
-					<Menu.Item
-						leftSection={<Icon name="edit" size={18} />}
-						onClick={() => {
+					<EditLockMenuItem
+						entryId={entry.id}
+						defaultLabel="Bearbeiten"
+						defaultIcon="edit"
+						onTrigger={() => {
 							onEdit(entry);
 							onClose();
 						}}
-					>
-						Bearbeiten
-					</Menu.Item>
+					/>
 				) : null}
 				{canDelete ? (
 					<Menu.Item

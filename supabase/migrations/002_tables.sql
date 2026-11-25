@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     email TEXT,
     name TEXT,
     team_ids TEXT[] DEFAULT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

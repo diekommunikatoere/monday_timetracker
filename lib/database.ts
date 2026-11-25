@@ -460,18 +460,21 @@ function httpError(message: string, statusCode: number): Error & { statusCode: n
 
 /**
  * Assert that `targetUserId` may be assigned an entry by `actorId`: the target profile must
- * exist and belong to the same monday account as the actor.
+ * exist, be active (`is_active = true`), and belong to the same monday account as the actor.
  *
- * @throws Error with `statusCode` 400 ("Ungültiger Benutzer") otherwise.
+ * @throws Error with `statusCode` 400 otherwise.
  */
 async function assertAssignableUser(actorId: string, targetUserId: string): Promise<void> {
-	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, monday_account_id").in("id", [actorId, targetUserId]);
+	const { data, error } = await supabaseAdmin.from("user_profiles").select("id, monday_account_id, is_active").in("id", [actorId, targetUserId]);
 	if (error) throw error;
 
 	const actor = data?.find((p) => p.id === actorId);
 	const target = data?.find((p) => p.id === targetUserId);
 	if (!actor || !target || actor.monday_account_id !== target.monday_account_id) {
 		throw httpError("Ungültiger Benutzer", 400);
+	}
+	if (target.is_active === false) {
+		throw httpError("Inaktiver Benutzer kann nicht zugewiesen werden", 400);
 	}
 }
 
@@ -598,9 +601,9 @@ export async function deleteTimeEntry(id: string, userId: string): Promise<void>
  * (per-user keys aren't worth caching; the whole set is invalidated on every
  * write anyway).
  *
- * The RPC excludes the live running timer server-side (`timer_state <>
- * 'running'`) but still includes other non-finalized entries (paused/parked
- * drafts) — the entries table uses `timer_state` to render draft-row styling.
+ * The RPC returns only `finalized` and `parked` (saved draft) entries; live
+ * timers (`running`/`paused`) are excluded server-side. The entries table uses
+ * `timer_state` to render draft-row styling for parked rows.
  * Each row also carries a `total_count` column (identical on every row via
  * `COUNT(*) OVER()`); it's only used internally to drive the loop and is
  * otherwise ignored by the {@link TimeEntry} type.

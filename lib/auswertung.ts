@@ -27,6 +27,7 @@ interface UserProfileForAuswertung {
 	id: string;
 	name: string | null;
 	photo_urls: unknown;
+	is_active: boolean;
 }
 
 /** Best-effort extraction of a small avatar URL from the `photo_urls` jsonb bag; tolerates any shape. */
@@ -66,7 +67,7 @@ export async function getAuswertungData(range: AuswertungDateRange): Promise<Aus
 	// generated file; `GetUsersTimeByRoleResult` (types/database/database.types.ts)
 	// still gives the response its real shape.
 	const [usersResult, rowsResult] = await Promise.all([
-		supabaseAdmin.from("user_profiles").select("id, name, photo_urls").order("name") as unknown as Promise<{ data: UserProfileForAuswertung[] | null; error: any }>,
+		supabaseAdmin.from("user_profiles").select("id, name, photo_urls, is_active").order("name") as unknown as Promise<{ data: UserProfileForAuswertung[] | null; error: any }>,
 		(supabaseAdmin.rpc as any)("get_users_time_by_role", { p_start_date: range.startDate, p_end_date: range.endDate }) as Promise<{ data: GetUsersTimeByRoleResult[] | null; error: any }>,
 	]);
 
@@ -122,6 +123,7 @@ export async function getAuswertungData(range: AuswertungDateRange): Promise<Aus
 			userId: user.id,
 			name: user.name || "Unbekannt",
 			photoUrl: extractPhotoUrl(user.photo_urls),
+			isActive: user.is_active !== false,
 			billableSeconds,
 			nonBillableSeconds,
 			unassignedSeconds,
